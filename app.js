@@ -37,12 +37,8 @@ const CLASS_NAMES = [
   'Artist',
   'Aeromancer',
   'Breaker',
-  'Valkyrie'
+  'Valkyrie',
 ];
-
-/* -------------------------------------------------------
-   STATE
-------------------------------------------------------- */
 
 function loadState() {
   try {
@@ -52,12 +48,12 @@ function loadState() {
       ? x
       : {
           characters: [],
-          testCharacter: null
+          testCharacter: null,
         };
   } catch {
     return {
       characters: [],
-      testCharacter: null
+      testCharacter: null,
     };
   }
 }
@@ -66,34 +62,24 @@ function save() {
   localStorage.setItem(KEY, JSON.stringify(state));
 }
 
-/* -------------------------------------------------------
-   GENERAL HELPERS
-------------------------------------------------------- */
-
 function esc(v) {
-  return String(v ?? '').replace(
-    /[&<>\"']/g,
-    (c) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '\"': '&quot;',
-      "'": '&#39;'
-    })[c]
-  );
+  return String(v ?? '').replace(/[&<>\"']/g, (c) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }[c]));
 }
 
 function fmt(v) {
   return v == null || v === ''
     ? '—'
     : Number(v).toLocaleString(undefined, {
-        maximumFractionDigits: 2
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
       });
 }
-
-/* -------------------------------------------------------
-   BIBLE URL VALIDATION
-------------------------------------------------------- */
 
 function bibleUrl(v) {
   try {
@@ -114,16 +100,12 @@ function bibleUrl(v) {
     return {
       url: u.href,
       region: parts[1],
-      name: decodeURIComponent(parts.slice(2).join('/'))
+      name: decodeURIComponent(parts.slice(2).join('/')),
     };
   } catch {
     return null;
   }
 }
-
-/* -------------------------------------------------------
-   TEXT PARSING HELPERS
-------------------------------------------------------- */
 
 function linesFromDoc(doc) {
   return (doc.body?.textContent || '')
@@ -131,125 +113,6 @@ function linesFromDoc(doc) {
     .map((x) => x.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
-
-function cleanNumber(value) {
-  if (value == null) return null;
-
-  const normalized = String(value)
-    .replace(/,/g, '')
-    .replace(/≈/g, '')
-    .replace(/[^\d.]/g, '');
-
-  if (!normalized) return null;
-
-  const number = Number(normalized);
-
-  return Number.isFinite(number) ? number : null;
-}
-
-function findValueAfterLabel(lines, label, options = {}) {
-  const {
-    maxLookAhead = 8,
-    allowApproximation = true
-  } = options;
-
-  const labelRegex = new RegExp(`^${label}$`, 'i');
-
-  for (let i = 0; i < lines.length; i++) {
-    if (!labelRegex.test(lines[i])) continue;
-
-    for (
-      let j = i + 1;
-      j < Math.min(lines.length, i + 1 + maxLookAhead);
-      j++
-    ) {
-      const value = lines[j];
-
-      if (!value) continue;
-
-      const cleaned = cleanNumber(value);
-
-      if (cleaned != null) {
-        if (!allowApproximation && value.includes('≈')) {
-          continue;
-        }
-
-        return cleaned;
-      }
-    }
-  }
-
-  return null;
-}
-
-function findMetricFromDocument(doc, label) {
-  /*
-   * First attempt: inspect elements containing the exact label.
-   *
-   * Bible currently renders metrics using structures such as:
-   *
-   * <p>Combat Power</p>
-   * <div>≈8740<span>.84</span></div>
-   *
-   * So we intentionally inspect nearby DOM elements instead of
-   * requiring the value to be a separate text node.
-   */
-
-  const all = [...doc.querySelectorAll('p, div, span')];
-
-  for (const element of all) {
-    const labelText = (element.textContent || '').replace(/\s+/g, ' ').trim();
-
-    if (labelText.toLowerCase() !== label.toLowerCase()) {
-      continue;
-    }
-
-    let sibling = element.nextElementSibling;
-
-    for (let i = 0; i < 5 && sibling; i++) {
-      const valueText = (sibling.textContent || '')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-      const value = cleanNumber(valueText);
-
-      if (value != null) {
-        return value;
-      }
-
-      sibling = sibling.nextElementSibling;
-    }
-
-    /*
-     * Some layouts wrap the value inside the parent's next child.
-     */
-
-    const parent = element.parentElement;
-
-    if (parent) {
-      const children = [...parent.children];
-      const index = children.indexOf(element);
-
-      for (let i = index + 1; i < Math.min(children.length, index + 5); i++) {
-        const valueText = (children[i].textContent || '')
-          .replace(/\s+/g, ' ')
-          .trim();
-
-        const value = cleanNumber(valueText);
-
-        if (value != null) {
-          return value;
-        }
-      }
-    }
-  }
-
-  return null;
-}
-
-/* -------------------------------------------------------
-   LOADOUT PRIORITY
-------------------------------------------------------- */
 
 function loadoutClassificationText(loadout) {
   return String(
@@ -305,160 +168,190 @@ function selectPreferredLoadout(loadouts) {
     )[0];
 }
 
-/* -------------------------------------------------------
-   CLASS DETECTION
-------------------------------------------------------- */
-
-function detectClass(lines, name) {
-  const normalizedName = String(name || '').trim().toLowerCase();
+/*
+ * Extracts the actual CP rendered by the currently selected loadout.
+ *
+ * IMPORTANT:
+ * We intentionally do NOT use the character header's Combat Power.
+ *
+ * Bible's character header can show the character's historical/highest CP.
+ * For the optimizer we need the CP belonging to the selected raid loadout.
+ *
+ * Estimated Raid Loadout:
+ *     <span class="text-red-400">8348.83</span>
+ *
+ * Current Loadout (Raid) is the fallback.
+ *
+ * Chaos Dungeon Loadout is never accepted.
+ */
+function extractRaidLoadoutCP(doc, selectedLoadout) {
+  if (
+    selectedLoadout !== 'Estimated Raid Loadout' &&
+    selectedLoadout !== 'Current Loadout (Raid)'
+  ) {
+    return null;
+  }
 
   /*
-   * Look through the entire page first.
+   * Bible's loadout CP is rendered as a decimal number in a span.
    *
-   * The current Bible page clearly contains:
-   *
-   * North America
-   * Balthorr
-   * Summoner
-   * Seraphh
-   *
-   * so there is no reason to restrict the search to only a few
-   * lines around the character name.
+   * We deliberately avoid reading the page's header CP because that is
+   * the character's historical/highest CP.
    */
+  const possible = [];
 
-  for (const line of lines) {
-    const normalized = line.toLowerCase();
+  for (const el of doc.querySelectorAll('span')) {
+    const text = (el.textContent || '').replace(/,/g, '').trim();
 
-    const match = CLASS_NAMES.find(
-      (className) => normalized === className.toLowerCase()
-    );
+    if (/^\d+(?:\.\d+)?$/.test(text)) {
+      const value = Number(text);
 
-    if (match) {
-      return match;
+      /*
+       * CP values for these characters are generally in the thousands.
+       * This also prevents us from accidentally selecting small values
+       * such as item levels, accessory levels, percentages, etc.
+       */
+      if (value >= 5000 && value <= 50000) {
+        possible.push({
+          value,
+          el,
+        });
+      }
     }
   }
 
   /*
-   * Fallback: search for the class name anywhere inside a line.
+   * Prefer the exact visual pattern Bible uses for the loadout CP.
    */
-
-  for (const line of lines) {
-    const normalized = line.toLowerCase();
-
-    const match = CLASS_NAMES.find((className) =>
-      normalized.includes(className.toLowerCase())
-    );
-
-    if (match) {
-      return match;
-    }
-  }
-
-  return null;
-}
-
-/* -------------------------------------------------------
-   CHARACTER PROFILE PARSER
-------------------------------------------------------- */
-
-function parseProfile(html, expectedName) {
-  const doc = new DOMParser().parseFromString(
-    html,
-    'text/html'
+  const redCP = possible.find((x) =>
+    x.el.classList.contains('text-red-400')
   );
 
+  if (redCP) {
+    return redCP.value;
+  }
+
+  /*
+   * Fallback: return the first plausible CP value.
+   */
+  return possible.length ? possible[0].value : null;
+}
+
+function parseProfile(html, expectedName) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
   const lines = linesFromDoc(doc);
-  const text = lines.join('\n');
+
+  const name =
+    (doc.querySelector('h1')?.textContent || expectedName).trim();
 
   /*
-   * Character name
+   * Determine class.
    */
+  const nameIndex = lines.findIndex((x) => x === name);
 
-  let name =
-    doc.querySelector('h1')?.textContent?.trim() ||
-    expectedName ||
-    'Unknown';
+  let cls = null;
 
-  /*
-   * The Bible HTML currently renders:
-   *
-   * <h1>Seraphh</h1>
-   *
-   * so this should reliably resolve to Seraphh.
-   */
-
-  if (!name || name.length > 100) {
-    name = expectedName || 'Unknown';
-  }
-
-  /*
-   * Class
-   */
-
-  const detectedClass = detectClass(lines, name);
-
-  /*
-   * Combat Power
-   *
-   * Current Bible format:
-   *
-   * Combat Power
-   * ≈8740.84
-   *
-   * or a nested DOM representation where the integer and
-   * decimal are separate spans.
-   */
-
-  let cp = findMetricFromDocument(doc, 'Combat Power');
-
-  if (cp == null) {
-    cp = findValueAfterLabel(lines, 'Combat Power', {
-      maxLookAhead: 8,
-      allowApproximation: true
-    });
-  }
-
-  /*
-   * Additional fallback for the exact visible text pattern.
-   */
-
-  if (cp == null) {
-    const cpMatch = text.match(
-      /Combat Power[\s\S]{0,100}?≈?\s*([\d,]+(?:\.\d+)?)/i
+  for (
+    let i = Math.max(0, nameIndex - 6);
+    i < Math.min(lines.length, nameIndex + 8);
+    i++
+  ) {
+    const hit = CLASS_NAMES.find(
+      (c) =>
+        lines[i].toLowerCase() === c.toLowerCase()
     );
 
-    if (cpMatch) {
-      cp = cleanNumber(cpMatch[1]);
+    if (hit) {
+      cls = hit;
+      break;
     }
   }
 
   /*
-   * Item Level
+   * Detect available loadout buttons.
    */
+  const loadoutButtons = [...doc.querySelectorAll('button')].map(
+    (x) => ({
+      text: (x.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      el: x,
+    })
+  );
 
-  let ilvl = findMetricFromDocument(doc, 'Item Level');
+  const estimatedButton = loadoutButtons.find((x) =>
+    /estimated raid loadout/i.test(x.text)
+  );
 
-  if (ilvl == null) {
-    ilvl = findValueAfterLabel(lines, 'Item Level', {
-      maxLookAhead: 8,
-      allowApproximation: false
-    });
+  const currentRaidButton = loadoutButtons.find((x) =>
+    /current loadout\s*\(raid\)/i.test(x.text)
+  );
+
+  const chaosButton = loadoutButtons.find((x) =>
+    /chaos dungeon loadout/i.test(x.text)
+  );
+
+  /*
+   * Established loadout priority:
+   *
+   * 1. Estimated Raid Loadout
+   * 2. Current Loadout (Raid)
+   * 3. Nothing
+   *
+   * Chaos Dungeon is NEVER selected.
+   */
+  let selectedLoadout = 'No acceptable raid loadout found';
+
+  if (estimatedButton) {
+    selectedLoadout = 'Estimated Raid Loadout';
+  } else if (currentRaidButton) {
+    selectedLoadout = 'Current Loadout (Raid)';
   }
 
-  if (ilvl == null) {
-    const ilvlMatch = text.match(
-      /Item Level[\s\S]{0,80}?(\d{3,4}(?:\.\d+)?)/i
-    );
+  /*
+   * IMPORTANT:
+   *
+   * We do NOT read the "Combat Power" text from the character header.
+   *
+   * That value can represent the character's historical/highest CP.
+   *
+   * Instead, extract the CP belonging to the selected raid loadout.
+   */
+  const cp = extractRaidLoadoutCP(
+    doc,
+    selectedLoadout
+  );
 
-    if (ilvlMatch) {
-      ilvl = cleanNumber(ilvlMatch[1]);
+  /*
+   * Item Level can safely come from the character profile because the
+   * item level itself is not the historical CP value.
+   */
+  let ilvl = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (/^Item Level$/i.test(lines[i])) {
+      for (
+        let j = i + 1;
+        j < Math.min(lines.length, i + 4);
+        j++
+      ) {
+        const m = lines[j].match(/^([\d,.]+)$/);
+
+        if (m) {
+          ilvl = Number(
+            m[1].replace(/,/g, '')
+          );
+          break;
+        }
+      }
+
+      if (ilvl != null) break;
     }
   }
 
   /*
-   * Ark Grid
+   * Ark Grid.
    */
-
   const arkGrid = [];
 
   const gridStart = lines.findIndex(
@@ -482,9 +375,8 @@ function parseProfile(html, expectedName) {
   }
 
   /*
-   * Engravings
+   * Engravings.
    */
-
   const engravings = [];
 
   const eStart = lines.findIndex(
@@ -504,16 +396,15 @@ function parseProfile(html, expectedName) {
       if (m) {
         engravings.push({
           name: m[1],
-          level: Number(m[2])
+          level: Number(m[2]),
         });
       }
     }
   }
 
   /*
-   * Ark Passive
+   * Ark Passive.
    */
-
   const arkPassive = {};
 
   const apStart = lines.findIndex(
@@ -534,19 +425,21 @@ function parseProfile(html, expectedName) {
         m &&
         m[1] &&
         !/^T\d$/i.test(m[1]) &&
-        !['Evolution', 'Enlightenment', 'Leap'].includes(
-          m[1].trim()
-        )
+        ![
+          'Evolution',
+          'Enlightenment',
+          'Leap',
+        ].includes(m[1].trim())
       ) {
-        arkPassive[m[1].trim()] = Number(m[2]);
+        arkPassive[m[1].trim()] =
+          Number(m[2]);
       }
     }
   }
 
   /*
-   * Ark Grid effects
+   * Ark Grid effects.
    */
-
   const gridEffects = [];
 
   for (let i = 0; i < lines.length; i++) {
@@ -558,15 +451,14 @@ function parseProfile(html, expectedName) {
       gridEffects.push({
         level: Number(m[1]),
         effect: m[2],
-        value: m[3]
+        value: m[3],
       });
     }
   }
 
   /*
-   * Summary
+   * Small summary values.
    */
-
   const summary = {};
 
   for (const label of [
@@ -575,7 +467,7 @@ function parseProfile(html, expectedName) {
     'Engravings',
     'Accessory Effects',
     'Bracelet Effects',
-    'Gems'
+    'Gems',
   ]) {
     const idx = lines.findIndex(
       (x) => x === label
@@ -591,58 +483,15 @@ function parseProfile(html, expectedName) {
   }
 
   /*
-   * Loadout detection
+   * Detect serialized loadout information if Bible exposes it.
    */
-
-  const loadoutButtons = [
-    ...doc.querySelectorAll('button')
-  ].map((x) => ({
-    text: (x.textContent || '')
-      .replace(/\s+/g, ' ')
-      .trim(),
-    el: x
-  }));
-
-  const estimatedButton = loadoutButtons.find((x) =>
-    /estimated raid loadout/i.test(x.text)
-  );
-
-  const currentRaidButton = loadoutButtons.find((x) =>
-    /current loadout\s*\(raid\)/i.test(x.text)
-  );
-
-  const chaosButton = loadoutButtons.find((x) =>
-    /chaos dungeon loadout/i.test(x.text)
-  );
-
-  /*
-   * IMPORTANT:
-   *
-   * Estimated Raid is preferred.
-   * If it doesn't exist, Current Loadout (Raid) is used.
-   * Chaos Dungeon is NEVER selected.
-   */
-
-  let selectedLoadout =
-    'No acceptable raid loadout found';
-
-  if (estimatedButton) {
-    selectedLoadout = 'Estimated Raid Loadout';
-  } else if (currentRaidButton) {
-    selectedLoadout = 'Current Loadout (Raid)';
-  }
-
-  /*
-   * Look for serialized loadout data.
-   */
-
   let serializedLoadout = null;
 
   for (const script of [...doc.scripts]) {
     const s = script.textContent || '';
 
     if (
-      /raid_merged|most_recent_raid|most_recent_chaos_dungeon/i.test(
+      /raid_merged|most_recent_raid|most_recent_chaos_dungeon/.test(
         s
       )
     ) {
@@ -651,49 +500,63 @@ function parseProfile(html, expectedName) {
     }
   }
 
-  /*
-   * Return complete profile.
-   */
-
   return {
     name,
-    class: detectedClass || 'Unknown',
+    class: cls || 'Unknown',
+
+    /*
+     * This is now RAID LOADOUT CP.
+     *
+     * It is intentionally NOT the historical/header CP.
+     */
     cp,
+
     ilvl,
 
     arkGrid,
     gridEffects,
     arkPassive,
     engravings,
-
     summary,
 
     gemsIncomplete:
-      /Gems incomplete\./i.test(text),
+      /Gems incomplete\./i.test(
+        lines.join('\n')
+      ),
 
     loadout: selectedLoadout,
 
     loadoutSelection: {
-      estimatedRaidAvailable: !!estimatedButton,
-      currentRaidAvailable: !!currentRaidButton,
-      chaosDungeonDetected: !!chaosButton,
-      serializedRaidDataDetected: !!serializedLoadout
+      estimatedRaidAvailable:
+        !!estimatedButton,
+
+      currentRaidAvailable:
+        !!currentRaidButton,
+
+      chaosDungeonDetected:
+        !!chaosButton,
+
+      serializedRaidDataDetected:
+        !!serializedLoadout,
+
+      cpSource:
+        cp != null
+          ? selectedLoadout
+          : 'No raid loadout CP found',
     },
 
-    retrievedAt: new Date().toISOString()
+    retrievedAt:
+      new Date().toISOString(),
   };
 }
 
-/* -------------------------------------------------------
-   BIBLE FETCH
-------------------------------------------------------- */
-
 async function fetchCharacter(c) {
   const endpoint =
-    `${BIBLE_CONNECTOR}?url=${encodeURIComponent(c.url)}`;
+    `${BIBLE_CONNECTOR}?url=` +
+    encodeURIComponent(c.url);
 
   const r = await fetch(endpoint, {
-    cache: 'no-store'
+    cache: 'no-store',
   });
 
   let data;
@@ -713,12 +576,11 @@ async function fetchCharacter(c) {
     );
   }
 
-  return parseProfile(data.html, c.name);
+  return parseProfile(
+    data.html,
+    c.name
+  );
 }
-
-/* -------------------------------------------------------
-   REFRESH
-------------------------------------------------------- */
 
 async function refreshProfiles() {
   if (!state.characters.length) {
@@ -736,7 +598,9 @@ async function refreshProfiles() {
   for (const c of state.characters) {
     try {
       c.profile = await fetchCharacter(c);
+
       delete c.profileError;
+
       ok++;
     } catch (e) {
       c.profileError = e.message;
@@ -748,13 +612,13 @@ async function refreshProfiles() {
   render();
 
   $('#status').textContent = failed
-    ? `Refreshed ${ok} profile${ok === 1 ? '' : 's'}; ${failed} failed.`
-    : `Refreshed ${ok} profile${ok === 1 ? '' : 's'} from Bible.`;
+    ? `Refreshed ${ok} profile${
+        ok === 1 ? '' : 's'
+      }; ${failed} failed.`
+    : `Refreshed ${ok} profile${
+        ok === 1 ? '' : 's'
+      } from Bible.`;
 }
-
-/* -------------------------------------------------------
-   RENDER
-------------------------------------------------------- */
 
 function render() {
   const chars = state.characters;
@@ -779,8 +643,7 @@ function render() {
 
   $('#avgCp').textContent = cp.length
     ? Math.round(
-        cp.reduce((a, b) => a + b, 0) /
-          cp.length
+        cp.reduce((a, b) => a + b, 0)
       ).toLocaleString()
     : '—';
 
@@ -790,62 +653,70 @@ function render() {
   $('#rosterNote').textContent =
     'Only explicitly supplied character URLs are retrieved. No roster/account-wide data is imported. Raid loadout priority: Estimated Raid → Current Loadout (Raid). Chaos Dungeon is never selected.';
 
-  $('#roster').innerHTML = chars
-    .map(
-      (c) => `
-        <article class="character">
-          <div class="character-head">
-            <div>
-              <h3>${esc(
-                c.profile?.name || c.name
-              )}</h3>
+  $('#roster').innerHTML =
+    chars
+      .map(
+        (c) => `
+          <article class="character">
+            <div class="character-head">
+              <div>
+                <h3>${esc(
+                  c.profile?.name ||
+                    c.name
+                )}</h3>
 
-              <div class="class">
-                ${esc(
-                  c.profile?.class ||
-                    'Profile pending'
-                )}
+                <div class="class">
+                  ${esc(
+                    c.profile?.class ||
+                      'Profile pending'
+                  )}
+                </div>
+              </div>
+
+              <button
+                class="remove-character"
+                data-id="${esc(c.id)}"
+                type="button"
+                aria-label="Remove ${esc(
+                  c.name
+                )}"
+              >
+                Remove
+              </button>
+            </div>
+
+            <div class="stats">
+              <div class="stat">
+                iLvl
+                <b>${fmt(
+                  c.profile?.ilvl
+                )}</b>
+              </div>
+
+              <div class="stat">
+                CP
+                <b>${fmt(
+                  c.profile?.cp
+                )}</b>
               </div>
             </div>
 
-            <button
-              class="remove-character"
-              data-id="${esc(c.id)}"
-              type="button"
-              aria-label="Remove ${esc(c.name)}"
-            >
-              Remove
-            </button>
-          </div>
-
-          <div class="stats">
-            <div class="stat">
-              iLvl
-              <b>${fmt(c.profile?.ilvl)}</b>
+            <div class="privacy-note">
+              ${
+                c.profile
+                  ? `Bible profile loaded · ${esc(
+                      c.profile.loadout
+                    )} page data`
+                  : esc(
+                      c.profileError ||
+                        'Profile pending'
+                    )
+              }
             </div>
-
-            <div class="stat">
-              CP
-              <b>${fmt(c.profile?.cp)}</b>
-            </div>
-          </div>
-
-          <div class="privacy-note">
-            ${
-              c.profile
-                ? `Bible profile loaded · ${esc(
-                    c.profile.loadout
-                  )} page data`
-                : esc(
-                    c.profileError ||
-                      'Profile pending'
-                  )
-            }
-          </div>
-        </article>
-      `
-    )
-    .join('') ||
+          </article>
+        `
+      )
+      .join('') ||
     '<div class="empty-roster">No designated main characters have been added.</div>';
 
   document
@@ -863,10 +734,6 @@ function render() {
   renderSuggestions();
 }
 
-/* -------------------------------------------------------
-   CHARACTER REMOVAL
-------------------------------------------------------- */
-
 function performRemoveCharacter(c) {
   state.characters =
     state.characters.filter(
@@ -876,11 +743,9 @@ function performRemoveCharacter(c) {
   save();
 
   /*
-   * Keep the status message because the user
-   * explicitly wanted the profile refresh message
-   * but not a persistent changelog/history system.
+   * Keep the normal status message, but do not
+   * create a persistent changelog/history entry.
    */
-
   $('#status').textContent =
     `${c.name} removed`;
 
@@ -963,14 +828,16 @@ function showRemoveDialog(c) {
     </div>
   `;
 
-  document.body.appendChild(overlay);
+  document.body.appendChild(
+    overlay
+  );
 
   const close = () =>
     overlay.remove();
 
-  overlay
-    .querySelector('.remove-cancel')
-    .onclick = close;
+  overlay.querySelector(
+    '.remove-cancel'
+  ).onclick = close;
 
   overlay.addEventListener(
     'click',
@@ -981,33 +848,31 @@ function showRemoveDialog(c) {
     }
   );
 
+  overlay.querySelector(
+    '.remove-confirm'
+  ).onclick = () => {
+    if (
+      overlay.querySelector(
+        '#remove-confirm-skip'
+      ).checked
+    ) {
+      localStorage.setItem(
+        REMOVE_CONFIRM_KEY,
+        '1'
+      );
+    }
+
+    close();
+
+    performRemoveCharacter(c);
+  };
+
   overlay
-    .querySelector('.remove-confirm')
-    .onclick = () => {
-      if (
-        overlay.querySelector(
-          '#remove-confirm-skip'
-        ).checked
-      ) {
-        localStorage.setItem(
-          REMOVE_CONFIRM_KEY,
-          '1'
-        );
-      }
-
-      close();
-
-      performRemoveCharacter(c);
-    };
-
-  overlay
-    .querySelector('.remove-confirm')
+    .querySelector(
+      '.remove-confirm'
+    )
     .focus();
 }
-
-/* -------------------------------------------------------
-   SUGGESTIONS / OPTIMIZATION
-------------------------------------------------------- */
 
 function renderSuggestions() {
   const el =
@@ -1027,11 +892,14 @@ function renderSuggestions() {
 
   el.innerHTML = `
     <article class="party">
-      <h3>Optimization engine</h3>
+      <h3>
+        Optimization engine
+      </h3>
 
       <div class="score">
-        ${complete.length}/${state.characters.length}
-        profiles loaded
+        ${complete.length}/${
+          state.characters.length
+        } profiles loaded
       </div>
 
       <p class="privacy-note">
@@ -1039,14 +907,16 @@ function renderSuggestions() {
           complete.length >= 8
             ? 'Ready for the full 4 + 4 optimizer.'
             : complete.length >= 2
-              ? 'Profiles are loaded. The synergy/character-strength optimizer will be enabled as its scoring rules are added.'
-              : 'Load at least two complete profiles to begin optimization.'
+            ? 'Profiles are loaded. The synergy/character-strength optimizer will be enabled as its scoring rules are added.'
+            : 'Load at least two complete profiles to begin optimization.'
         }
       </p>
     </article>
 
     <article class="party">
-      <h3>Loaded profile data</h3>
+      <h3>
+        Loaded profile data
+      </h3>
 
       <div class="score">
         ${
@@ -1077,10 +947,6 @@ function renderSuggestions() {
   `;
 }
 
-/* -------------------------------------------------------
-   ADD CHARACTER
-------------------------------------------------------- */
-
 $('#addCharacterBtn').onclick = () => {
   if (
     state.characters.length >=
@@ -1094,7 +960,9 @@ $('#addCharacterBtn').onclick = () => {
   }
 
   const parsed = bibleUrl(
-    $('#characterUrl').value.trim()
+    $('#characterUrl')
+      .value
+      .trim()
   );
 
   if (!parsed) {
@@ -1118,7 +986,7 @@ $('#addCharacterBtn').onclick = () => {
   state.characters.push({
     id: crypto.randomUUID(),
     ...parsed,
-    profile: null
+    profile: null,
   });
 
   save();
@@ -1130,10 +998,6 @@ $('#addCharacterBtn').onclick = () => {
 
   render();
 };
-
-/* -------------------------------------------------------
-   BUTTONS
-------------------------------------------------------- */
 
 $('#refreshBtn').onclick =
   refreshProfiles;
@@ -1165,7 +1029,7 @@ $('#compareBtn').onclick =
     }
 
     const test = {
-      ...parsed
+      ...parsed,
     };
 
     $('#status').textContent =
@@ -1173,25 +1037,35 @@ $('#compareBtn').onclick =
 
     try {
       test.profile =
-        await fetchCharacter(test);
+        await fetchCharacter(
+          test
+        );
 
-      state.testCharacter = test;
+      state.testCharacter =
+        test;
 
       save();
 
       $('#comparison').innerHTML = `
         <div class="comparison-grid">
+
           <div class="comparison-card">
-            <span>Current pool</span>
+            <span>
+              Current pool
+            </span>
 
             <b>
-              ${state.characters.length}
+              ${
+                state.characters.length
+              }
               characters
             </b>
           </div>
 
           <div class="comparison-card">
-            <span>Test character</span>
+            <span>
+              Test character
+            </span>
 
             <b>
               ${esc(
@@ -1216,7 +1090,9 @@ $('#compareBtn').onclick =
           </div>
 
           <div class="comparison-card">
-            <span>Result</span>
+            <span>
+              Result
+            </span>
 
             <b>
               Profile loaded
@@ -1226,11 +1102,13 @@ $('#compareBtn').onclick =
               ${esc(
                 test.profile.loadout
               )}.
-              Optimization percentage will
-              be calculated after the party
-              scoring engine is enabled.
+              Optimization percentage
+              will be calculated after
+              the party scoring engine
+              is enabled.
             </div>
           </div>
+
         </div>
       `;
 
@@ -1242,19 +1120,11 @@ $('#compareBtn').onclick =
     }
   };
 
-/* -------------------------------------------------------
-   SHARING
-------------------------------------------------------- */
-
 $('#shareBtn').onclick = () => {
   alert(
     'Private sharing is intentionally disabled until the secure data layer is implemented. Character profiles remain local to this browser and are not committed to GitHub.'
   );
 };
-
-/* -------------------------------------------------------
-   INITIAL RENDER
-------------------------------------------------------- */
 
 render();
 ```
