@@ -17,6 +17,7 @@ const CLASS_NAMES=[
 function loadState(){
   try{
     const x=JSON.parse(localStorage.getItem(KEY)||'null');
+
     return x&&Array.isArray(x.characters)
       ?x
       :{characters:[],testCharacter:null};
@@ -309,7 +310,9 @@ function parseProfile(html,expectedName){
       'Gems'
     ]
   ){
-    const idx=lines.findIndex(x=>x===label);
+    const idx=lines.findIndex(
+      x=>x===label
+    );
 
     if(
       idx>=0&&
@@ -329,29 +332,18 @@ function parseProfile(html,expectedName){
     el:x
   }));
 
-  const estimatedButton=
-    loadoutButtons.find(
-      x=>/estimated raid loadout/i.test(x.text)
-    );
+  const estimatedButton=loadoutButtons.find(
+    x=>/estimated raid loadout/i.test(x.text)
+  );
 
-  const currentRaidButton=
-    loadoutButtons.find(
-      x=>/current loadout\s*\(raid\)/i.test(x.text)
-    );
+  const currentRaidButton=loadoutButtons.find(
+    x=>/current loadout\s*\(raid\)/i.test(x.text)
+  );
 
-  const chaosButton=
-    loadoutButtons.find(
-      x=>/chaos dungeon loadout/i.test(x.text)
-    );
+  const chaosButton=loadoutButtons.find(
+    x=>/chaos dungeon loadout/i.test(x.text)
+  );
 
-  /*
-   * Loadout priority:
-   *
-   * 1. Estimated Raid Loadout
-   * 2. Current Loadout (Raid)
-   *
-   * NEVER use Chaos Dungeon Loadout.
-   */
   let selectedLoadout='Estimated Raid Loadout';
 
   if(!estimatedButton&&currentRaidButton){
@@ -406,7 +398,10 @@ async function fetchCharacter(c){
   const endpoint=
     `${BIBLE_CONNECTOR}?url=${encodeURIComponent(c.url)}`;
 
-  const r=await fetch(endpoint,{cache:'no-store'});
+  const r=await fetch(
+    endpoint,
+    {cache:'no-store'}
+  );
 
   let data;
 
@@ -425,13 +420,17 @@ async function fetchCharacter(c){
     );
   }
 
-  return parseProfile(data.html,c.name);
+  return parseProfile(
+    data.html,
+    c.name
+  );
 }
 
 async function refreshProfiles(){
   if(!state.characters.length){
     $('#status').textContent=
       'Add at least one character first';
+
     return;
   }
 
@@ -531,7 +530,7 @@ function render(){
         <div class="privacy-note">
           ${
             c.profile
-              ?`Bible profile loaded · ${esc(c.profile.loadout)}`
+              ?`Bible profile loaded · ${esc(c.profile.loadout)} page data`
               :esc(c.profileError||'Profile pending')
           }
         </div>
@@ -554,29 +553,33 @@ function render(){
 
 function performRemoveCharacter(c){
   state.characters=
-    state.characters.filter(x=>x.id!==c.id);
+    state.characters.filter(
+      x=>x.id!==c.id
+    );
 
   save();
 
-  $('#status').textContent=
-    `${c.name} removed`;
-
+  /*
+   * Intentionally do not write a removal message
+   * to #status. The dashboard should not display
+   * a changelog-style notification when a character
+   * is removed.
+   */
   render();
 }
 
 function removeCharacter(id){
-  const c=state.characters.find(
-    x=>x.id===id
-  );
+  const c=
+    state.characters.find(
+      x=>x.id===id
+    );
 
   if(!c)return;
 
-  /*
-   * If the user previously selected
-   * "Don't ask me again", remove immediately.
-   */
   if(
-    localStorage.getItem(REMOVE_CONFIRM_KEY)==='1'
+    localStorage.getItem(
+      REMOVE_CONFIRM_KEY
+    )==='1'
   ){
     performRemoveCharacter(c);
     return;
@@ -590,7 +593,8 @@ function showRemoveDialog(c){
     .querySelector('.remove-modal')
     ?.remove();
 
-  const overlay=document.createElement('div');
+  const overlay=
+    document.createElement('div');
 
   overlay.className='remove-modal';
 
@@ -616,10 +620,7 @@ function showRemoveDialog(c){
           id="remove-confirm-skip"
           type="checkbox"
         >
-
-        <span>
-          Don't ask me again
-        </span>
+        <span>Don't ask me again</span>
       </label>
 
       <div class="remove-modal-actions">
@@ -689,14 +690,17 @@ function renderSuggestions(){
   }
 
   const complete=
-    state.characters.filter(c=>c.profile);
+    state.characters.filter(
+      c=>c.profile
+    );
 
   el.innerHTML=`
     <article class="party">
       <h3>Optimization engine</h3>
 
       <div class="score">
-        ${complete.length}/${state.characters.length} profiles loaded
+        ${complete.length}/${state.characters.length}
+        profiles loaded
       </div>
 
       <p class="privacy-note">
@@ -777,13 +781,15 @@ $('#addCharacterBtn').onclick=()=>{
 
   $('#characterUrl').value='';
 
-  $('#status').textContent=
-    'Character added locally; click Refresh Profiles to retrieve it';
-
+  /*
+   * Adding a character also does not create a
+   * changelog-style status message.
+   */
   render();
 };
 
-$('#refreshBtn').onclick=refreshProfiles;
+$('#refreshBtn').onclick=
+  refreshProfiles;
 
 $('#optimizeBtn').onclick=()=>{
   $('#status').textContent=
@@ -828,7 +834,8 @@ $('#compareBtn').onclick=async()=>{
         <div class="comparison-card">
           <span>Current pool</span>
           <b>
-            ${state.characters.length} characters
+            ${state.characters.length}
+            characters
           </b>
         </div>
 
@@ -880,94 +887,4 @@ $('#shareBtn').onclick=()=>{
   );
 };
 
-
-/*
- * ---------------------------------------------------------
- * PAGE VISIT COUNTER
- * ---------------------------------------------------------
- *
- * Every full dashboard load calls the Cloudflare Worker.
- * The Worker increments the global KV counter and returns
- * the new total.
- *
- * No IP address or visitor identity is stored.
- */
-
-async function recordPageVisit(){
-  try{
-    const visitsEndpoint=
-      `${BIBLE_CONNECTOR.replace('/character','')}/visits`;
-
-    const r=await fetch(
-      visitsEndpoint,
-      {
-        method:'GET',
-        cache:'no-store'
-      }
-    );
-
-    if(!r.ok){
-      console.error(
-        'Visit counter returned HTTP',
-        r.status
-      );
-
-      return;
-    }
-
-    const data=await r.json();
-
-    if(!data.ok){
-      console.error(
-        'Visit counter error:',
-        data.error
-      );
-
-      return;
-    }
-
-    const footer=
-      document.querySelector('footer');
-
-    if(!footer)return;
-
-    /*
-     * Preserve the existing footer text while adding
-     * the visit counter to the right side.
-     */
-    footer.innerHTML=`
-      <span>
-        Public source contains only generic application code.
-        Real character data is not committed to the repository.
-        Character retrieval is restricted to explicitly supplied
-        character identifiers.
-      </span>
-
-      <span class="page-visits">
-        Page visits: ${Number(data.visits).toLocaleString()}
-      </span>
-    `;
-
-  }catch(error){
-    /*
-     * A visit-counter failure should NEVER prevent the
-     * dashboard itself from working.
-     */
-    console.error(
-      'Unable to record page visit:',
-      error
-    );
-  }
-};
-
-
-/*
- * Initial dashboard render.
- */
 render();
-
-
-/*
- * Record this page load.
- */
-recordPageVisit();
