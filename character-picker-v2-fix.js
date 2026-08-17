@@ -4,7 +4,7 @@
 
   document.addEventListener('click', (event) => {
     const button = event.target.closest?.('.character-candidate');
-    if (!button) return;
+    if (!button || button.classList.contains('comparison-candidate')) return;
     event.preventDefault();
     event.stopImmediatePropagation();
 
