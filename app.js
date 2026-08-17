@@ -1,4 +1,5 @@
 const KEY='lostark-hideout-private-v2';
+const REMOVE_CONFIRM_KEY='lostark-hideout-skip-remove-confirm-v1';
 const MAX_CHARACTERS=8;
 const BIBLE_CONNECTOR='https://lostark-bible-connector.seraph0226.workers.dev/character';
 const state=loadState();
@@ -22,16 +23,6 @@ const engravings=[];const eStart=lines.findIndex(x=>x==='Engravings');if(eStart>
 const arkPassive={};const apStart=lines.findIndex(x=>x==='Ark Passive');if(apStart>=0){for(let i=apStart+1;i<Math.min(lines.length,apStart+110);i++){const m=lines[i].match(/^(.*?)\s+Lv\.\s*(\d+)$/);if(m&&m[1]&&!/^T\d$/i.test(m[1])&&!['Evolution','Enlightenment','Leap'].includes(m[1].trim()))arkPassive[m[1].trim()]=Number(m[2])}}
 const gridEffects=[];for(let i=0;i<lines.length;i++){const m=lines[i].match(/^Lv\.\s*(\d+)\s+(.+?)\s+([+-]\d+(?:\.\d+)?%)$/);if(m)gridEffects.push({level:Number(m[1]),effect:m[2],value:m[3]})}
 const summary={};for(const label of ['Ark Passive','Ark Grid','Engravings','Accessory Effects','Bracelet Effects','Gems']){const idx=lines.findIndex(x=>x===label);if(idx>=0&&lines[idx+1]&&/^[+-]\d/.test(lines[idx+1]))summary[label]=lines[idx+1]}
-/*
- * The Bible character page can expose several loadout choices.  The dashboard
- * must use raid data only, with this strict preference:
- *   1. Estimated Raid Loadout (raid_merged)
- *   2. Current Loadout (Raid) / most_recent_raid
- *   3. Never Chaos Dungeon Loadout
- *
- * This parser runs against the explicitly supplied character page, so the
- * page itself remains the only source requested by the connector.
- */
 const loadoutButtons=[...doc.querySelectorAll('button')].map(x=>({text:(x.textContent||'').replace(/\s+/g,' ').trim(),el:x}));
 const estimatedButton=loadoutButtons.find(x=>/estimated raid loadout/i.test(x.text));
 const currentRaidButton=loadoutButtons.find(x=>/current loadout\s*\(raid\)/i.test(x.text));
@@ -39,9 +30,6 @@ const chaosButton=loadoutButtons.find(x=>/chaos dungeon loadout/i.test(x.text));
 let selectedLoadout='Estimated Raid Loadout';
 if(!estimatedButton&&currentRaidButton)selectedLoadout='Current Loadout (Raid)';
 if(!estimatedButton&&!currentRaidButton)selectedLoadout='No acceptable raid loadout found';
-/* If the page exposes a serialized loadout collection, select it by the same
- * priority. This is intentionally informational here; no chaos loadout is
- * accepted as the dashboard's data source. */
 let serializedLoadout=null;
 for(const script of [...doc.scripts]){const s=script.textContent||'';if(/raid_merged|most_recent_raid|most_recent_chaos_dungeon/.test(s)){serializedLoadout=s;break}}
 const loadoutSource=selectedLoadout==='No acceptable raid loadout found'?'No acceptable raid loadout found':selectedLoadout;
@@ -49,7 +37,9 @@ return{name, class:cls||'Unknown', cp, ilvl, arkGrid, gridEffects, arkPassive, e
 async function fetchCharacter(c){const endpoint=`${BIBLE_CONNECTOR}?url=${encodeURIComponent(c.url)}`;const r=await fetch(endpoint,{cache:'no-store'});let data;try{data=await r.json()}catch{throw new Error(`Connector returned HTTP ${r.status}`)}if(!r.ok||!data.ok)throw new Error(data?.error||`Connector returned HTTP ${r.status}`);return parseProfile(data.html,c.name)}
 async function refreshProfiles(){if(!state.characters.length){$('#status').textContent='Add at least one character first';return}$('#status').textContent='Refreshing specific character profiles…';let ok=0,failed=0;for(const c of state.characters){try{c.profile=await fetchCharacter(c);delete c.profileError;ok++}catch(e){c.profileError=e.message;failed++}}save();render();$('#status').textContent=failed?`Refreshed ${ok} profile${ok===1?'':'s'}; ${failed} failed.`:`Refreshed ${ok} profile${ok===1?'':'s'} from Bible.`}
 function render(){const chars=state.characters;const il=chars.map(x=>x.profile?.ilvl).filter(Number.isFinite),cp=chars.map(x=>x.profile?.cp).filter(Number.isFinite);$('#playerCount').textContent=`${chars.length} / ${MAX_CHARACTERS}`;$('#avgIlvl').textContent=il.length?Math.round(il.reduce((a,b)=>a+b,0)/il.length):'—';$('#avgCp').textContent=cp.length?Math.round(cp.reduce((a,b)=>a+b,0)/cp.length).toLocaleString():'—';$('#dataMode').textContent='Bible profiles';$('#rosterNote').textContent='Only explicitly supplied character URLs are retrieved. No roster/account-wide data is imported. Raid loadout priority: Estimated Raid → Current Loadout (Raid). Chaos Dungeon is never selected.';$('#roster').innerHTML=chars.map(c=>`<article class="character"><div class="character-head"><div><h3>${esc(c.profile?.name||c.name)}</h3><div class="class">${esc(c.profile?.class||'Profile pending')}</div></div><button class="remove-character" data-id="${esc(c.id)}" type="button" aria-label="Remove ${esc(c.name)}">Remove</button></div><div class="stats"><div class="stat">iLvl<b>${fmt(c.profile?.ilvl)}</b></div><div class="stat">CP<b>${fmt(c.profile?.cp)}</b></div></div><div class="privacy-note">${c.profile?`Bible profile loaded · ${esc(c.profile.loadout)}`:esc(c.profileError||'Profile pending')}</div></article>`).join('')||'<div class="empty-roster">No designated main characters have been added.</div>';document.querySelectorAll('.remove-character').forEach(btn=>btn.addEventListener('click',()=>removeCharacter(btn.dataset.id)));renderSuggestions()}
-function removeCharacter(id){const c=state.characters.find(x=>x.id===id);if(!c)return;if(!confirm(`Remove ${c.name} from Available Characters?`))return;state.characters=state.characters.filter(x=>x.id!==id);save();$('#status').textContent=`${c.name} removed`;render()}
+function performRemoveCharacter(c){state.characters=state.characters.filter(x=>x.id!==c.id);save();$('#status').textContent=`${c.name} removed`;render()}
+function removeCharacter(id){const c=state.characters.find(x=>x.id===id);if(!c)return;if(localStorage.getItem(REMOVE_CONFIRM_KEY)==='1'){performRemoveCharacter(c);return}showRemoveDialog(c)}
+function showRemoveDialog(c){document.querySelector('.remove-modal')?.remove();const overlay=document.createElement('div');overlay.className='remove-modal';overlay.innerHTML=`<div class="remove-modal-card" role="dialog" aria-modal="true" aria-labelledby="remove-modal-title"><h2 id="remove-modal-title">Remove character?</h2><p>Are you sure you want to remove <strong>${esc(c.name)}</strong> from Available Characters?</p><label class="remove-modal-check"><input id="remove-confirm-skip" type="checkbox"> <span>Don't ask me again</span></label><div class="remove-modal-actions"><button type="button" class="remove-cancel">Cancel</button><button type="button" class="remove-confirm">Remove Character</button></div></div>`;document.body.appendChild(overlay);const close=()=>overlay.remove();overlay.querySelector('.remove-cancel').onclick=close;overlay.addEventListener('click',e=>{if(e.target===overlay)close()});overlay.querySelector('.remove-confirm').onclick=()=>{if(overlay.querySelector('#remove-confirm-skip').checked)localStorage.setItem(REMOVE_CONFIRM_KEY,'1');close();performRemoveCharacter(c)};overlay.querySelector('.remove-confirm').focus()}
 function renderSuggestions(){const el=$('#suggestedParties');if(!state.characters.length){el.innerHTML='<div class="empty-roster">Add specific character profiles to generate the two-party optimization.</div>';return}const complete=state.characters.filter(c=>c.profile);el.innerHTML=`<article class="party"><h3>Optimization engine</h3><div class="score">${complete.length}/${state.characters.length} profiles loaded</div><p class="privacy-note">${complete.length>=8?'Ready for the full 4 + 4 optimizer.':complete.length>=2?'Profiles are loaded. The synergy/character-strength optimizer will be enabled as its scoring rules are added.':'Load at least two complete profiles to begin optimization.'}</p></article><article class="party"><h3>Loaded profile data</h3><div class="score">${complete.map(c=>`${esc(c.profile.name)} · ${esc(c.profile.class)} · ${fmt(c.profile.ilvl)} · CP ${fmt(c.profile.cp)}`).join('<br>')||'No complete profiles yet'}</div><p class="privacy-note">Character-specific data only. No roster/siblings/account-wide endpoint is used.</p></article>`}
 $('#addCharacterBtn').onclick=()=>{if(state.characters.length>=MAX_CHARACTERS){alert(`Maximum of ${MAX_CHARACTERS} designated characters reached.`);return}const parsed=bibleUrl($('#characterUrl').value.trim());if(!parsed){$('#status').textContent='Enter a valid lostark.bible character URL';return}if(state.characters.some(c=>c.url===parsed.url)){$('#status').textContent='That character is already added';return}state.characters.push({id:crypto.randomUUID(),...parsed,profile:null});save();$('#characterUrl').value='';$('#status').textContent='Character added locally; click Refresh Profiles to retrieve it';render()};
 $('#refreshBtn').onclick=refreshProfiles;
