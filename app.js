@@ -1,17 +1,16 @@
 const KEY='lostark-hideout-private-v1';
 const blank={players:[],parties:2,updatedAt:null};
-let shared=false;
+let shared=location.hash.startsWith('#share=');
 let state=load();
 const $=s=>document.querySelector(s);
-function load(){try{const raw=location.hash.startsWith('#share=')?location.hash.slice(7):null;if(raw){shared=true;const decoded=decodeURIComponent(raw);const parts=decoded.split('.');if(parts.length===3){const [iv64,cipher64,key64]=parts;return decryptState(iv64,cipher64,key64)}}const x=JSON.parse(localStorage.getItem(KEY)||'null');return x&&Array.isArray(x.players)?x:structuredClone(blank)}catch{return structuredClone(blank)}}
+function load(){if(shared)return structuredClone(blank);try{const x=JSON.parse(localStorage.getItem(KEY)||'null');return x&&Array.isArray(x.players)?x:structuredClone(blank)}catch{return structuredClone(blank)}}
 function save(){if(shared)return;localStorage.setItem(KEY,JSON.stringify(state))}
 function fmt(v){return v==null||v===''?'—':Number(v).toLocaleString()}
 function esc(v){return String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]))}
 function b64(bytes){let s='';bytes.forEach(b=>s+=String.fromCharCode(b));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function bytes(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const x=atob(s);return Uint8Array.from(x,c=>c.charCodeAt(0))}
 async function encryptState(){const key=await crypto.subtle.generateKey({name:'AES-GCM',length:256},true,['encrypt','decrypt']);const iv=crypto.getRandomValues(new Uint8Array(12));const data=new TextEncoder().encode(JSON.stringify(state));const cipher=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,data));const raw=new Uint8Array(await crypto.subtle.exportKey('raw',key));return `${b64(iv)}.${b64(cipher)}.${b64(raw)}`}
-function decryptState(iv64,cipher64,key64){try{const iv=bytes(iv64),cipher=bytes(cipher64),raw=bytes(key64);const keyPromise=crypto.subtle.importKey('raw',raw,{name:'AES-GCM'},false,['decrypt']);return {then:()=>{}}}catch{return structuredClone(blank)}}
-async function loadSharedAsync(){if(!shared)return;try{const raw=location.hash.slice(7).split('.');const key=await crypto.subtle.importKey('raw',bytes(raw[2]),{name:'AES-GCM'},false,['decrypt']);const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(raw[0])},key,bytes(raw[1]));const x=JSON.parse(new TextDecoder().decode(plain));if(x&&Array.isArray(x.players)){state=x;render()}}catch{$('#status').textContent='Invalid share link'}}
+async function loadSharedAsync(){if(!shared)return;try{const raw=location.hash.slice(7).split('.');if(raw.length!==3)throw Error();const key=await crypto.subtle.importKey('raw',bytes(raw[2]),{name:'AES-GCM'},false,['decrypt']);const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes(raw[0])},key,bytes(raw[1]));const x=JSON.parse(new TextDecoder().decode(plain));if(!x||!Array.isArray(x.players))throw Error();state=x;render()}catch{$('#status').textContent='Invalid or corrupted share link'}}
 // Loadout policy: Estimated Raid Loadout first; Current Loadout (Raid) second; never Chaos Dungeon Loadout.
 function selectRaidLoadout(loadouts){if(!Array.isArray(loadouts))return null;const n=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ');return loadouts.find(x=>/estimated\s+raid\s+loadout/.test(n(x.name||x.label||x.type)))||loadouts.find(x=>/current\s+loadout\s+raid/.test(n(x.name||x.label||x.type)))||null}
 function applyRow(p,row){const sets=row.loadouts||row.configurations||row.builds;const raid=selectRaidLoadout(sets);const s=raid||row;p.class=s.class||s.className||row.class||row.className||p.class||'—';p.ilvl=Number(s.ilvl??s.itemLevel??row.ilvl??row.itemLevel??p.ilvl)||null;p.cp=Number(s.cp??s.combatPower??row.cp??row.combatPower??p.cp)||null}
