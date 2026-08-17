@@ -1,13 +1,12 @@
 const KEY = 'lostark-hideout-private-v2';
 const REMOVE_CONFIRM_KEY = 'lostark-hideout-skip-remove-confirm-v1';
 const MAX_CHARACTERS = 8;
-
 const BIBLE_CONNECTOR =
   'https://lostark-bible-connector.seraph0226.workers.dev/character';
 
-const SHARE_PREFIX = '#snapshot=';
+const state = loadState();
 
-const $ = (selector) => document.querySelector(selector);
+const $ = (s) => document.querySelector(s);
 
 const CLASS_NAMES = [
   'Berserker',
@@ -37,592 +36,550 @@ const CLASS_NAMES = [
   'Artist',
   'Aeromancer',
   'Breaker',
-  'Valkyrie',
+  'Valkyrie'
 ];
-
-/* =========================================================
-   STATE
-   ========================================================= */
-
-function defaultState() {
-  return {
-    characters: [],
-    testCharacter: null,
-    parties: null,
-  };
-}
-
-function normalizeCharacter(character) {
-  if (!character || typeof character !== 'object') return null;
-
-  if (!character.url || !character.name) return null;
-
-  return {
-    id: character.id || crypto.randomUUID(),
-    url: String(character.url),
-    region: String(character.region || ''),
-    name: String(character.name || ''),
-    profile:
-      character.profile && typeof character.profile === 'object'
-        ? character.profile
-        : null,
-    profileError: character.profileError
-      ? String(character.profileError)
-      : undefined,
-  };
-}
-
-function normalizeState(value) {
-  const base = defaultState();
-
-  if (!value || typeof value !== 'object') {
-    return base;
-  }
-
-  if (Array.isArray(value.characters)) {
-    base.characters = value.characters
-      .map(normalizeCharacter)
-      .filter(Boolean)
-      .slice(0, MAX_CHARACTERS);
-  }
-
-  if (value.testCharacter && typeof value.testCharacter === 'object') {
-    base.testCharacter = value.testCharacter;
-  }
-
-  if (value.parties && typeof value.parties === 'object') {
-    base.parties = value.parties;
-  }
-
-  return base;
-}
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(KEY);
+    const x = JSON.parse(localStorage.getItem(KEY) || 'null');
 
-    if (!raw) {
-      return defaultState();
+    if (x && Array.isArray(x.characters)) {
+      return {
+        characters: x.characters,
+        testCharacter: x.testCharacter || null
+      };
     }
 
-    return normalizeState(JSON.parse(raw));
+    return {
+      characters: [],
+      testCharacter: null
+    };
   } catch {
-    /*
-     * IMPORTANT:
-     * Do not overwrite potentially recoverable local data here.
-     * If parsing fails, start an in-memory empty state only.
-     */
-    return defaultState();
+    return {
+      characters: [],
+      testCharacter: null
+    };
   }
 }
-
-const state = loadState();
 
 function save() {
+  localStorage.setItem(KEY, JSON.stringify(state));
+}
+
+function esc(v) {
+  return String(v ?? '').replace(
+    /[&<>\"']/g,
+    (c) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[c]
+  );
+}
+
+function fmt(v) {
+  return v == null || v === ''
+    ? '—'
+    : Number(v).toLocaleString(undefined, {
+        maximumFractionDigits: 2
+      });
+}
+
+function bibleUrl(v) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-  } catch {
-    /*
-     * If localStorage is unavailable/full, the dashboard can still
-     * operate during the current page session.
-     */
-  }
-}
-
-/* =========================================================
-   BASIC HELPERS
-   ========================================================= */
-
-function esc(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  }[c]));
-}
-
-function fmt(value) {
-  if (value == null || value === '') {
-    return '—';
-  }
-
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return '—';
-  }
-
-  return number.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
-
-function setStatus(message) {
-  const status = $('#status');
-
-  if (status) {
-    status.textContent = message;
-  }
-}
-
-/* =========================================================
-   BIBLE URL VALIDATION
-   ========================================================= */
-
-function bibleUrl(value) {
-  try {
-    const url = new URL(value);
+    const u = new URL(v);
 
     if (
-      url.protocol !== 'https:' ||
-      url.hostname !== 'lostark.bible' ||
-      !url.pathname.toLowerCase().startsWith('/character/')
+      u.protocol !== 'https:' ||
+      u.hostname !== 'lostark.bible' ||
+      !u.pathname.startsWith('/character/')
     ) {
       return null;
     }
 
-    const parts = url.pathname
-      .split('/')
-      .filter(Boolean);
+    const parts = u.pathname.split('/').filter(Boolean);
 
-    /*
-     * Expected:
-     * /character/REGION/CHARACTER_NAME
-     */
-
-    if (parts.length < 3) {
-      return null;
-    }
+    if (parts.length < 3) return null;
 
     return {
-      url: url.href,
-      region: decodeURIComponent(parts[1]),
-      name: decodeURIComponent(
-        parts.slice(2).join('/')
-      ),
+      url: u.href,
+      region: parts[1],
+      name: decodeURIComponent(parts.slice(2).join('/'))
     };
   } catch {
     return null;
   }
 }
 
-/* =========================================================
-   HTML PARSING
-   ========================================================= */
-
 function linesFromDoc(doc) {
   return (doc.body?.textContent || '')
     .split(/\n+/)
-    .map((value) =>
-      value.replace(/\s+/g, ' ').trim()
-    )
+    .map((x) => x.replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
 
-/* =========================================================
-   LOADOUT SELECTION
-   ========================================================= */
+function cleanNumber(value) {
+  if (value == null) return null;
 
-function loadoutClassificationText(loadout) {
-  return String(
-    loadout?.classification ||
-      loadout?.type ||
-      ''
-  ).toLowerCase();
+  const match = String(value).replace(/,/g, '').match(/[\d.]+/);
+
+  if (!match) return null;
+
+  const n = Number(match[0]);
+
+  return Number.isFinite(n) ? n : null;
 }
 
-function loadoutPriority(loadout) {
-  const classification =
-    loadoutClassificationText(loadout);
-
-  /*
-   * Estimated Raid Loadout is always preferred.
-   */
-
-  if (
-    classification === 'raid_merged' ||
-    classification.includes('estimated_raid') ||
-    classification.includes('estimated raid')
-  ) {
-    return 0;
-  }
-
-  /*
-   * Current Loadout (Raid) is the fallback.
-   */
-
-  if (
-    classification === 'most_recent_raid' ||
-    classification.includes('current_raid') ||
-    classification.includes('current raid')
-  ) {
-    return 1;
-  }
-
-  /*
-   * Chaos Dungeon is NEVER accepted.
-   */
-
-  if (
-    classification === 'most_recent_chaos_dungeon' ||
-    classification.includes('chaos')
-  ) {
-    return 99;
-  }
-
-  return 50;
+function allText(doc) {
+  return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
-function selectPreferredLoadout(loadouts) {
-  const candidates = (
-    Array.isArray(loadouts)
-      ? loadouts
-      : []
-  )
-    .filter(Boolean)
-    .filter(
-      (loadout) =>
-        loadoutPriority(loadout) < 99
+function findClass(doc, lines, expectedName) {
+  /*
+   * Bible's rendered page puts the class near the character name,
+   * but the exact surrounding markup can change.
+   *
+   * First look through visible text.
+   */
+  for (const line of lines) {
+    const found = CLASS_NAMES.find(
+      (c) => line.toLowerCase() === c.toLowerCase()
     );
 
-  if (!candidates.length) {
-    return null;
+    if (found) return found;
   }
-
-  return candidates
-    .slice()
-    .sort(
-      (a, b) =>
-        loadoutPriority(a) -
-          loadoutPriority(b) ||
-        new Date(
-          b.lastUpdated || 0
-        ) -
-          new Date(
-            a.lastUpdated || 0
-          )
-    )[0];
-}
-
-/* =========================================================
-   RAID LOADOUT COMBAT POWER
-   ========================================================= */
-
-/*
- * IMPORTANT:
- *
- * We NEVER use the Combat Power in the character header.
- *
- * Bible can show the character's historical/highest CP there.
- *
- * Example:
- *
- *     header CP = 8740.84
- *
- * But the actual selected raid loadout CP is:
- *
- *     <span class="text-red-400">8348.83</span>
- *
- * That 8348.83 value is what the optimizer needs.
- */
-
-function extractRaidLoadoutCP(
-  doc,
-  selectedLoadout
-) {
-  if (
-    selectedLoadout !==
-      'Estimated Raid Loadout' &&
-    selectedLoadout !==
-      'Current Loadout (Raid)'
-  ) {
-    return null;
-  }
-
-  const possible = [];
 
   /*
-   * First look for the exact visual class Bible uses
-   * for the selected raid loadout CP.
+   * Then search the complete HTML/text for a known class.
    */
+  const text = allText(doc);
 
-  for (
-    const element of
-    doc.querySelectorAll(
-      'span.text-red-400'
-    )
-  ) {
-    const text = (
-      element.textContent || ''
-    )
-      .replace(/,/g, '')
-      .trim();
+  for (const cls of CLASS_NAMES) {
+    const re = new RegExp(
+      `(?:^|[^A-Za-z])${cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:[^A-Za-z]|$)`,
+      'i'
+    );
 
-    if (
-      /^\d+(?:\.\d+)?$/.test(text)
-    ) {
-      const value = Number(text);
+    if (re.test(text)) return cls;
+  }
 
-      if (
-        value >= 5000 &&
-        value <= 50000
-      ) {
-        possible.push({
-          value,
-          element,
-        });
+  return null;
+}
+
+function findItemLevel(doc, lines) {
+  /*
+   * Normal rendered Bible format:
+   *
+   * Item Level
+   * 1800
+   */
+  for (let i = 0; i < lines.length; i++) {
+    if (/^Item Level$/i.test(lines[i])) {
+      for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
+        const value = cleanNumber(lines[j]);
+
+        if (value != null && value >= 1000 && value <= 2000) {
+          return value;
+        }
       }
     }
   }
 
-  if (possible.length) {
-    return possible[0].value;
+  /*
+   * Fallback to the HTML itself.
+   */
+  const html = doc.documentElement?.outerHTML || '';
+
+  const match = html.match(
+    /Item Level[\s\S]{0,500}?>(\d{3,4}(?:\.\d+)?)</i
+  );
+
+  if (match) {
+    const value = cleanNumber(match[1]);
+
+    if (value != null) return value;
+  }
+
+  return null;
+}
+
+function findNumericAfterLabel(lines, label, validator) {
+  for (let i = 0; i < lines.length; i++) {
+    if (!new RegExp(`^${label}$`, 'i').test(lines[i])) continue;
+
+    for (let j = i + 1; j < Math.min(lines.length, i + 8); j++) {
+      const value = cleanNumber(lines[j]);
+
+      if (value != null && (!validator || validator(value))) {
+        return value;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractAllNumbersNear(text, phrase) {
+  const results = [];
+
+  const lower = text.toLowerCase();
+  let start = 0;
+
+  while (true) {
+    const index = lower.indexOf(phrase.toLowerCase(), start);
+
+    if (index === -1) break;
+
+    const section = text.slice(index, index + 1000);
+
+    const matches = section.match(/\b\d{3,5}(?:\.\d+)?\b/g) || [];
+
+    for (const m of matches) {
+      const n = cleanNumber(m);
+
+      if (n != null) results.push(n);
+    }
+
+    start = index + phrase.length;
+  }
+
+  return results;
+}
+
+function extractRaidCPFromHTML(doc, lines) {
+  /*
+   * IMPORTANT:
+   *
+   * The CP displayed at the top of Bible can represent the
+   * character's historical/highest CP depending on the selected
+   * loadout.
+   *
+   * We must NOT use that value blindly.
+   *
+   * Desired priority:
+   *
+   * 1. Estimated Raid Loadout CP
+   * 2. Current Loadout (Raid) CP
+   * 3. No CP
+   *
+   * Never use Chaos Dungeon CP.
+   */
+
+  const html = doc.documentElement?.outerHTML || '';
+  const bodyText = allText(doc);
+
+  /*
+   * Look for explicit estimated-raid sections in the HTML.
+   *
+   * Bible/Svelte markup can change, so we use several patterns
+   * instead of depending on a single CSS class.
+   */
+
+  const estimatedSections = [];
+
+  const estimatedRegexes = [
+    /Estimated Raid Loadout[\s\S]{0,5000}/gi,
+    /estimated_raid[\s\S]{0,5000}/gi,
+    /estimatedRaid[\s\S]{0,5000}/gi,
+    /raid_merged[\s\S]{0,5000}/gi
+  ];
+
+  for (const regex of estimatedRegexes) {
+    const matches = html.match(regex) || [];
+
+    for (const match of matches) {
+      estimatedSections.push(match);
+    }
   }
 
   /*
-   * Fallback in case Bible changes the class.
+   * The user's actual estimated raid CP is 8348.83.
    *
-   * We look for plausible CP-sized spans,
-   * but NEVER specifically target the header
-   * "Combat Power" section.
+   * More generally, search estimated-raid sections for a CP-like
+   * number in the normal Lost Ark combat-power range.
    */
+  for (const section of estimatedSections) {
+    const cpMatches =
+      section.match(/\b(?:[4-9]\d{3}|1\d{4})(?:\.\d{1,2})?\b/g) || [];
 
-  const allPossible = [];
+    for (const raw of cpMatches) {
+      const value = cleanNumber(raw);
 
-  for (
-    const element of
-    doc.querySelectorAll('span')
-  ) {
-    const text = (
-      element.textContent || ''
-    )
-      .replace(/,/g, '')
-      .trim();
+      if (
+        value != null &&
+        value >= 4000 &&
+        value <= 20000 &&
+        /combat|power|cp/i.test(section)
+      ) {
+        return {
+          value,
+          source: 'Estimated Raid Loadout'
+        };
+      }
+    }
+  }
 
+  /*
+   * Search script contents independently. SvelteKit frequently
+   * serializes page data into script tags.
+   */
+  const scripts = [...doc.scripts]
+    .map((s) => s.textContent || '')
+    .filter(Boolean);
+
+  for (const script of scripts) {
     if (
-      !/^\d+(?:\.\d+)?$/.test(text)
+      !/estimated_raid|estimated raid|raid_merged|estimatedRaid/i.test(
+        script
+      )
     ) {
       continue;
     }
 
-    const value = Number(text);
+    const numbers =
+      script.match(/\b(?:[4-9]\d{3}|1\d{4})(?:\.\d{1,2})?\b/g) || [];
 
-    if (
-      value >= 5000 &&
-      value <= 50000
-    ) {
-      allPossible.push({
-        value,
-        element,
-      });
-    }
-  }
+    for (const raw of numbers) {
+      const value = cleanNumber(raw);
 
-  return allPossible.length
-    ? allPossible[0].value
-    : null;
-}
-
-/* =========================================================
-   PROFILE PARSER
-   ========================================================= */
-
-function parseProfile(
-  html,
-  expectedName
-) {
-  const doc =
-    new DOMParser().parseFromString(
-      html,
-      'text/html'
-    );
-
-  const lines = linesFromDoc(doc);
-
-  const name = (
-    doc.querySelector('h1')
-      ?.textContent ||
-    expectedName
-  ).trim();
-
-  /*
-   * Class
-   */
-
-  const nameIndex =
-    lines.findIndex(
-      (line) => line === name
-    );
-
-  let characterClass = null;
-
-  for (
-    let i = Math.max(
-      0,
-      nameIndex - 6
-    );
-    i <
-    Math.min(
-      lines.length,
-      nameIndex + 8
-    );
-    i++
-  ) {
-    const hit =
-      CLASS_NAMES.find(
-        (className) =>
-          lines[i].toLowerCase() ===
-          className.toLowerCase()
-      );
-
-    if (hit) {
-      characterClass = hit;
-      break;
-    }
-  }
-
-  /*
-   * Loadout buttons
-   */
-
-  const loadoutButtons = [
-    ...doc.querySelectorAll('button'),
-  ].map((element) => ({
-    text: (
-      element.textContent || ''
-    )
-      .replace(/\s+/g, ' ')
-      .trim(),
-    element,
-  }));
-
-  const estimatedButton =
-    loadoutButtons.find(
-      (button) =>
-        /estimated raid loadout/i.test(
-          button.text
-        )
-    );
-
-  const currentRaidButton =
-    loadoutButtons.find(
-      (button) =>
-        /current loadout\s*\(raid\)/i.test(
-          button.text
-        )
-    );
-
-  const chaosButton =
-    loadoutButtons.find(
-      (button) =>
-        /chaos dungeon loadout/i.test(
-          button.text
-        )
-    );
-
-  /*
-   * Established priority:
-   *
-   * 1. Estimated Raid Loadout
-   * 2. Current Loadout (Raid)
-   * 3. No acceptable raid loadout
-   *
-   * Chaos Dungeon is never selected.
-   */
-
-  let selectedLoadout =
-    'No acceptable raid loadout found';
-
-  if (estimatedButton) {
-    selectedLoadout =
-      'Estimated Raid Loadout';
-  } else if (currentRaidButton) {
-    selectedLoadout =
-      'Current Loadout (Raid)';
-  }
-
-  /*
-   * RAID CP
-   *
-   * Do NOT use the header CP.
-   */
-
-  const cp =
-    extractRaidLoadoutCP(
-      doc,
-      selectedLoadout
-    );
-
-  /*
-   * Item Level
-   */
-
-  let ilvl = null;
-
-  for (
-    let i = 0;
-    i < lines.length;
-    i++
-  ) {
-    if (
-      /^Item Level$/i.test(
-        lines[i]
-      )
-    ) {
-      for (
-        let j = i + 1;
-        j <
-        Math.min(
-          lines.length,
-          i + 4
-        );
-        j++
+      if (
+        value != null &&
+        value >= 4000 &&
+        value <= 20000
       ) {
-        const match =
-          lines[j].match(
-            /^([\d,.]+)$/
-          );
+        /*
+         * Prefer numbers that occur near combat-power terminology.
+         */
+        const index = script.indexOf(raw);
+        const nearby = script.slice(
+          Math.max(0, index - 500),
+          index + 500
+        );
 
-        if (match) {
-          ilvl = Number(
-            match[1].replace(
-              /,/g,
-              ''
-            )
-          );
-          break;
+        if (/combat|power|cp/i.test(nearby)) {
+          return {
+            value,
+            source: 'Estimated Raid Loadout'
+          };
         }
       }
+    }
+  }
 
-      if (ilvl != null) {
-        break;
+  /*
+   * Fallback: look for the exact CP pattern in the visible HTML.
+   *
+   * This catches the user's current known value:
+   *
+   * <span class="text-red-400">8348.83</span>
+   *
+   * without accidentally treating 8740.84 as the raid CP if the
+   * estimated value is present elsewhere.
+   */
+  const explicitCPValues = [];
+
+  const cpPatterns = [
+    /<span[^>]*>\s*(\d{4,5}\.\d{1,2})\s*<\/span>/gi,
+    />(\d{4,5}\.\d{1,2})</gi
+  ];
+
+  for (const regex of cpPatterns) {
+    let match;
+
+    while ((match = regex.exec(html)) !== null) {
+      const value = cleanNumber(match[1]);
+
+      if (
+        value != null &&
+        value >= 4000 &&
+        value <= 20000
+      ) {
+        explicitCPValues.push(value);
       }
     }
   }
 
   /*
-   * Ark Grid
+   * If only one plausible decimal CP is present, it is safe to use.
    */
+  const uniqueExplicit = [...new Set(explicitCPValues)];
+
+  if (uniqueExplicit.length === 1) {
+    return {
+      value: uniqueExplicit[0],
+      source: 'Estimated Raid Loadout'
+    };
+  }
+
+  /*
+   * Current Loadout (Raid) is the final acceptable fallback.
+   *
+   * We deliberately do NOT search anything associated with
+   * Chaos Dungeon Loadout.
+   */
+  const currentRaidSections = [];
+
+  const currentRaidRegexes = [
+    /Current Loadout\s*\(Raid\)[\s\S]{0,5000}/gi,
+    /most_recent_raid[\s\S]{0,5000}/gi,
+    /current_raid[\s\S]{0,5000}/gi
+  ];
+
+  for (const regex of currentRaidRegexes) {
+    const matches = html.match(regex) || [];
+
+    for (const match of matches) {
+      currentRaidSections.push(match);
+    }
+  }
+
+  for (const section of currentRaidSections) {
+    const cpMatches =
+      section.match(/\b(?:[4-9]\d{3}|1\d{4})(?:\.\d{1,2})?\b/g) || [];
+
+    for (const raw of cpMatches) {
+      const value = cleanNumber(raw);
+
+      if (
+        value != null &&
+        value >= 4000 &&
+        value <= 20000 &&
+        /combat|power|cp/i.test(section)
+      ) {
+        return {
+          value,
+          source: 'Current Loadout (Raid)'
+        };
+      }
+    }
+  }
+
+  /*
+   * Last-resort current raid detection.
+   */
+  const currentRaidButton =
+    [...doc.querySelectorAll('button')].find((button) =>
+      /current loadout\s*\(raid\)/i.test(
+        (button.textContent || '').replace(/\s+/g, ' ').trim()
+      )
+    );
+
+  if (currentRaidButton) {
+    /*
+     * If the page is currently displaying Current Loadout (Raid),
+     * use the visible CP only as a raid value.
+     */
+    const visibleCP = findNumericAfterLabel(
+      lines,
+      'Combat Power',
+      (n) => n >= 4000 && n <= 20000
+    );
+
+    if (visibleCP != null) {
+      return {
+        value: visibleCP,
+        source: 'Current Loadout (Raid)'
+      };
+    }
+  }
+
+  return {
+    value: null,
+    source: 'No acceptable raid CP found'
+  };
+}
+
+function findProfileName(doc, expectedName) {
+  const heading = doc.querySelector('h1');
+
+  if (heading) {
+    const name = (heading.textContent || '').replace(/\s+/g, ' ').trim();
+
+    if (name) return name;
+  }
+
+  /*
+   * Fall back to the supplied Bible URL name.
+   */
+  return expectedName || 'Unknown';
+}
+
+function detectLoadout(doc) {
+  const buttons = [...doc.querySelectorAll('button')].map((button) => ({
+    text: (button.textContent || '').replace(/\s+/g, ' ').trim(),
+    button
+  }));
+
+  const estimatedButton = buttons.find((x) =>
+    /estimated raid loadout/i.test(x.text)
+  );
+
+  const currentRaidButton = buttons.find((x) =>
+    /current loadout\s*\(raid\)/i.test(x.text)
+  );
+
+  const chaosButton = buttons.find((x) =>
+    /chaos dungeon loadout/i.test(x.text)
+  );
+
+  const scripts = [...doc.scripts]
+    .map((s) => s.textContent || '')
+    .filter(Boolean);
+
+  const estimatedData = scripts.some((s) =>
+    /estimated_raid|estimated raid|raid_merged|estimatedRaid/i.test(s)
+  );
+
+  if (estimatedButton || estimatedData) {
+    return {
+      label: 'Estimated Raid Loadout',
+      estimatedRaidAvailable: true,
+      currentRaidAvailable: !!currentRaidButton,
+      chaosDungeonDetected: !!chaosButton
+    };
+  }
+
+  if (currentRaidButton) {
+    return {
+      label: 'Current Loadout (Raid)',
+      estimatedRaidAvailable: false,
+      currentRaidAvailable: true,
+      chaosDungeonDetected: !!chaosButton
+    };
+  }
+
+  return {
+    label: 'No acceptable raid loadout found',
+    estimatedRaidAvailable: false,
+    currentRaidAvailable: false,
+    chaosDungeonDetected: !!chaosButton
+  };
+}
+
+function parseProfile(html, expectedName) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const lines = linesFromDoc(doc);
+
+  const name = findProfileName(doc, expectedName);
+  const cls = findClass(doc, lines, expectedName);
+  const ilvl = findItemLevel(doc, lines);
+
+  const raidCP = extractRaidCPFromHTML(doc, lines);
+  const loadout = detectLoadout(doc);
+
+  const text = lines.join('\n');
 
   const arkGrid = [];
 
-  const gridStart =
-    lines.findIndex(
-      (line) =>
-        line === 'Ark Grid'
-    );
+  const gridStart = lines.findIndex((x) => x === 'Ark Grid');
 
   if (gridStart >= 0) {
     for (
       let i = gridStart + 1;
-      i <
-      Math.min(
-        lines.length,
-        gridStart + 110
-      );
+      i < Math.min(lines.length, gridStart + 110);
       i++
     ) {
       if (
@@ -630,428 +587,322 @@ function parseProfile(
           lines[i]
         )
       ) {
-        arkGrid.push(
-          lines[i]
-        );
+        arkGrid.push(lines[i]);
       }
     }
   }
 
-  /*
-   * Engravings
-   */
-
   const engravings = [];
 
-  const engravingStart =
-    lines.findIndex(
-      (line) =>
-        line === 'Engravings'
-    );
+  const eStart = lines.findIndex((x) => x === 'Engravings');
 
-  if (engravingStart >= 0) {
+  if (eStart >= 0) {
     for (
-      let i =
-        engravingStart + 1;
-      i <
-      Math.min(
-        lines.length,
-        engravingStart + 35
-      );
+      let i = eStart + 1;
+      i < Math.min(lines.length, eStart + 35);
       i++
     ) {
-      const match =
-        lines[i].match(
-          /^(.+?)\s+(\d+)\/20(?:\s*[+]?\d+)?$/
-        );
+      const m = lines[i].match(
+        /^(.+?)\s+(\d+)\/20(?:\s*[+]?\d+)?$/
+      );
 
-      if (match) {
+      if (m) {
         engravings.push({
-          name: match[1],
-          level: Number(
-            match[2]
-          ),
+          name: m[1],
+          level: Number(m[2])
         });
       }
     }
   }
 
-  /*
-   * Ark Passive
-   */
-
   const arkPassive = {};
 
-  const arkPassiveStart =
-    lines.findIndex(
-      (line) =>
-        line === 'Ark Passive'
-    );
+  const apStart = lines.findIndex((x) => x === 'Ark Passive');
 
-  if (arkPassiveStart >= 0) {
+  if (apStart >= 0) {
     for (
-      let i =
-        arkPassiveStart + 1;
-      i <
-      Math.min(
-        lines.length,
-        arkPassiveStart + 110
-      );
+      let i = apStart + 1;
+      i < Math.min(lines.length, apStart + 110);
       i++
     ) {
-      const match =
-        lines[i].match(
-          /^(.*?)\s+Lv\.\s*(\d+)$/
-        );
+      const m = lines[i].match(
+        /^(.*?)\s+Lv\.\s*(\d+)$/
+      );
 
       if (
-        match &&
-        match[1] &&
-        !/^T\d$/i.test(
-          match[1]
-        ) &&
-        ![
-          'Evolution',
-          'Enlightenment',
-          'Leap',
-        ].includes(
-          match[1].trim()
+        m &&
+        m[1] &&
+        !/^T\d$/i.test(m[1]) &&
+        !['Evolution', 'Enlightenment', 'Leap'].includes(
+          m[1].trim()
         )
       ) {
-        arkPassive[
-          match[1].trim()
-        ] = Number(
-          match[2]
-        );
+        arkPassive[m[1].trim()] = Number(m[2]);
       }
     }
   }
 
-  /*
-   * Ark Grid effects
-   */
-
   const gridEffects = [];
 
-  for (
-    let i = 0;
-    i < lines.length;
-    i++
-  ) {
-    const match =
-      lines[i].match(
-        /^Lv\.\s*(\d+)\s+(.+?)\s+([+-]\d+(?:\.\d+)?%)$/
-      );
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(
+      /^Lv\.\s*(\d+)\s+(.+?)\s+([+-]\d+(?:\.\d+)?%)$/
+    );
 
-    if (match) {
+    if (m) {
       gridEffects.push({
-        level: Number(
-          match[1]
-        ),
-        effect: match[2],
-        value: match[3],
+        level: Number(m[1]),
+        effect: m[2],
+        value: m[3]
       });
     }
   }
 
-  /*
-   * Summary values
-   */
-
   const summary = {};
 
-  for (
-    const label of [
-      'Ark Passive',
-      'Ark Grid',
-      'Engravings',
-      'Accessory Effects',
-      'Bracelet Effects',
-      'Gems',
-    ]
-  ) {
-    const index =
-      lines.findIndex(
-        (line) =>
-          line === label
-      );
+  for (const label of [
+    'Ark Passive',
+    'Ark Grid',
+    'Engravings',
+    'Accessory Effects',
+    'Bracelet Effects',
+    'Gems'
+  ]) {
+    const idx = lines.findIndex((x) => x === label);
 
     if (
-      index >= 0 &&
-      lines[index + 1] &&
-      /^[+-]\d/.test(
-        lines[index + 1]
-      )
+      idx >= 0 &&
+      lines[idx + 1] &&
+      /^[+-]\d/.test(lines[idx + 1])
     ) {
-      summary[label] =
-        lines[index + 1];
-    }
-  }
-
-  /*
-   * Serialized loadout information.
-   */
-
-  let serializedLoadout = null;
-
-  for (
-    const script of
-    [...doc.scripts]
-  ) {
-    const scriptText =
-      script.textContent || '';
-
-    if (
-      /raid_merged|most_recent_raid|most_recent_chaos_dungeon/.test(
-        scriptText
-      )
-    ) {
-      serializedLoadout =
-        scriptText;
-      break;
+      summary[label] = lines[idx + 1];
     }
   }
 
   return {
     name,
-    class:
-      characterClass ||
-      'Unknown',
-
-    /*
-     * This is RAID LOADOUT CP.
-     *
-     * It is deliberately NOT the
-     * historical/header CP.
-     */
-
-    cp,
-
+    class: cls || 'Unknown',
+    cp: raidCP.value,
+    cpSource: raidCP.source,
     ilvl,
-
     arkGrid,
     gridEffects,
     arkPassive,
     engravings,
     summary,
+    gemsIncomplete: /Gems incomplete\./i.test(text),
 
-    gemsIncomplete:
-      /Gems incomplete\./i.test(
-        lines.join('\n')
-      ),
-
-    loadout:
-      selectedLoadout,
+    /*
+     * Keep the selected loadout visible in the dashboard.
+     */
+    loadout: loadout.label,
 
     loadoutSelection: {
-      estimatedRaidAvailable:
-        !!estimatedButton,
-
-      currentRaidAvailable:
-        !!currentRaidButton,
-
-      chaosDungeonDetected:
-        !!chaosButton,
-
-      serializedRaidDataDetected:
-        !!serializedLoadout,
-
-      cpSource:
-        cp != null
-          ? selectedLoadout
-          : 'No raid loadout CP found',
+      estimatedRaidAvailable: loadout.estimatedRaidAvailable,
+      currentRaidAvailable: loadout.currentRaidAvailable,
+      chaosDungeonDetected: loadout.chaosDungeonDetected
     },
 
-    retrievedAt:
-      new Date().toISOString(),
+    retrievedAt: new Date().toISOString()
   };
 }
 
-/* =========================================================
-   BIBLE FETCH
-   ========================================================= */
-
-async function fetchCharacter(character) {
+async function fetchCharacter(c) {
   const endpoint =
-    `${BIBLE_CONNECTOR}?url=` +
-    encodeURIComponent(
-      character.url
-    );
+    `${BIBLE_CONNECTOR}?url=${encodeURIComponent(c.url)}`;
 
-  const response =
-    await fetch(endpoint, {
-      method: 'GET',
-      cache: 'no-store',
-    });
+  const r = await fetch(endpoint, {
+    cache: 'no-store'
+  });
 
   let data;
 
   try {
-    data =
-      await response.json();
+    data = await r.json();
   } catch {
     throw new Error(
-      `Connector returned HTTP ${response.status}`
+      `Connector returned HTTP ${r.status}`
     );
   }
 
-  if (
-    !response.ok ||
-    !data.ok
-  ) {
+  if (!r.ok || !data.ok) {
     throw new Error(
       data?.error ||
-        `Connector returned HTTP ${response.status}`
+        `Connector returned HTTP ${r.status}`
     );
   }
 
-  return parseProfile(
-    data.html,
-    character.name
-  );
+  return parseProfile(data.html, c.name);
 }
 
-/* =========================================================
-   REFRESH PROFILES
-   ========================================================= */
-
 async function refreshProfiles() {
-  if (
-    !state.characters.length
-  ) {
-    setStatus(
-      'Add at least one character first'
-    );
+  if (!state.characters.length) {
+    $('#status').textContent =
+      'Add at least one character first';
+
     return;
   }
 
-  setStatus(
-    'Refreshing specific character profiles…'
-  );
+  $('#status').textContent =
+    'Refreshing specific character profiles…';
 
-  let successCount = 0;
-  let failedCount = 0;
+  let ok = 0;
+  let failed = 0;
 
-  for (
-    const character of
-    state.characters
-  ) {
+  for (const c of state.characters) {
     try {
-      character.profile =
-        await fetchCharacter(
-          character
-        );
-
-      delete character.profileError;
-
-      successCount++;
-    } catch (error) {
-      character.profileError =
-        error?.message ||
-        'Profile retrieval failed.';
-
-      failedCount++;
+      c.profile = await fetchCharacter(c);
+      delete c.profileError;
+      ok++;
+    } catch (e) {
+      c.profileError = e.message;
+      failed++;
     }
   }
 
   save();
   render();
 
-  if (failedCount) {
-    setStatus(
-      `Refreshed ${successCount} profile${
-        successCount === 1
-          ? ''
-          : 's'
-      }; ${failedCount} failed.`
-    );
-  } else {
-    setStatus(
-      `Refreshed ${successCount} profile${
-        successCount === 1
-          ? ''
-          : 's'
-      } from Bible.`
-    );
-  }
+  $('#status').textContent = failed
+    ? `Refreshed ${ok} profile${ok === 1 ? '' : 's'}; ${failed} failed.`
+    : `Refreshed ${ok} profile${ok === 1 ? '' : 's'} from Bible.`;
 }
 
-/* =========================================================
-   CHARACTER REMOVAL
-   ========================================================= */
+function render() {
+  const chars = state.characters;
 
-function performRemoveCharacter(
-  character
-) {
-  state.characters =
-    state.characters.filter(
-      (item) =>
-        item.id !== character.id
+  const il = chars
+    .map((x) => x.profile?.ilvl)
+    .filter(Number.isFinite);
+
+  const cp = chars
+    .map((x) => x.profile?.cp)
+    .filter(Number.isFinite);
+
+  $('#playerCount').textContent =
+    `${chars.length} / ${MAX_CHARACTERS}`;
+
+  $('#avgIlvl').textContent = il.length
+    ? Math.round(
+        il.reduce((a, b) => a + b, 0) / il.length
+      )
+    : '—';
+
+  $('#avgCp').textContent = cp.length
+    ? Math.round(
+        cp.reduce((a, b) => a + b, 0) / cp.length
+      ).toLocaleString()
+    : '—';
+
+  $('#dataMode').textContent =
+    'Bible profiles';
+
+  $('#rosterNote').textContent =
+    'Only explicitly supplied character URLs are retrieved. No roster/account-wide data is imported. Raid loadout priority: Estimated Raid → Current Loadout (Raid). Chaos Dungeon is never selected.';
+
+  $('#roster').innerHTML =
+    chars
+      .map(
+        (c) => `
+        <article class="character">
+          <div class="character-head">
+            <div>
+              <h3>${esc(c.profile?.name || c.name)}</h3>
+              <div class="class">
+                ${esc(c.profile?.class || 'Profile pending')}
+              </div>
+            </div>
+
+            <button
+              class="remove-character"
+              data-id="${esc(c.id)}"
+              type="button"
+              aria-label="Remove ${esc(c.name)}"
+            >
+              Remove
+            </button>
+          </div>
+
+          <div class="stats">
+            <div class="stat">
+              iLvl
+              <b>${fmt(c.profile?.ilvl)}</b>
+            </div>
+
+            <div class="stat">
+              CP
+              <b>${fmt(c.profile?.cp)}</b>
+            </div>
+          </div>
+
+          <div class="privacy-note">
+            ${
+              c.profile
+                ? `Bible profile loaded · ${esc(
+                    c.profile.loadout
+                  )} page data`
+                : esc(
+                    c.profileError ||
+                      'Profile pending'
+                  )
+            }
+          </div>
+        </article>
+      `
+      )
+      .join('') ||
+    '<div class="empty-roster">No designated main characters have been added.</div>';
+
+  document
+    .querySelectorAll('.remove-character')
+    .forEach((btn) =>
+      btn.addEventListener('click', () =>
+        removeCharacter(btn.dataset.id)
+      )
     );
+
+  renderSuggestions();
+}
+
+function performRemoveCharacter(c) {
+  state.characters = state.characters.filter(
+    (x) => x.id !== c.id
+  );
 
   save();
 
   /*
-   * Keep this as a simple status message.
-   * There is deliberately NO changelog/history section.
+   * No changelog/status message is generated for removal.
+   * The user specifically requested that character-removal
+   * messages not appear at the top of the dashboard.
    */
-
-  setStatus(
-    `${character.name} removed`
-  );
 
   render();
 }
 
 function removeCharacter(id) {
-  const character =
-    state.characters.find(
-      (item) =>
-        item.id === id
-    );
+  const c = state.characters.find(
+    (x) => x.id === id
+  );
 
-  if (!character) {
-    return;
-  }
-
-  /*
-   * If the user previously chose
-   * "Don't ask me again", remove directly.
-   */
+  if (!c) return;
 
   if (
-    localStorage.getItem(
-      REMOVE_CONFIRM_KEY
-    ) === '1'
+    localStorage.getItem(REMOVE_CONFIRM_KEY) === '1'
   ) {
-    performRemoveCharacter(
-      character
-    );
-
+    performRemoveCharacter(c);
     return;
   }
 
-  showRemoveDialog(
-    character
-  );
+  showRemoveDialog(c);
 }
 
-function showRemoveDialog(
-  character
-) {
-  document
-    .querySelector(
-      '.remove-modal'
-    )
-    ?.remove();
+function showRemoveDialog(c) {
+  document.querySelector('.remove-modal')?.remove();
 
-  const overlay =
-    document.createElement(
-      'div'
-    );
+  const overlay = document.createElement('div');
 
-  overlay.className =
-    'remove-modal';
+  overlay.className = 'remove-modal';
 
   overlay.innerHTML = `
     <div
@@ -1066,9 +917,7 @@ function showRemoveDialog(
 
       <p>
         Are you sure you want to remove
-        <strong>${esc(
-          character.name
-        )}</strong>
+        <strong>${esc(c.name)}</strong>
         from Available Characters?
       </p>
 
@@ -1098,42 +947,24 @@ function showRemoveDialog(
     </div>
   `;
 
-  document.body.appendChild(
-    overlay
-  );
+  document.body.appendChild(overlay);
 
-  const close = () =>
-    overlay.remove();
+  const close = () => overlay.remove();
 
-  overlay
-    .querySelector(
-      '.remove-cancel'
-    )
-    .onclick = close;
+  overlay.querySelector('.remove-cancel').onclick =
+    close;
 
-  overlay.addEventListener(
-    'click',
-    (event) => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  overlay.querySelector('.remove-confirm').onclick =
+    () => {
       if (
-        event.target ===
-        overlay
-      ) {
-        close();
-      }
-    }
-  );
-
-  overlay
-    .querySelector(
-      '.remove-confirm'
-    )
-    .onclick = () => {
-      const skip =
         overlay.querySelector(
           '#remove-confirm-skip'
-        ).checked;
-
-      if (skip) {
+        ).checked
+      ) {
         localStorage.setItem(
           REMOVE_CONFIRM_KEY,
           '1'
@@ -1141,76 +972,29 @@ function showRemoveDialog(
       }
 
       close();
-
-      performRemoveCharacter(
-        character
-      );
+      performRemoveCharacter(c);
     };
 
   overlay
-    .querySelector(
-      '.remove-confirm'
-    )
+    .querySelector('.remove-confirm')
     .focus();
 }
 
-/* =========================================================
-   PARTY / OPTIMIZATION DISPLAY
-   ========================================================= */
-
 function renderSuggestions() {
-  const element =
-    $('#suggestedParties');
+  const el = $('#suggestedParties');
 
-  if (!element) {
-    return;
-  }
-
-  if (
-    !state.characters.length
-  ) {
-    element.innerHTML =
-      `
-      <div class="empty-roster">
-        Add specific character profiles to generate the two-party optimization.
-      </div>
-      `;
+  if (!state.characters.length) {
+    el.innerHTML =
+      '<div class="empty-roster">Add specific character profiles to generate the two-party optimization.</div>';
 
     return;
   }
 
-  const complete =
-    state.characters.filter(
-      (character) =>
-        character.profile
-    );
+  const complete = state.characters.filter(
+    (c) => c.profile
+  );
 
-  let partyContent = '';
-
-  if (
-    state.parties &&
-    typeof state.parties ===
-      'object'
-  ) {
-    partyContent =
-      `
-      <article class="party">
-        <h3>Party Setup</h3>
-        <div class="score">
-          ${esc(
-            JSON.stringify(
-              state.parties
-            )
-          )}
-        </div>
-        <p class="privacy-note">
-          Shared party information is stored locally and can be included in a snapshot.
-        </p>
-      </article>
-      `;
-  }
-
-  element.innerHTML = `
+  el.innerHTML = `
     <article class="party">
       <h3>Optimization engine</h3>
 
@@ -1224,8 +1008,8 @@ function renderSuggestions() {
           complete.length >= 8
             ? 'Ready for the full 4 + 4 optimizer.'
             : complete.length >= 2
-              ? 'Profiles are loaded. The synergy/character-strength optimizer will be enabled as its scoring rules are added.'
-              : 'Load at least two complete profiles to begin optimization.'
+            ? 'Profiles are loaded. The synergy/character-strength optimizer will be enabled as its scoring rules are added.'
+            : 'Load at least two complete profiles to begin optimization.'
         }
       </p>
     </article>
@@ -1235,28 +1019,17 @@ function renderSuggestions() {
 
       <div class="score">
         ${
-          complete.length
-            ? complete
-                .map(
-                  (character) =>
-                    `${esc(
-                      character.profile
-                        ?.name ||
-                        character.name
-                    )} · ${esc(
-                      character.profile
-                        ?.class ||
-                        'Unknown'
-                    )} · ${fmt(
-                      character.profile
-                        ?.ilvl
-                    )} · CP ${fmt(
-                      character.profile
-                        ?.cp
-                    )}`
-                )
-                .join('<br>')
-            : 'No complete profiles yet'
+          complete
+            .map(
+              (c) =>
+                `${esc(c.profile.name)} · ${esc(
+                  c.profile.class
+                )} · ${fmt(
+                  c.profile.ilvl
+                )} · CP ${fmt(c.profile.cp)}`
+            )
+            .join('<br>') ||
+          'No complete profiles yet'
         }
       </div>
 
@@ -1265,523 +1038,49 @@ function renderSuggestions() {
         No roster/siblings/account-wide endpoint is used.
       </p>
     </article>
-
-    ${partyContent}
   `;
 }
 
-/* =========================================================
-   MAIN RENDER
-   ========================================================= */
-
-function render() {
-  const characters =
-    state.characters;
-
-  const ilvls =
-    characters
-      .map(
-        (character) =>
-          character.profile
-            ?.ilvl
-      )
-      .filter(
-        Number.isFinite
-      );
-
-  const cps =
-    characters
-      .map(
-        (character) =>
-          character.profile
-            ?.cp
-      )
-      .filter(
-        Number.isFinite
-      );
-
-  const playerCount =
-    $('#playerCount');
-
-  if (playerCount) {
-    playerCount.textContent =
-      `${characters.length} / ${MAX_CHARACTERS}`;
-  }
-
-  const avgIlvl =
-    $('#avgIlvl');
-
-  if (avgIlvl) {
-    avgIlvl.textContent =
-      ilvls.length
-        ? Math.round(
-            ilvls.reduce(
-              (total, value) =>
-                total + value,
-              0
-            ) / ilvls.length
-          )
-        : '—';
-  }
-
-  const avgCp =
-    $('#avgCp');
-
-  if (avgCp) {
-    avgCp.textContent =
-      cps.length
-        ? Math.round(
-            cps.reduce(
-              (total, value) =>
-                total + value,
-              0
-            ) / cps.length
-          ).toLocaleString()
-        : '—';
-  }
-
-  const dataMode =
-    $('#dataMode');
-
-  if (dataMode) {
-    dataMode.textContent =
-      'Bible profiles';
-  }
-
-  const rosterNote =
-    $('#rosterNote');
-
-  if (rosterNote) {
-    rosterNote.textContent =
-      'Only explicitly supplied character URLs are retrieved. No roster/account-wide data is imported. Raid loadout priority: Estimated Raid → Current Loadout (Raid). Chaos Dungeon is never selected.';
-  }
-
-  const roster =
-    $('#roster');
-
-  if (roster) {
-    roster.innerHTML =
-      characters
-        .map(
-          (character) => {
-            const profile =
-              character.profile;
-
-            return `
-              <article class="character">
-
-                <div class="character-head">
-
-                  <div>
-                    <h3>
-                      ${esc(
-                        profile?.name ||
-                          character.name
-                      )}
-                    </h3>
-
-                    <div class="class">
-                      ${esc(
-                        profile?.class ||
-                          'Profile pending'
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    class="remove-character"
-                    data-id="${esc(
-                      character.id
-                    )}"
-                    type="button"
-                    aria-label="Remove ${esc(
-                      character.name
-                    )}"
-                  >
-                    Remove
-                  </button>
-
-                </div>
-
-                <div class="stats">
-
-                  <div class="stat">
-                    iLvl
-                    <b>
-                      ${fmt(
-                        profile?.ilvl
-                      )}
-                    </b>
-                  </div>
-
-                  <div class="stat">
-                    CP
-                    <b>
-                      ${fmt(
-                        profile?.cp
-                      )}
-                    </b>
-                  </div>
-
-                </div>
-
-                <div class="privacy-note">
-                  ${
-                    profile
-                      ? `Bible profile loaded · ${esc(
-                          profile.loadout ||
-                            'Raid loadout'
-                        )} page data`
-                      : esc(
-                          character.profileError ||
-                            'Profile pending'
-                        )
-                  }
-                </div>
-
-              </article>
-            `;
-          }
-        )
-        .join('') ||
-      `
-        <div class="empty-roster">
-          No designated main characters have been added.
-        </div>
-      `;
-
-    document
-      .querySelectorAll(
-        '.remove-character'
-      )
-      .forEach(
-        (button) => {
-          button.addEventListener(
-            'click',
-            () =>
-              removeCharacter(
-                button.dataset.id
-              )
-          );
-        }
-      );
-  }
-
-  renderSuggestions();
-}
-
-/* =========================================================
-   ADD CHARACTER
-   ========================================================= */
-
-function addCharacter() {
-  const input =
-    $('#characterUrl');
-
-  if (!input) {
-    return;
-  }
-
-  if (
-    state.characters.length >=
-    MAX_CHARACTERS
-  ) {
-    setStatus(
-      `Maximum of ${MAX_CHARACTERS} designated characters reached.`
-    );
-
-    return;
-  }
-
-  const value =
-    input.value.trim();
-
-  const parsed =
-    bibleUrl(value);
-
-  if (!parsed) {
-    setStatus(
-      'Enter a valid lostark.bible character URL'
-    );
-
-    return;
-  }
-
-  const duplicate =
-    state.characters.some(
-      (character) =>
-        character.url ===
-        parsed.url
-    );
-
-  if (duplicate) {
-    setStatus(
-      'That character is already added'
-    );
-
-    return;
-  }
-
-  state.characters.push({
-    id: crypto.randomUUID(),
-    ...parsed,
-    profile: null,
-  });
-
-  save();
-
-  input.value = '';
-
-  setStatus(
-    'Character added locally; click Refresh Profiles to retrieve it'
-  );
-
-  render();
-}
-
-/* =========================================================
-   OPTIMIZE
-   ========================================================= */
-
-function optimizeParties() {
-  const complete =
-    state.characters.filter(
-      (character) =>
-        character.profile
-    );
-
-  if (
-    complete.length < 2
-  ) {
-    setStatus(
-      'Load at least two complete character profiles first'
-    );
-
-    renderSuggestions();
-
-    return;
-  }
-
-  /*
-   * The real scoring engine can populate
-   * state.parties later.
-   *
-   * Keeping this field in state means the
-   * Share Snapshot feature automatically
-   * carries it when it exists.
-   */
-
-  setStatus(
-    'Optimization scoring is the next layer; character retrieval is active.'
-  );
-
-  renderSuggestions();
-}
-
-/* =========================================================
-   CHARACTER COMPARISON
-   ========================================================= */
-
-async function compareCharacter() {
-  const input =
-    $('#testCharacterUrl');
-
-  if (!input) {
-    return;
-  }
-
-  const parsed =
-    bibleUrl(
-      input.value.trim()
-    );
-
-  if (!parsed) {
-    setStatus(
-      'Enter a valid Bible character URL for the test character'
-    );
-
-    return;
-  }
-
-  const testCharacter = {
-    ...parsed,
-  };
-
-  setStatus(
-    `Retrieving ${parsed.name}…`
-  );
-
-  try {
-    testCharacter.profile =
-      await fetchCharacter(
-        testCharacter
-      );
-
-    state.testCharacter =
-      testCharacter;
-
-    save();
-
-    const comparison =
-      $('#comparison');
-
-    if (comparison) {
-      comparison.innerHTML = `
-        <div class="comparison-grid">
-
-          <div class="comparison-card">
-            <span>Current pool</span>
-            <b>
-              ${state.characters.length}
-              characters
-            </b>
-          </div>
-
-          <div class="comparison-card">
-            <span>Test character</span>
-
-            <b>
-              ${esc(
-                testCharacter.profile
-                  .name
-              )}
-              ·
-              ${esc(
-                testCharacter.profile
-                  .class
-              )}
-            </b>
-
-            <div class="delta">
-              iLvl
-              ${fmt(
-                testCharacter.profile
-                  .ilvl
-              )}
-              · CP
-              ${fmt(
-                testCharacter.profile
-                  .cp
-              )}
-            </div>
-          </div>
-
-          <div class="comparison-card">
-            <span>Result</span>
-
-            <b>
-              Profile loaded
-            </b>
-
-            <div class="delta">
-              ${esc(
-                testCharacter.profile
-                  .loadout
-              )}.
-              Optimization percentage
-              will be calculated after
-              the party scoring engine
-              is enabled.
-            </div>
-          </div>
-
-        </div>
-      `;
-    }
-
-    setStatus(
-      `Loaded test character ${testCharacter.profile.name}`
-    );
-  } catch (error) {
-    setStatus(
-      `Test character retrieval failed: ${
-        error?.message ||
-        'Unknown error'
-      }`
-    );
-  }
-}
-
-/* =========================================================
+/* ============================================================
    SHARE SNAPSHOT
-   ========================================================= */
+   ============================================================ */
 
-/*
- * The snapshot contains only the dashboard's
- * parsed character/profile state.
- *
- * It does NOT contain the raw Bible HTML.
- *
- * That keeps the share URL substantially smaller
- * and avoids unnecessarily copying the entire
- * source page into the URL.
- */
-
-function createShareState() {
+function createShareSnapshot() {
   return {
     version: 1,
+    createdAt: new Date().toISOString(),
 
-    characters:
-      state.characters.map(
-        (character) => ({
-          id: character.id,
-          url: character.url,
-          region: character.region,
-          name: character.name,
-          profile:
-            character.profile ||
-            null,
-        })
-      ),
+    characters: state.characters.map((c) => ({
+      id: c.id,
+      url: c.url,
+      region: c.region,
+      name: c.name,
+      profile: c.profile || null
+    })),
 
-    testCharacter:
-      state.testCharacter ||
-      null,
-
-    parties:
-      state.parties ||
-      null,
-
-    createdAt:
-      new Date().toISOString(),
+    testCharacter: state.testCharacter
+      ? {
+          url: state.testCharacter.url,
+          region: state.testCharacter.region,
+          name: state.testCharacter.name,
+          profile: state.testCharacter.profile || null
+        }
+      : null
   };
 }
 
-function encodeSnapshot(
-  value
-) {
-  const json =
-    JSON.stringify(value);
+function encodeShareSnapshot(snapshot) {
+  const json = JSON.stringify(snapshot);
 
-  /*
-   * UTF-8 safe Base64.
-   */
-
-  const bytes =
-    new TextEncoder().encode(
-      json
-    );
+  const bytes = new TextEncoder().encode(json);
 
   let binary = '';
 
-  const chunkSize = 0x8000;
-
-  for (
-    let i = 0;
-    i < bytes.length;
-    i += chunkSize
-  ) {
+  for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(
-      ...bytes.subarray(
-        i,
-        i + chunkSize
-      )
+      ...bytes.subarray(i, i + 0x8000)
     );
   }
-
-  /*
-   * URL-safe Base64.
-   */
 
   return btoa(binary)
     .replace(/\+/g, '-')
@@ -1789,361 +1088,324 @@ function encodeSnapshot(
     .replace(/=+$/g, '');
 }
 
-function decodeSnapshot(
-  encoded
-) {
+function buildShareLink() {
+  const encoded = encodeShareSnapshot(
+    createShareSnapshot()
+  );
+
+  const url = new URL(
+    window.location.href
+  );
+
+  url.hash = `share=${encoded}`;
+
+  return url.toString();
+}
+
+async function copyShareLink() {
+  const link = buildShareLink();
+
   try {
-    const normalized =
+    await navigator.clipboard.writeText(link);
+
+    $('#status').textContent =
+      'Share link copied to clipboard.';
+  } catch {
+    /*
+     * Clipboard API can be blocked in some browsers.
+     * Fall back to a temporary input.
+     */
+    const input =
+      document.createElement('textarea');
+
+    input.value = link;
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+
+    document.body.appendChild(input);
+
+    input.focus();
+    input.select();
+
+    let copied = false;
+
+    try {
+      copied =
+        document.execCommand('copy');
+    } catch {
+      copied = false;
+    }
+
+    input.remove();
+
+    $('#status').textContent = copied
+      ? 'Share link copied to clipboard.'
+      : 'Unable to copy automatically. The share link could not be copied.';
+  }
+}
+
+function decodeShareSnapshot(encoded) {
+  try {
+    let binary = atob(
       encoded
         .replace(/-/g, '+')
-        .replace(/_/g, '/');
+        .replace(/_/g, '/')
+    );
 
-    const padding =
-      normalized.length % 4;
+    const bytes = new Uint8Array(
+      binary.length
+    );
 
-    const padded =
-      normalized +
-      (padding
-        ? '='.repeat(
-            4 - padding
-          )
-        : '');
-
-    const binary =
-      atob(padded);
-
-    const bytes =
-      Uint8Array.from(
-        binary,
-        (character) =>
-          character.charCodeAt(0)
-      );
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
 
     const json =
-      new TextDecoder().decode(
-        bytes
-      );
+      new TextDecoder().decode(bytes);
 
-    return JSON.parse(json);
+    const snapshot = JSON.parse(json);
+
+    if (
+      !snapshot ||
+      snapshot.version !== 1 ||
+      !Array.isArray(snapshot.characters)
+    ) {
+      return null;
+    }
+
+    return snapshot;
   } catch {
     return null;
   }
 }
 
-function getSnapshotFromUrl() {
+function loadShareSnapshotFromURL() {
   const hash =
     window.location.hash || '';
 
-  if (
-    !hash.startsWith(
-      SHARE_PREFIX
-    )
-  ) {
-    return null;
-  }
-
-  const encoded =
-    hash.slice(
-      SHARE_PREFIX.length
-    );
-
-  if (!encoded) {
-    return null;
-  }
-
-  return decodeSnapshot(
-    encoded
-  );
-}
-
-function applySharedSnapshot() {
-  const snapshot =
-    getSnapshotFromUrl();
-
-  if (
-    !snapshot ||
-    !Array.isArray(
-      snapshot.characters
-    )
-  ) {
+  if (!hash.startsWith('#share=')) {
     return false;
   }
 
-  const imported =
-    normalizeState({
-      characters:
-        snapshot.characters,
-      testCharacter:
-        snapshot.testCharacter ||
-        null,
-      parties:
-        snapshot.parties ||
-        null,
-    });
+  const encoded =
+    hash.slice('#share='.length);
 
+  if (!encoded) return false;
+
+  const snapshot =
+    decodeShareSnapshot(encoded);
+
+  if (!snapshot) {
+    $('#status').textContent =
+      'The share link is invalid or corrupted.';
+
+    return false;
+  }
+
+  /*
+   * Import the snapshot into this browser.
+   *
+   * This does not fetch Bible data automatically.
+   * The recipient receives the character/profile snapshot
+   * exactly as it existed when the link was created.
+   */
   state.characters =
-    imported.characters;
+    snapshot.characters
+      .slice(0, MAX_CHARACTERS)
+      .map((c) => ({
+        id:
+          c.id ||
+          crypto.randomUUID(),
+        url: c.url,
+        region: c.region,
+        name: c.name,
+        profile: c.profile || null
+      }));
 
   state.testCharacter =
-    imported.testCharacter;
-
-  state.parties =
-    imported.parties;
+    snapshot.testCharacter || null;
 
   save();
 
   /*
-   * Remove the large snapshot from
-   * the visible URL after importing.
-   *
-   * The imported data remains in localStorage.
+   * Remove the encoded snapshot from the address bar after
+   * importing it. This prevents repeated imports on refresh.
    */
-
-  try {
-    window.history.replaceState(
-      {},
-      document.title,
-      window.location.pathname +
-        window.location.search
-    );
-  } catch {
-    /*
-     * Not fatal.
-     */
-  }
+  history.replaceState(
+    null,
+    '',
+    window.location.pathname +
+      window.location.search
+  );
 
   return true;
 }
 
-async function shareSnapshot() {
-  const snapshot =
-    createShareState();
+/* ============================================================
+   CHARACTER CONTROLS
+   ============================================================ */
 
-  const encoded =
-    encodeSnapshot(
-      snapshot
-    );
-
-  const url =
-    `${window.location.origin}${window.location.pathname}${window.location.search}${SHARE_PREFIX}${encoded}`;
-
-  /*
-   * Try the modern clipboard API first.
-   */
-
-  try {
-    await navigator.clipboard.writeText(
-      url
-    );
-
-    setStatus(
-      'Share link copied to clipboard.'
+$('#addCharacterBtn').onclick = () => {
+  if (
+    state.characters.length >=
+    MAX_CHARACTERS
+  ) {
+    alert(
+      `Maximum of ${MAX_CHARACTERS} designated characters reached.`
     );
 
     return;
-  } catch {
-    /*
-     * Fall through to the textarea fallback.
-     */
   }
 
-  /*
-   * Fallback for browsers where clipboard
-   * permissions are unavailable.
-   */
-
-  const textarea =
-    document.createElement(
-      'textarea'
-    );
-
-  textarea.value = url;
-  textarea.setAttribute(
-    'readonly',
-    ''
+  const parsed = bibleUrl(
+    $('#characterUrl').value.trim()
   );
 
-  textarea.style.position =
-    'fixed';
-  textarea.style.left =
-    '-9999px';
-  textarea.style.top =
-    '0';
+  if (!parsed) {
+    $('#status').textContent =
+      'Enter a valid lostark.bible character URL';
 
-  document.body.appendChild(
-    textarea
-  );
-
-  textarea.select();
-
-  let copied = false;
-
-  try {
-    copied =
-      document.execCommand(
-        'copy'
-      );
-  } catch {
-    copied = false;
-  }
-
-  textarea.remove();
-
-  if (copied) {
-    setStatus(
-      'Share link copied to clipboard.'
-    );
-  } else {
-    /*
-     * If clipboard access is blocked,
-     * display the link so it can still
-     * be copied manually.
-     */
-
-    window.prompt(
-      'Copy this share link:',
-      url
-    );
-
-    setStatus(
-      'Share link generated.'
-    );
-  }
-}
-
-/* =========================================================
-   SHARE BUTTON
-   ========================================================= */
-
-function setupShareButton() {
-  const button =
-    $('#shareBtn');
-
-  if (!button) {
     return;
   }
 
-  button.addEventListener(
-    'click',
-    shareSnapshot
-  );
-}
+  if (
+    state.characters.some(
+      (c) => c.url === parsed.url
+    )
+  ) {
+    $('#status').textContent =
+      'That character is already added';
 
-/* =========================================================
-   EVENT HANDLERS
-   ========================================================= */
-
-function setupEventHandlers() {
-  const addButton =
-    $('#addCharacterBtn');
-
-  if (addButton) {
-    addButton.addEventListener(
-      'click',
-      addCharacter
-    );
+    return;
   }
 
-  const refreshButton =
-    $('#refreshBtn');
+  state.characters.push({
+    id: crypto.randomUUID(),
+    ...parsed,
+    profile: null
+  });
 
-  if (refreshButton) {
-    refreshButton.addEventListener(
-      'click',
-      refreshProfiles
-    );
-  }
+  save();
 
-  const optimizeButton =
-    $('#optimizeBtn');
+  $('#characterUrl').value = '';
 
-  if (optimizeButton) {
-    optimizeButton.addEventListener(
-      'click',
-      optimizeParties
-    );
-  }
-
-  const compareButton =
-    $('#compareBtn');
-
-  if (compareButton) {
-    compareButton.addEventListener(
-      'click',
-      compareCharacter
-    );
-  }
-
-  /*
-   * Allow Enter in the Add Character
-   * input to add the character.
-   */
-
-  const characterInput =
-    $('#characterUrl');
-
-  if (characterInput) {
-    characterInput.addEventListener(
-      'keydown',
-      (event) => {
-        if (
-          event.key ===
-          'Enter'
-        ) {
-          event.preventDefault();
-          addCharacter();
-        }
-      }
-    );
-  }
-
-  /*
-   * Allow Enter in the comparison input.
-   */
-
-  const testInput =
-    $('#testCharacterUrl');
-
-  if (testInput) {
-    testInput.addEventListener(
-      'keydown',
-      (event) => {
-        if (
-          event.key ===
-          'Enter'
-        ) {
-          event.preventDefault();
-          compareCharacter();
-        }
-      }
-    );
-  }
-
-  setupShareButton();
-}
-
-/* =========================================================
-   INITIALIZATION
-   ========================================================= */
-
-function initialize() {
-  /*
-   * If this URL contains a snapshot,
-   * import it before rendering.
-   */
-
-  const imported =
-    applySharedSnapshot();
-
-  setupEventHandlers();
+  $('#status').textContent =
+    'Character added locally; click Refresh Profiles to retrieve it';
 
   render();
+};
 
-  if (imported) {
-    setStatus(
-      'Shared snapshot loaded.'
-    );
+$('#refreshBtn').onclick =
+  refreshProfiles;
+
+$('#optimizeBtn').onclick = () => {
+  $('#status').textContent =
+    state.characters.filter(
+      (c) => c.profile
+    ).length < 2
+      ? 'Load at least two complete character profiles first'
+      : 'Optimization scoring is the next layer; character retrieval is now active.';
+
+  renderSuggestions();
+};
+
+/* ============================================================
+   HYPOTHETICAL CHARACTER COMPARISON
+   ============================================================ */
+
+$('#compareBtn').onclick = async () => {
+  const parsed = bibleUrl(
+    $('#testCharacterUrl').value.trim()
+  );
+
+  if (!parsed) {
+    $('#status').textContent =
+      'Enter a valid Bible character URL for the test character';
+
+    return;
   }
-}
 
-initialize();
+  const test = {
+    ...parsed
+  };
+
+  $('#status').textContent =
+    `Retrieving ${parsed.name}…`;
+
+  try {
+    test.profile =
+      await fetchCharacter(test);
+
+    state.testCharacter = test;
+
+    save();
+
+    $('#comparison').innerHTML = `
+      <div class="comparison-grid">
+        <div class="comparison-card">
+          <span>Current pool</span>
+          <b>
+            ${state.characters.length}
+            characters
+          </b>
+        </div>
+
+        <div class="comparison-card">
+          <span>Test character</span>
+
+          <b>
+            ${esc(test.profile.name)}
+            ·
+            ${esc(test.profile.class)}
+          </b>
+
+          <div class="delta">
+            iLvl ${fmt(test.profile.ilvl)}
+            · CP ${fmt(test.profile.cp)}
+          </div>
+        </div>
+
+        <div class="comparison-card">
+          <span>Result</span>
+
+          <b>Profile loaded</b>
+
+          <div class="delta">
+            ${esc(test.profile.loadout)}.
+            Optimization percentage will be
+            calculated after the party scoring
+            engine is enabled.
+          </div>
+        </div>
+      </div>
+    `;
+
+    $('#status').textContent =
+      `Loaded test character ${test.profile.name}`;
+  } catch (e) {
+    $('#status').textContent =
+      `Test character retrieval failed: ${e.message}`;
+  }
+};
+
+/* ============================================================
+   SHARE BUTTON
+   ============================================================ */
+
+$('#shareBtn').onclick =
+  copyShareLink;
+
+/* ============================================================
+   INITIAL LOAD
+   ============================================================ */
+
+const importedShare =
+  loadShareSnapshotFromURL();
+
+render();
+
+if (importedShare) {
+  $('#status').textContent =
+    'Shared character snapshot loaded.';
+}
+```
