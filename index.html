@@ -6,14 +6,14 @@
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="referrer" content="no-referrer">
 <title>Lost Ark Hideout</title>
-<link rel="stylesheet" href="styles.css?v=20260817e">
-<link rel="stylesheet" href="party-v5.css?v=20260817e">
+<link rel="stylesheet" href="styles.css?v=20260817f">
+<link rel="stylesheet" href="party-v5.css?v=20260817f">
 </head>
 <body>
 <header class="topbar"><div><div class="eyebrow">PRIVATE RAID OPTIMIZER</div><h1>Lost Ark Hideout</h1></div><div class="actions"><span id="status">Ready</span><button id="refreshBtn" type="button">Refresh Profiles</button><button id="shareBtn" type="button">Create Private Share Link</button></div></header>
 <main class="shell">
 <section class="summary-grid"><div class="card"><span>Available Characters</span><b id="playerCount">0 / 8</b></div><div class="card"><span>Average iLvl</span><b id="avgIlvl">—</b></div><div class="card"><span>Average CP</span><b id="avgCp">—</b></div><div class="card"><span>Data Handling</span><b id="dataMode">Local</b></div></section>
-<section class="import-panel"><div><h2>Add a specific character</h2><p>Enter the Bible character URL. Only that character is queried; roster/account data is never imported.</p></div><div class="import-row"><input id="characterUrl" placeholder="https://lostark.bible/character/NA/CharacterName" autocomplete="off"><button id="addCharacterBtn" type="button">Add Character</button></div><div class="privacy-note">Raid CP priority: Estimated Raid Loadout → Current Loadout (Raid). Chaos Dungeon Loadout is never used.</div></section>
+<section class="import-panel"><div><h2>Add a specific character</h2><p>Choose a region and enter the character name. Select the matching Bible profile when results appear.</p></div><div class="import-row"><select id="characterRegion" aria-label="Character region"><option value="NA">NA</option><option value="EU">EU</option></select><input id="characterName" placeholder="Character name" autocomplete="off"><button id="findCharacterBtn" type="button">Find Character</button></div><div id="characterCandidates" class="character-candidates"></div><div class="privacy-note">Raid CP priority: Estimated Raid Loadout → Current Loadout (Raid). Chaos Dungeon Loadout is never used.</div></section>
 <section class="toolbar"><div><h2>Available Characters</h2><p id="rosterNote">Up to 8 explicitly designated main characters. No account-wide roster.</p></div></section>
 <section id="roster" class="roster"></section>
 <section class="toolbar"><div><h2>Suggested Party Setup Based on Available Synergies</h2></div><button id="optimizeBtn" type="button">Optimize Parties</button></section>
@@ -23,6 +23,7 @@
 </main>
 <script src="app-fixed.js?v=20260817f" defer></script>
 <script src="party-controller-v5.js?v=20260817f" defer></script>
+<script src="character-picker-v1.js?v=20260817f" defer></script>
 <script src="visits.js?v=20260817f" defer></script>
 </body>
 </html>
