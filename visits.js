@@ -10,22 +10,20 @@ async function loadVisitCounter() {
     if (!response.ok) return;
 
     const data = await response.json();
-    const summary = document.querySelector('.summary-grid');
-    if (!summary) return;
+    const footer = document.querySelector('footer');
+    if (!footer) return;
 
-    let card = document.getElementById('visitCounterCard');
-    if (!card) {
-      card = document.createElement('div');
-      card.className = 'card';
-      card.id = 'visitCounterCard';
-      card.innerHTML = '<span>Dashboard Visits</span><b id="visitCount">—</b>';
-      summary.appendChild(card);
+    let counter = document.getElementById('visitCounter');
+    if (!counter) {
+      counter = document.createElement('span');
+      counter.id = 'visitCounter';
+      footer.appendChild(counter);
     }
 
     const count = Number(data.visits);
-    document.getElementById('visitCount').textContent = Number.isFinite(count)
-      ? count.toLocaleString()
-      : '—';
+    counter.innerHTML = Number.isFinite(count)
+      ? `Page visits: <b>${count.toLocaleString()}</b>`
+      : 'Page visits: <b>—</b>';
   } catch {
     // The dashboard should continue working normally if the counter is unavailable.
   }
