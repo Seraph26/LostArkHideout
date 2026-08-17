@@ -15,7 +15,7 @@
 <section class="import-panel"><div><h2>Add a specific character</h2><p>Enter the Bible character URL. Only that character is queried; roster/account data is never imported.</p></div><div class="import-row"><input id="characterUrl" placeholder="https://lostark.bible/character/NA/CharacterName" autocomplete="off"><button id="addCharacterBtn" type="button">Add Character</button></div><div class="privacy-note">Raid CP priority: Estimated Raid Loadout → Current Loadout (Raid). Chaos Dungeon Loadout is never used.</div></section>
 <section class="toolbar"><div><h2>Available Characters</h2><p id="rosterNote">Up to 8 explicitly designated main characters. No account-wide roster.</p></div></section>
 <section id="roster" class="roster"></section>
-<section class="toolbar"><div><h2>Suggested Party Setup Based on Available Synergies</h2><p>Each party can hold up to four characters. With fewer than eight characters, Party 1 is filled to four first and the remaining characters go into Party 2. Drag characters between parties to test swaps.</p></div><button id="optimizeBtn" type="button">Optimize Parties</button></section>
+<section class="toolbar"><div><h2>Suggested Party Setup Based on Available Synergies</h2><p>Each party holds up to four characters. With fewer than eight characters, Party 1 is filled to four first and the remaining characters go into Party 2. Drag characters between parties to test swaps.</p></div><button id="optimizeBtn" type="button">Optimize Parties</button></section>
 <section id="suggestedParties" class="parties"></section>
 <section class="comparison-panel"><div class="toolbar"><div><h2>Character Comparison</h2><p>Test a hypothetical character without adding it to the main roster.</p></div></div><div class="import-row"><input id="testCharacterUrl" placeholder="Bible URL for hypothetical replacement character" autocomplete="off"><button id="compareBtn" type="button">Compare</button></div><div id="comparison" class="comparison-result"><div class="empty-roster">Add characters, then use a Bible URL here to test a hypothetical replacement.</div></div></section>
 <footer>Public source contains only generic application code. Real character data is not committed to the repository. Character retrieval is restricted to explicitly supplied character identifiers.</footer>
@@ -23,6 +23,7 @@
 <script src="app-fixed.js" defer></script>
 <script src="class-fix.js" defer></script>
 <script src="party-enhancements.js" defer></script>
+<script src="party-swap-fix-v2.js" defer></script>
 <script src="visits.js" defer></script>
 </body>
 </html>
