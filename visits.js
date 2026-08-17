@@ -1,31 +1,29 @@
 const VISIT_COUNTER = 'https://lostark-bible-connector.seraph0226.workers.dev/visits';
 
 async function loadVisitCounter() {
+  const counter = document.getElementById('visitCounter');
+  if (!counter) return;
+
   try {
     const response = await fetch(VISIT_COUNTER, {
       method: 'GET',
-      cache: 'no-store'
+      cache: 'no-store',
+      headers: { Accept: 'application/json' }
     });
 
-    if (!response.ok) return;
-
-    const data = await response.json();
-    const footer = document.querySelector('footer');
-    if (!footer) return;
-
-    let counter = document.getElementById('visitCounter');
-    if (!counter) {
-      counter = document.createElement('span');
-      counter.id = 'visitCounter';
-      footer.appendChild(counter);
+    if (!response.ok) {
+      counter.innerHTML = 'Page visits: <b>—</b>';
+      return;
     }
 
-    const count = Number(data.visits);
+    const data = await response.json();
+    const count = Number(data?.visits);
+
     counter.innerHTML = Number.isFinite(count)
       ? `Page visits: <b>${count.toLocaleString()}</b>`
       : 'Page visits: <b>—</b>';
   } catch {
-    // The dashboard should continue working normally if the counter is unavailable.
+    counter.innerHTML = 'Page visits: <b>—</b>';
   }
 }
 
