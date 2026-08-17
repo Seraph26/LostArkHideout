@@ -49,26 +49,24 @@
   async function liveSearch(){
     const name=($('#comparisonName')?.value||'').trim(), region=($('#comparisonRegion')?.value||'NA').toUpperCase();
     if(name.length<2){render([]);return;} const id=++requestId;
-    const results=await search(region,name); if(id===requestId)render(results);
+    try { const results=await search(region,name); if(id===requestId)render(results); } catch { if(id===requestId)render([]); }
   }
   function doCompare(){
     const name=($('#comparisonName')?.value||'').trim(),region=($('#comparisonRegion')?.value||'NA').toUpperCase();
     if(!name){$('#status').textContent='Enter a character name first.';return;}
     $('#testCharacterUrl').value=makeUrl(region,name);
-    const original=window.__lostArkOriginalCompare; if(original) original();
+    if(typeof window.compareCharacter==='function') window.compareCharacter();
   }
   function init(){
     const input=$('#testCharacterUrl'),button=$('#compareBtn'); if(!input||!button)return;
     const row=input.closest('.import-row');
-    window.__lostArkOriginalCompare=window.__lostArkOriginalCompare||(()=>{const url=$('#testCharacterUrl').value.trim();if(!url)return;});
     row.innerHTML=`<select id="comparisonRegion" aria-label="Comparison character region"><option value="NA">NA</option><option value="EU">EU</option></select><input id="comparisonName" placeholder="Character name" autocomplete="off"><button id="comparisonFindBtn" type="button">Find Character</button><button id="compareBtn" type="button">Compare</button><input id="testCharacterUrl" type="hidden">`;
     const box=document.createElement('div');box.id='comparisonCandidates';box.className='character-candidates';row.parentElement.appendChild(box);
     $('#comparisonName').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(liveSearch,SEARCH_DELAY);});
     $('#comparisonName').addEventListener('keydown',e=>{if(e.key==='Enter')liveSearch();});
     $('#comparisonRegion').addEventListener('change',liveSearch);
     $('#comparisonFindBtn').addEventListener('click',liveSearch);
-    $('#compareBtn').addEventListener('click',()=>{const name=$('#comparisonName').value.trim(),region=$('#comparisonRegion').value;$('#testCharacterUrl').value=makeUrl(region,name);window.__lostArkRunCompare?.();});
-    window.__lostArkRunCompare=window.__lostArkRunCompare||(()=>{});
+    $('#compareBtn').addEventListener('click',doCompare);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
