@@ -10,29 +10,19 @@
 
     const name = button.dataset.name || button.querySelector('.character-candidate-name')?.textContent?.trim();
     const region = (button.dataset.region || document.querySelector('#characterRegion')?.value || 'NA').toUpperCase();
+    const url = button.dataset.url || `https://lostark.bible/character/${encodeURIComponent(region)}/${encodeURIComponent(name || '')}`;
     if (!name) return;
-
-    const input = document.querySelector('#characterName');
-    if (input) {
-      input.value = name;
-      input.dataset.selectedUrl = button.dataset.url || `https://lostark.bible/character/${encodeURIComponent(region)}/${encodeURIComponent(name)}`;
-      input.focus();
-    }
-
-    const statusEl = document.querySelector('#status');
-    const status = statusEl?.textContent || '';
-    if (!/matching (active )?Bible character.*found|matching character.*found/i.test(status)) return;
 
     let state;
     try { state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { state = null; }
     if (!state || !Array.isArray(state.characters)) state = { characters: [] };
     if (state.characters.length >= MAX_CHARACTERS) {
+      const statusEl = document.querySelector('#status');
       if (statusEl) statusEl.textContent = `Maximum of ${MAX_CHARACTERS} characters reached.`;
       return;
     }
-
-    const url = button.dataset.url || `https://lostark.bible/character/${encodeURIComponent(region)}/${encodeURIComponent(name)}`;
     if (state.characters.some(c => c.url === url)) {
+      const statusEl = document.querySelector('#status');
       if (statusEl) statusEl.textContent = 'That character is already added.';
       return;
     }
