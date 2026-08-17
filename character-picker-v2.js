@@ -12,10 +12,8 @@
   let liveSearchRequest = 0;
 
   function getState() {
-    try {
-      const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      return s && Array.isArray(s.characters) ? s : { characters: [] };
-    } catch { return { characters: [] }; }
+    try { const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); return s && Array.isArray(s.characters) ? s : { characters: [] }; }
+    catch { return { characters: [] }; }
   }
   function saveState(state) { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
   function setStatus(message) { const el = $('#status'); if (el) el.textContent = message; }
@@ -44,6 +42,16 @@
     return textMatch ? cleanNumber(textMatch[1]) : null;
   }
 
+  function isActiveSearchResult(anchor) {
+    const text = `${anchor.textContent || ''} ${anchor.getAttribute('aria-label') || ''}`;
+    const href = anchor.getAttribute('href') || '';
+    const context = anchor.parentElement?.parentElement?.textContent || '';
+    const className = `${anchor.className || ''} ${anchor.parentElement?.className || ''}`;
+    if (/inactive|deleted|retired|not\s*found|unavailable/i.test(`${text} ${context} ${className}`)) return false;
+    if (/character\/(?:NA|EU)\//i.test(href) && !/inactive|deleted|retired/i.test(`${text} ${context} ${className}`)) return true;
+    return false;
+  }
+
   function parseCandidates(html, requestedRegion) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const candidates = [];
@@ -51,7 +59,7 @@
     for (const a of doc.querySelectorAll('a[href]')) {
       try {
         const u = new URL(a.href, 'https://lostark.bible');
-        if (u.hostname !== 'lostark.bible') continue;
+        if (u.hostname !== 'lostark.bible' || !isActiveSearchResult(a)) continue;
         const parts = u.pathname.split('/').filter(Boolean);
         if (parts.length < 3 || parts[0].toLowerCase() !== 'character') continue;
         const region = parts[1].toUpperCase();
@@ -96,68 +104,47 @@
     return [{ region, name: original, url: makeUrl(region, original), itemLevel: null, exact: true }];
   }
 
-  function formatItemLevel(value) {
-    if (!Number.isFinite(value)) return 'iLvl —';
-    return `iLvl ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-  }
+  function formatItemLevel(value) { return Number.isFinite(value) ? `iLvl ${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}` : 'iLvl —'; }
   function sortCandidates(candidates) {
-    return [...candidates].sort((a, b) => {
-      const aKnown = Number.isFinite(a.itemLevel), bKnown = Number.isFinite(b.itemLevel);
-      if (aKnown && bKnown) return b.itemLevel !== a.itemLevel ? b.itemLevel - a.itemLevel : a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
-      if (aKnown) return -1;
-      if (bKnown) return 1;
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+    return [...candidates].sort((a,b) => {
+      const ak = Number.isFinite(a.itemLevel), bk = Number.isFinite(b.itemLevel);
+      if (ak && bk) return b.itemLevel !== a.itemLevel ? b.itemLevel - a.itemLevel : a.name.localeCompare(b.name, undefined, { sensitivity:'base' });
+      if (ak) return -1; if (bk) return 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity:'base' });
     });
   }
-
   async function enrichCandidateItemLevels(candidates) {
-    await Promise.all(candidates.slice(0, MAX_PROFILE_LOOKUPS).map(async candidate => {
-      try { candidate.itemLevel = extractItemLevel(await connectorFetch(candidate.url)); } catch { candidate.itemLevel = null; }
-    }));
+    await Promise.all(candidates.slice(0, MAX_PROFILE_LOOKUPS).map(async c => { try { c.itemLevel = extractItemLevel(await connectorFetch(c.url)); } catch { c.itemLevel = null; } }));
     return sortCandidates(candidates);
   }
-
   function updateNameSuggestions(candidates) {
     const datalist = $('#characterNameSuggestions');
-    if (!datalist) return;
-    datalist.innerHTML = sortCandidates(candidates).map(c => `<option value="${esc(c.name)}">${esc(c.region)}</option>`).join('');
+    if (datalist) datalist.innerHTML = sortCandidates(candidates).map(c => `<option value="${esc(c.name)}"></option>`).join('');
   }
-
-  function showCandidates(candidates, searching = false, live = false) {
-    const box = $('#characterCandidates');
-    if (!box) return;
+  function showCandidates(candidates, searching=false, live=false) {
+    const box = $('#characterCandidates'); if (!box) return;
     updateNameSuggestions(candidates);
-    if (searching) {
-      if (!live) box.innerHTML = '<div class="character-candidate-status">Finding matching names…</div>';
-      return;
-    }
+    if (searching) { if (!live) box.innerHTML = '<div class="character-candidate-status">Finding matching names…</div>'; return; }
     const sorted = sortCandidates(candidates);
     if (!sorted.length) { box.innerHTML = ''; return; }
-    box.innerHTML = sorted.map((c, i) => `
-      <button type="button" class="character-candidate" data-index="${i}">
-        <span class="character-candidate-name">${esc(c.name)}</span>
-        <small>${esc(c.region)}${Number.isFinite(c.itemLevel) ? ` · ${esc(formatItemLevel(c.itemLevel))}` : ''}${c.exact ? ' · Exact name' : ''}</small>
-      </button>`).join('');
+    box.innerHTML = sorted.map((c,i) => `<button type="button" class="character-candidate" data-index="${i}"><span class="character-candidate-name">${esc(c.name)}</span><small>${esc(c.region)}${Number.isFinite(c.itemLevel) ? ` · ${esc(formatItemLevel(c.itemLevel))}` : ''}${c.exact ? ' · Exact name' : ''}</small></button>`).join('');
     box.querySelectorAll('.character-candidate').forEach(btn => btn.addEventListener('click', () => {
       const candidate = sorted[Number(btn.dataset.index)];
-      const input = $('#characterName');
-      if (input) { input.value = candidate.name; input.focus(); }
+      const input = $('#characterName'); if (input) { input.value = candidate.name; input.focus(); }
       runSearch();
     }));
   }
-
   function addCandidate(candidate) {
     const state = getState();
     if (state.characters.length >= MAX_CHARACTERS) { setStatus(`Maximum of ${MAX_CHARACTERS} characters reached.`); return; }
     if (state.characters.some(c => c.url === candidate.url)) { setStatus('That character is already added.'); return; }
     state.characters.push({ id: crypto.randomUUID(), url: candidate.url, region: candidate.region, name: candidate.name, profile: null });
     saveState(state);
-    const nameInput = $('#characterName'); if (nameInput) nameInput.value = '';
-    const candidateBox = $('#characterCandidates'); if (candidateBox) candidateBox.innerHTML = '';
+    const input = $('#characterName'); if (input) input.value = '';
+    const box = $('#characterCandidates'); if (box) box.innerHTML = '';
     const datalist = $('#characterNameSuggestions'); if (datalist) datalist.innerHTML = '';
     location.reload();
   }
-
   async function runSearch() {
     const region = ($('#characterRegion')?.value || 'NA').toUpperCase();
     const name = ($('#characterName')?.value || '').trim();
@@ -167,66 +154,37 @@
     try {
       let candidates = await searchBible(region, name);
       showCandidates(candidates, true);
-      setStatus(`Found ${candidates.length} matching character${candidates.length === 1 ? '' : 's'}; checking item levels…`);
       candidates = await enrichCandidateItemLevels(candidates);
       showCandidates(candidates);
       setStatus(candidates.length === 1 && candidates[0].exact ? 'Select the character to add it.' : `${candidates.length} matching character${candidates.length === 1 ? '' : 's'} found. Highest iLvl shown first.`);
-    } catch (error) {
-      setStatus(`Character search failed: ${error.message}`);
-      const box = $('#characterCandidates'); if (box) box.innerHTML = '';
-    } finally { if (button) button.disabled = false; }
+    } catch (error) { setStatus(`Character search failed: ${error.message}`); const box=$('#characterCandidates'); if(box) box.innerHTML=''; }
+    finally { if(button) button.disabled=false; }
   }
-
   async function liveSearch() {
     const region = ($('#characterRegion')?.value || 'NA').toUpperCase();
     const name = ($('#characterName')?.value || '').trim();
-    if (name.length < 2) {
-      const box = $('#characterCandidates'); if (box) box.innerHTML = '';
-      const datalist = $('#characterNameSuggestions'); if (datalist) datalist.innerHTML = '';
-      return;
-    }
+    if (name.length < 2) { const box=$('#characterCandidates'); if(box) box.innerHTML=''; const d=$('#characterNameSuggestions'); if(d) d.innerHTML=''; return; }
     const requestId = ++liveSearchRequest;
     try {
       const candidates = await searchBible(region, name);
       if (requestId !== liveSearchRequest) return;
       showCandidates(candidates, false, true);
-    } catch { if (requestId === liveSearchRequest) showCandidates([], false, true); }
+    } catch { if(requestId === liveSearchRequest) showCandidates([], false, true); }
   }
-
   function makeNamesClickable() {
-    const state = getState(), roster = $('#roster');
-    if (!roster) return;
-    roster.querySelectorAll('.character').forEach((card, index) => {
-      const character = state.characters[index];
-      if (!character?.url) return;
-      const heading = card.querySelector('.character-head h3');
-      if (!heading || heading.querySelector('a')) return;
-      const link = document.createElement('a');
-      link.href = character.url; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = heading.textContent;
-      heading.textContent = ''; heading.appendChild(link);
-    });
+    const state=getState(), roster=$('#roster'); if(!roster) return;
+    roster.querySelectorAll('.character').forEach((card,index)=>{ const c=state.characters[index]; if(!c?.url) return; const h=card.querySelector('.character-head h3'); if(!h||h.querySelector('a')) return; const a=document.createElement('a'); a.href=c.url; a.target='_blank'; a.rel='noopener noreferrer'; a.textContent=h.textContent; h.textContent=''; h.appendChild(a); });
   }
-
   function init() {
-    const nameInput = $('#characterName'), findButton = $('#findCharacterBtn');
-    if (!nameInput || !findButton) return;
-    if (!$('#characterNameSuggestions')) {
-      const datalist = document.createElement('datalist'); datalist.id = 'characterNameSuggestions';
-      nameInput.setAttribute('list', datalist.id); nameInput.insertAdjacentElement('afterend', datalist);
-    }
-    if (!$('#characterCandidates')) {
-      const candidateContainer = document.createElement('div'); candidateContainer.id = 'characterCandidates'; candidateContainer.className = 'character-candidates';
-      nameInput.closest('.import-row')?.parentElement?.appendChild(candidateContainer);
-    }
-    findButton.addEventListener('click', runSearch);
-    nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
-    nameInput.addEventListener('input', () => { clearTimeout(liveSearchTimer); liveSearchTimer = setTimeout(liveSearch, LIVE_SEARCH_DELAY); });
-    $('#characterRegion')?.addEventListener('change', () => { clearTimeout(liveSearchTimer); liveSearch(); });
+    const input=$('#characterName'), button=$('#findCharacterBtn'); if(!input||!button) return;
+    if(!$('#characterNameSuggestions')) { const d=document.createElement('datalist'); d.id='characterNameSuggestions'; input.setAttribute('list',d.id); input.insertAdjacentElement('afterend',d); }
+    if(!$('#characterCandidates')) { const box=document.createElement('div'); box.id='characterCandidates'; box.className='character-candidates'; input.closest('.import-row')?.parentElement?.appendChild(box); }
+    button.addEventListener('click',runSearch);
+    input.addEventListener('keydown',e=>{if(e.key==='Enter')runSearch();});
+    input.addEventListener('input',()=>{clearTimeout(liveSearchTimer); liveSearchTimer=setTimeout(liveSearch,LIVE_SEARCH_DELAY);});
+    $('#characterRegion')?.addEventListener('change',()=>{clearTimeout(liveSearchTimer);liveSearch();});
     makeNamesClickable();
-    const roster = $('#roster');
-    if (roster) new MutationObserver(makeNamesClickable).observe(roster, { childList: true, subtree: true });
+    const roster=$('#roster'); if(roster) new MutationObserver(makeNamesClickable).observe(roster,{childList:true,subtree:true});
   }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
-  else init();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true}); else init();
 })();
