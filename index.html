@@ -6,10 +6,10 @@
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="referrer" content="no-referrer">
 <title>Lost Ark Hideout</title>
-<link rel="stylesheet" href="styles.css?v=20260817m">
-<link rel="stylesheet" href="party-v5.css?v=20260817m">
-<link rel="stylesheet" href="character-picker-v1.css?v=20260817m">
-<link rel="stylesheet" href="profile-details.css?v=20260817m">
+<link rel="stylesheet" href="styles.css?v=20260817n">
+<link rel="stylesheet" href="party-v5.css?v=20260817n">
+<link rel="stylesheet" href="character-picker-v1.css?v=20260817n">
+<link rel="stylesheet" href="profile-details.css?v=20260817n">
 </head>
 <body>
 <header class="topbar"><div><div class="eyebrow">PRIVATE RAID OPTIMIZER</div><h1>Lost Ark Hideout</h1></div><div class="actions"><span id="status">Ready</span><button id="refreshBtn" type="button">Refresh Profiles</button><button id="shareBtn" type="button">Create Private Share Link</button></div></header>
@@ -21,14 +21,16 @@
 <section class="toolbar"><div><h2>Suggested Party Setup Based on Available Synergies</h2></div><button id="optimizeBtn" type="button">Optimize Parties</button></section>
 <section id="suggestedParties" class="parties"></section>
 <section class="comparison-panel"><div class="toolbar"><div><h2>Character Comparison</h2><p>Test a hypothetical character without adding it to the main roster.</p></div></div><div class="import-row"><select id="comparisonRegion" aria-label="Comparison character region"><option value="NA">NA</option><option value="EU">EU</option></select><input id="comparisonName" placeholder="Character name" autocomplete="off"><button id="comparisonFindBtn" type="button">Find Character</button><button id="compareBtn" type="button">Compare</button><input id="testCharacterUrl" type="hidden"></div><div id="comparisonCandidates" class="character-candidates"></div><div id="comparison" class="comparison-result"><div class="empty-roster">Add characters, then use this section to test a hypothetical replacement.</div></div></section>
+<!-- Compatibility controls retained for the legacy application initializer. They are intentionally hidden. -->
+<input id="characterUrl" type="hidden"><button id="addCharacterBtn" type="button" hidden aria-hidden="true">Add</button>
 <footer>Public source contains only generic application code. Real character data is not committed to the repository. Character retrieval is restricted to explicitly supplied character identifiers. <span id="visitCounter">Page visits: <b>—</b></span></footer>
 </main>
-<script src="app-fixed.js?v=20260817m" defer></script>
-<script src="party-controller-v5.js?v=20260817m" defer></script>
-<script src="character-search-v1.js?v=20260817m" defer></script>
-<script src="character-picker-v2-fix.js?v=20260817m" defer></script>
-<script src="profile-details.js?v=20260817m" defer></script>
-<script src="party-role-details.js?v=20260817m" defer></script>
-<script src="visits.js?v=20260817m" defer></script>
+<script src="app-fixed.js?v=20260817n" defer></script>
+<script src="party-controller-v5.js?v=20260817n" defer></script>
+<script src="character-search-v1.js?v=20260817n" defer></script>
+<script src="character-picker-v2-fix.js?v=20260817n" defer></script>
+<script src="profile-details.js?v=20260817n" defer></script>
+<script src="party-role-details.js?v=20260817n" defer></script>
+<script src="visits.js?v=20260817n" defer></script>
 </body>
 </html>
