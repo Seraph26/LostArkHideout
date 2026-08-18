@@ -3,7 +3,87 @@
 const KEYS=['lostark-hideout-private-v3','lostark-hideout-private-v2'];
 const PK='lostark-hideout-party-assignments-v2';
 const SUPPORT=new Set(['Bard','Paladin','Artist','Valkyrie']);
-const SYN={Berserker:['damage'],Destroyer:['damage'],Gunlancer:['damage','positional'],Paladin:['support'],Slayer:['damage'],Arcanist:['crit'],Arcana:['crit'],Summoner:['damage','mana'],Sorceress:['damage'],Bard:['support'],Gunslinger:['crit'],Deadeye:['crit'],Sharpshooter:['damage'],Artillerist:['damage'],Machinist:['attackPower'],Striker:['crit','attackSpeed'],Wardancer:['crit','attackSpeed'],Scrapper:['damage'],Soulfist:['attackPower'],Glavier:['critDamage'],Glaivier:['critDamage'],Deathblade:['positional','attackSpeed'],Shadowhunter:['damage'],Reaper:['damage'],Artist:['support','mana'],Aeromancer:['crit'],Breaker:['damage'],Valkyrie:['support','damage'],Souleater:['damage'],'Soul Eater':['damage']};
+
+// Party-synergy model. CP remains the character's individual-power metric;
+// these values only model interactions between characters in the same party.
+const SYNERGIES={
+  Berserker:['damage'],
+  Destroyer:['damage'],
+  Gunlancer:['damage','positional'],
+  Paladin:['supportDamage'],
+  Slayer:['damage'],
+  Arcanist:['crit'],
+  Arcana:['crit'],
+  Summoner:['damage'],
+  Sorceress:['damage'],
+  Bard:['supportDamage','attackSpeed'],
+  Gunslinger:['crit'],
+  Deadeye:['crit'],
+  Sharpshooter:['damage'],
+  Artillerist:['damage'],
+  Machinist:['attackPower'],
+  Striker:['crit','attackSpeed'],
+  Wardancer:['crit','attackSpeed'],
+  Scrapper:['damage'],
+  Soulfist:['attackPower'],
+  Glavier:['crit'],
+  Glaivier:['crit'],
+  Deathblade:['positional','attackSpeed'],
+  Shadowhunter:['damage'],
+  Reaper:['damage'],
+  Artist:['supportDamage','mana'],
+  Aeromancer:['crit'],
+  Breaker:['damage'],
+  Valkyrie:['supportDamage'],
+  Souleater:['damage'],
+  'Soul Eater':['damage']
+};
+
+// Relative benefit of each synergy. These are optimizer weights, not literal
+// in-game DPS percentages. A target's build is not inferred from CP components.
+const SYNERGY_WEIGHT={
+  damage:0.014,
+  crit:0.018,
+  attackPower:0.012,
+  attackSpeed:0.007,
+  positional:0.014,
+  mana:0.003,
+  supportDamage:0.12
+};
+
+// Some classes are especially sensitive to crit availability. This lets the
+// optimizer distinguish two otherwise equal parties without inventing gear data.
+const CRIT_AFFINITY={
+  Souleater:1.30,
+  'Soul Eater':1.30,
+  Berserker:1.10,
+  Scrapper:1.08,
+  Glaivier:0.95,
+  Glavier:0.95,
+  Summoner:0.90,
+  Wardancer:0.75
+};
+const ATTACK_SPEED_AFFINITY={
+  Wardancer:1.15,
+  Scrapper:1.05,
+  Glaivier:1.05,
+  Glavier:1.05,
+  Berserker:1.00,
+  Souleater:0.95,
+  'Soul Eater':0.95,
+  Summoner:0.85
+};
+const POSITIONAL_AFFINITY={
+  Scrapper:1.15,
+  Glaivier:1.10,
+  Glavier:1.10,
+  Souleater:1.05,
+  'Soul Eater':1.05,
+  Berserker:0.95,
+  Summoner:0.50,
+  Wardancer:0.90
+};
+
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const chars=()=>{for(const k of KEYS){try{const x=JSON.parse(localStorage.getItem(k)||'null');if(Array.isArray(x?.characters))return x.characters.filter(c=>c?.profile)}catch{}}return[]};
 const assignments=()=>{try{const x=JSON.parse(localStorage.getItem(PK)||'null');if(Array.isArray(x?.party1)&&Array.isArray(x?.party2))return x}catch{}return{party1:[],party2:[]}};
@@ -16,21 +96,53 @@ function cp(c){return identity(c).cp}
 function il(c){return identity(c).il}
 function cls(c){return identity(c).cls}
 function icon(c){return identity(c).icon}
-function tags(c){return SYN[cls(c)]||['damage']}
-function score(p){if(!p.length)return 0;let mult=p.some(c=>role(c)==='Support')?1.14:.84;const t=new Set(p.flatMap(tags));if(t.has('crit'))mult*=1.02;if(t.has('critDamage'))mult*=1.018;if(t.has('damage'))mult*=1.012;if(t.has('attackPower'))mult*=1.012;if(t.has('attackSpeed'))mult*=1.01;if(t.has('positional'))mult*=1.01;if(t.has('mana'))mult*=1.008;return p.reduce((s,c)=>s+cp(c)*.76+il(c)*2.5,0)*mult}
+function sourceSynergies(c){return SYNERGIES[cls(c)]||['damage']}
+function targetAffinity(c,synergy){const cl=cls(c);if(synergy==='crit')return CRIT_AFFINITY[cl]??1;if(synergy==='attackSpeed')return ATTACK_SPEED_AFFINITY[cl]??1;if(synergy==='positional')return POSITIONAL_AFFINITY[cl]??1;return 1}
+function uniqueSources(p){const seen=new Set(),out=[];for(const c of p){for(const s of sourceSynergies(c)){if(s==='supportDamage')continue;const key=`${s}:${cls(c)}`;if(!seen.has(key)){seen.add(key);out.push({source:c,synergy:s})}}}return out}
+function partyScore(p){if(!p.length)return 0;
+  // CP is the individual-power input. iLvl is deliberately not added again.
+  const base=p.reduce((sum,c)=>sum+cp(c),0);
+  const supports=p.filter(c=>role(c)==='Support');
+  if(supports.length!==1)return base*0.75;
+  let multiplier=1;
+  // One support is mandatory for a valid four-player party. Support-specific
+  // contribution is represented separately from DPS synergies.
+  const support=supports[0];
+  multiplier*=1+SYNERGY_WEIGHT.supportDamage;
+  if(cls(support)==='Artist')multiplier*=1.004;
+  if(cls(support)==='Bard')multiplier*=1.006;
+  if(cls(support)==='Paladin')multiplier*=1.002;
+
+  const dps=p.filter(c=>role(c)!=='Support');
+  // Same-type synergies from different classes can stack; repeated copies of
+  // the same class/type are not counted twice.
+  const active=new Set();
+  for(const source of uniqueSources(p)){
+    const key=source.synergy;
+    if(active.has(key))continue;
+    active.add(key);
+    const targets=dps.filter(c=>c!==source.source);
+    if(!targets.length)continue;
+    const weight=SYNERGY_WEIGHT[key]||0;
+    const avg=targets.reduce((s,c)=>s+targetAffinity(c,key),0)/targets.length;
+    multiplier*=1+weight*avg;
+  }
+  return base*multiplier;
+}
+const score=partyScore;
 const fmt=n=>Math.round(n).toLocaleString();
 function model(){const a=chars(),map=new Map(a.map(c=>[c.id,c])),x=assignments(),seen=new Set(),p1=[],p2=[];for(const id of x.party1||[]){if(map.has(id)&&!seen.has(id)&&p1.length<4){p1.push(id);seen.add(id)}}for(const id of x.party2||[]){if(map.has(id)&&!seen.has(id)&&p2.length<4){p2.push(id);seen.add(id)}}for(const c of a){if(seen.has(c.id))continue;if(p1.length<4)p1.push(c.id);else if(p2.length<4)p2.push(c.id);seen.add(c.id)}const n={party1:p1,party2:p2};save(n);return{map,n,p1:p1.map(id=>map.get(id)).filter(Boolean),p2:p2.map(id=>map.get(id)).filter(Boolean)}}
 function member(c){const x=identity(c),color=x.role==='DPS'?'#e07a7a':'#79c98b';return `<div class="party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><div class="party-member-main"><a class="party-character-link" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${x.icon?`<img class="class-icon" src="${esc(x.icon)}" alt="${esc(x.cls)}">`:''}${esc(x.name)}</a><span class="party-class-label">${esc(x.cls)}</span><span class="party-role-label" style="color:${color} !important">${x.role}</span><span class="party-stat-label">iLvl ${x.il.toLocaleString(undefined,{maximumFractionDigits:2})} · CP ${x.cp.toLocaleString(undefined,{maximumFractionDigits:2})}</span></div></div>`}
-function synergyList(p){const out=[],seen=new Set();for(const c of p){for(const t of tags(c)){if(t==='support')continue;if(!seen.has(t)){seen.add(t);out.push(t)}}if(role(c)==='Support'&&!seen.has('support')){seen.add('support');out.push('support amplification')}}return out}
+function synergyList(p){const out=[],seen=new Set();for(const c of p){for(const t of sourceSynergies(c)){if(t==='supportDamage')continue;if(!seen.has(t)){seen.add(t);out.push(t)}}if(role(c)==='Support'&&!seen.has('support')){seen.add('support');out.push('support amplification')}}return out}
 function party(title,id,p){const sy=synergyList(p);return `<article class="party authoritative-party" data-party="${id}"><div class="party-heading"><div><h3>${title}</h3><div class="party-score">Estimated potential: <strong>${fmt(score(p))}</strong></div></div><div class="party-meta">${p.length}/4 · ${p.filter(c=>role(c)==='Support').length} support</div></div><div class="party-dropzone authoritative-dropzone" data-drop-party="${id}">${p.length?p.map(member).join(''):'<div class="party-empty">Drop a character here</div>'}</div><div class="party-synergies"><strong>Synergies:</strong> ${sy.length?sy.map(esc).join(', '):'None'}</div></article>`}
 function impactHtml(beforeScore,afterScore,label){const pct=beforeScore?((afterScore-beforeScore)/beforeScore)*100:0,cc=pct>0.0001?'positive':pct<-0.0001?'negative':'neutral';return `<div id="swapImpact" class="swap-impact ${cc}" aria-live="polite"><div>${label}: <strong class="swap-impact-number ${cc}">${pct>=0?'+':''}${pct.toFixed(2)}%</strong> combined estimated potential damage (${fmt(beforeScore)} → ${fmt(afterScore)}).</div></div>`}
-function render(impact=''){const host=document.querySelector('#suggestedParties');if(!host)return;const m=model();if(!m.p1.length&&!m.p2.length){host.innerHTML='<div class="empty-roster">Add specific character profiles to generate the party setup.</div>';return}host.innerHTML=`<div class="authoritative-summary"><strong>Combined estimated potential: ${fmt(score(m.p1)+score(m.p2))}</strong><span class="potential-explanation"> — profile-aware relative damage score using CP, iLvl, class role, and party synergy. Higher is better; not a literal in-game DPS value.</span></div><div class="authoritative-parties">${party('Party 1','party1',m.p1)}${party('Party 2','party2',m.p2)}</div>${impact}`}
+function render(impact=''){const host=document.querySelector('#suggestedParties');if(!host)return;const m=model();if(!m.p1.length&&!m.p2.length){host.innerHTML='<div class="empty-roster">Add specific character profiles to generate the party setup.</div>';return}host.innerHTML=`<div class="authoritative-summary"><strong>Combined estimated potential: ${fmt(score(m.p1)+score(m.p2))}</strong><span class="potential-explanation"> — CP-based individual power with party-specific synergy interactions. Higher is better; not a literal in-game DPS value.</span></div><div class="authoritative-parties">${party('Party 1','party1',m.p1)}${party('Party 2','party2',m.p2)}</div>${impact}`}
 function currentParty(id,a){return a.party1.includes(id)?'party1':a.party2.includes(id)?'party2':null}
 function partyArrays(a){const cs=chars();return[cs.filter(c=>a.party1.includes(c.id)),cs.filter(c=>a.party2.includes(c.id))]}
 function applyMove(id,targetParty){const a=assignments(),from=currentParty(id,a);if(!from||from===targetParty||a[targetParty].length>=4)return false;const before=partyArrays(a),beforeScore=score(before[0])+score(before[1]);a[from]=a[from].filter(x=>x!==id);a[targetParty].push(id);save(a);const after=partyArrays(a),afterScore=score(after[0])+score(after[1]);render(impactHtml(beforeScore,afterScore,'Move applied'));return true}
 function applySwap(id1,id2){const a=assignments(),p1=currentParty(id1,a),p2=currentParty(id2,a);if(!p1||!p2||p1===p2)return false;const before=partyArrays(a),beforeScore=score(before[0])+score(before[1]);const i=a[p1].indexOf(id1),j=a[p2].indexOf(id2);a[p1][i]=id2;a[p2][j]=id1;save(a);const after=partyArrays(a),afterScore=score(after[0])+score(after[1]);render(impactHtml(beforeScore,afterScore,'Swap applied'));return true}
 function combinations(arr,k,start=0,p=[],out=[]){if(p.length===k){out.push(p.slice());return out}for(let i=start;i<=arr.length-(k-p.length);i++)combinations(arr,k,i+1,p.concat(arr[i]),out);return out}
-function optimize(){const a=chars();if(a.length<2)return;let best=null,bestScore=-Infinity;for(const p1 of combinations(a,Math.min(4,a.length))){const p2=a.filter(c=>!p1.includes(c));if(p1.length===4&&p2.length>4)continue;if(a.length>4&&p2.length<Math.min(4,a.length-4))continue;const s=score(p1)+score(p2);if(s>bestScore){bestScore=s;best={party1:p1.map(c=>c.id),party2:p2.map(c=>c.id)}}}if(best){save(best);render(`<div class="optimizer-result"><strong>Optimization complete.</strong> Best arrangement under the current scoring model: <strong>${fmt(bestScore)}</strong>.</div>`)}}
+function optimize(){const a=chars();if(a.length!==8)return;let best=null,bestScore=-Infinity;for(const p1 of combinations(a,4)){const p2=a.filter(c=>!p1.includes(c));if(p1.filter(c=>role(c)==='Support').length!==1)continue;if(p2.filter(c=>role(c)==='Support').length!==1)continue;const s=score(p1)+score(p2);if(s>bestScore){bestScore=s;best={party1:p1.map(c=>c.id),party2:p2.map(c=>c.id)}}}if(best){save(best);render(`<div class="optimizer-result"><strong>Optimization complete.</strong> Best valid 4/4 arrangement: <strong>${fmt(bestScore)}</strong>.</div>`)} }
 function install(){const host=document.querySelector('#suggestedParties'),button=document.querySelector('#optimizeBtn');if(!host||host.dataset.dragDropInstalled)return;host.dataset.dragDropInstalled='1';if(button&&!button.dataset.optimizerInstalled){button.dataset.optimizerInstalled='1';button.addEventListener('click',optimize)}host.addEventListener('dragstart',e=>{const item=e.target.closest('.authoritative-member');if(!item)return;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',item.dataset.characterId)});host.addEventListener('dragover',e=>{const zone=e.target.closest('.authoritative-dropzone');if(zone){e.preventDefault();e.dataTransfer.dropEffect='move'}});host.addEventListener('drop',e=>{e.preventDefault();const zone=e.target.closest('.authoritative-dropzone');if(!zone)return;const id=e.dataTransfer.getData('text/plain');if(!id)return;const target=e.target.closest('.authoritative-member');if(target&&target.dataset.characterId!==id)applySwap(id,target.dataset.characterId);else applyMove(id,zone.dataset.dropParty)});setTimeout(render,500)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
