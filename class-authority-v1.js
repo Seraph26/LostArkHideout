@@ -1,6 +1,5 @@
 /* Bible class authority: derive the actual subclass from the character's canonical
-   classId/class field in the embedded page data. Never infer a subclass from the
-   broad family name or incidental text elsewhere on the page. */
+   raid profile data. Never infer a subclass from incidental page text. */
 (() => {
   const CLASS_IDS = {
     berserker:'Berserker', destroyer:'Destroyer', gunlancer:'Gunlancer', paladin:'Paladin', slayer:'Slayer', valkyrie:'Valkyrie',
@@ -13,34 +12,54 @@
   };
   const normalizeId = v => String(v || '').trim().toLowerCase().replace(/[ -]+/g, '_');
 
+  function mapped(v) { return CLASS_IDS[normalizeId(v)] || null; }
+
   function classFromHtml(html) {
     const source = String(html || '');
-    // IMPORTANT: classId is the canonical subclass field used by Bible's raid
-    // data. Check it before generic `class:` fields, because the page can contain
-    // unrelated class text (including another roster character's class).
-    const canonicalPatterns = [
-      /classId\s*:\s*["']([a-z_]+)["']/ig,
-      /["']classId["']\s*:\s*["']([a-z_]+)["']/ig,
-      /classification\s*:\s*["']raid_merged["'][\s\S]{0,2500}?classId\s*:\s*["']([a-z_]+)["']/i,
-      /classification\s*:\s*["']raid_merged["'][\s\S]{0,2500}?["']classId["']\s*:\s*["']([a-z_]+)["']/i
+
+    // Bible can include multiple classId values on one page. The page contains
+    // raid-loadout data as well as unrelated class data, so a global first-match
+    // lookup is unsafe. Prefer classId values belonging to the raid_merged object.
+    const raidWindows = [];
+    const raidRe = /raid_merged/ig;
+    let rm;
+    while ((rm = raidRe.exec(source))) raidWindows.push(source.slice(Math.max(0, rm.index - 2500), rm.index + 5000));
+    for (const windowText of raidWindows) {
+      const patterns = [
+        /classId\s*:\s*["']([a-z_]+)["']/ig,
+        /["']classId["']\s*:\s*["']([a-z_]+)["']/ig
+      ];
+      for (const re of patterns) {
+        let m;
+        while ((m = re.exec(windowText))) {
+          const name = mapped(m[1]);
+          if (name) return name;
+        }
+      }
+    }
+
+    // Prefer an explicit character/profile object if Bible exposes one.
+    const profilePatterns = [
+      /(?:character|profile|characterProfile)[\s\S]{0,1800}?classId\s*[:=]\s*["']([a-z_]+)["']/ig,
+      /(?:character|profile|characterProfile)[\s\S]{0,1800}?["']classId["']\s*:\s*["']([a-z_]+)["']/ig
     ];
-    for (const re of canonicalPatterns) {
-      const m = source.match(re);
-      if (m) {
-        const name = CLASS_IDS[normalizeId(m[1])];
+    for (const re of profilePatterns) {
+      let m;
+      while ((m = re.exec(source))) {
+        const name = mapped(m[1]);
         if (name) return name;
       }
     }
-    // Fall back only when canonical raid data is absent.
-    const fallbackPatterns = [
-      /class\s*:\s*["']([a-z_]+)["']/i,
-      /["']class["']\s*:\s*["']([a-z_]+)["']/i
-    ];
-    for (const re of fallbackPatterns) {
-      const m = source.match(re);
-      const name = m && CLASS_IDS[normalizeId(m[1])];
+
+    // Only as a last resort, inspect classId fields globally. This is preferable
+    // to scanning visible page text, which may contain other classes.
+    const all = /(?:classId|["']classId["'])\s*[:=]\s*["']([a-z_]+)["']/ig;
+    let m;
+    while ((m = all.exec(source))) {
+      const name = mapped(m[1]);
       if (name) return name;
     }
+
     return null;
   }
 
