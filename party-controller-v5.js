@@ -8,12 +8,14 @@ function state(){for(const k of KEYS){try{const x=JSON.parse(localStorage.getIte
 function chars(){return state().characters.filter(c=>c&&c.profile)}
 function assigns(){try{const x=JSON.parse(localStorage.getItem(PK)||'null');if(x&&Array.isArray(x.party1)&&Array.isArray(x.party2))return x}catch{}return{party1:[],party2:[]}}
 const save=x=>localStorage.setItem(PK,JSON.stringify(x));
+function isDiamarte(c){return String(c?.profile?.name||c?.name||'').trim().toLowerCase()==='diamarte'}
 function canonicalClass(c){
+  if(isDiamarte(c))return 'Souleater';
   const raw=c?.profile?.class||'';
   try { const canonical=window.LostArkHideoutClassData?.canonical?.(raw); if(canonical)return canonical; } catch {}
   return raw;
 }
-function role(c){const cls=canonicalClass(c),r=c?.profile?.role;if(r==='Support'||r==='DPS')return r;return SUPPORT_CLASSES.has(cls)?'Support':'DPS'}
+function role(c){const cls=canonicalClass(c),r=c?.profile?.role;if(r==='Support'&&cls!=='Souleater')return r;return SUPPORT_CLASSES.has(cls)?'Support':'DPS'}
 function cp(c){return Number(c?.profile?.cp)||0} function il(c){return Number(c?.profile?.ilvl)||0}
 function tags(c){return SYN[canonicalClass(c)]||['damage']}
 function strength(c){return cp(c)*.76+il(c)*2.5}
