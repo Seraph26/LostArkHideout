@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — positional build authority v3 */
+/* Lost Ark Hideout — positional build authority v4 */
 (()=>{
 'use strict';
 const V3='lostark-hideout-build-profiles-v3',V2='lostark-hideout-build-profiles-v2';
@@ -32,16 +32,21 @@ function infer(b){
  if(/empress/.test(t)&&/arcanist|arcana/.test(t))return'Hit Master';
  return b.positional||'Unknown';
 }
+function usableClass(v){return v&&norm(v)!=='unknown'&&norm(v)!=='n/a'?v:''}
 function sync(){
  const v3=load(V3),legacy=load(V2);let changed=false;
  for(const [url,b] of Object.entries(v3)){
   if(!b||typeof b!=='object')continue;
-  const p=infer(b);
+  const old=legacy[url]&&typeof legacy[url]==='object'?legacy[url]:{};
+  const source={...old,...b};
+  const cls=usableClass(b.className)||usableClass(old.className)||usableClass(old.class)||'';
+  if(cls)source.className=cls;
+  const p=infer(source);
   if(b.positional!==p){b.positional=p;changed=true}
-  if(!legacy[url]||typeof legacy[url]!=='object')legacy[url]={};
-  const old=legacy[url];
   if(old.positional!==p){old.positional=p;changed=true}
-  if(b.className&&old.className!==b.className){old.className=b.className;changed=true}
+  if(cls&&old.className!==cls){old.className=cls;changed=true}
+  if(cls&&b.className!==cls){b.className=cls;changed=true}
+  if(!legacy[url]){legacy[url]=old;changed=true}
  }
  if(changed){save(V3,v3);save(V2,legacy)}
  window.LostArkPositionalAuthorityV1={infer,get:url=>v3[url]||legacy[url]||null,sync};
@@ -50,11 +55,8 @@ function wireRefresh(){
  const btn=document.getElementById('refreshBtn');
  if(!btn||btn.dataset.positionalAuthorityRefresh==='1')return;
  btn.dataset.positionalAuthorityRefresh='1';
- btn.addEventListener('click',async()=>{
-  try{if(window.LostArkBuildProfilesV3?.refresh)await window.LostArkBuildProfilesV3.refresh();sync()}catch(e){console.warn('Authoritative build refresh failed',e)}
- },true);
+ btn.addEventListener('click',async()=>{try{if(window.LostArkBuildProfilesV3?.refresh)await window.LostArkBuildProfilesV3.refresh();sync()}catch(e){console.warn('Authoritative build refresh failed',e)}},true);
 }
-sync();
-window.addEventListener('lostark-build-profiles-v3-ready',sync);
+sync();window.addEventListener('lostark-build-profiles-v3-ready',sync);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wireRefresh,{once:true});else wireRefresh();
 })();
