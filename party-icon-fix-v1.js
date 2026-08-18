@@ -1,11 +1,34 @@
 (() => {
   const CONNECTOR = 'https://lostark-bible-connector.seraph0226.workers.dev/character';
   const CACHE = new Map();
+  const STORAGE_KEYS = ['lostark-hideout-private-v3', 'lostark-hideout-private-v2'];
 
   function normalizePath(href) {
     try {
       const u = new URL(href, location.href);
       return u.pathname.replace(/\/$/, '').toLowerCase();
+    } catch {
+      return '';
+    }
+  }
+
+  function canonicalClassForUrl(characterUrl) {
+    const target = normalizePath(characterUrl);
+    if (!target) return '';
+    for (const key of STORAGE_KEYS) {
+      try {
+        const state = JSON.parse(localStorage.getItem(key) || 'null');
+        for (const c of state?.characters || []) {
+          if (normalizePath(c?.url) === target && c?.profile?.class) return c.profile.class;
+        }
+      } catch {}
+    }
+    return '';
+  }
+
+  function canonicalIconForClass(cls) {
+    try {
+      return window.LostArkHideoutClassData?.iconUrl?.(cls) || '';
     } catch {
       return '';
     }
@@ -55,18 +78,14 @@
 
   function findCharacterUrls() {
     const urls = new Set();
-
     document.querySelectorAll('a.character-bible-link[href]').forEach(a => urls.add(a.href));
     document.querySelectorAll('a.party-character-link[href]').forEach(a => urls.add(a.href));
-
     return [...urls];
   }
 
   function applyIcon(url, src) {
     if (!src) return;
-
     const target = normalizePath(url);
-
     document.querySelectorAll('a.character-bible-link[href], a.party-character-link[href]').forEach(link => {
       if (normalizePath(link.href) !== target) return;
       const img = link.querySelector('img.class-icon');
@@ -84,7 +103,9 @@
 
   async function run() {
     for (const url of findCharacterUrls()) {
-      const src = await getIcon(url);
+      const canonical = canonicalClassForUrl(url);
+      const canonicalIcon = canonicalIconForClass(canonical);
+      const src = canonicalIcon || await getIcon(url);
       applyIcon(url, src);
     }
   }
