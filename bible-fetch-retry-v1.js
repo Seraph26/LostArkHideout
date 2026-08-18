@@ -1,8 +1,8 @@
 /* Retries transient Bible connector failures and exposes exact refresh failures for diagnostics. */
 (()=>{
 'use strict';
-if(window.__BIBLE_FETCH_RETRY_V1__)return;
-window.__BIBLE_FETCH_RETRY_V1__=true;
+if(window.__BIBLE_FETCH_RETRY_V2__)return;
+window.__BIBLE_FETCH_RETRY_V2__=true;
 const originalFetch=window.fetch.bind(window);
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const failures=[];
@@ -24,10 +24,9 @@ window.fetch=async function(input,init){
   }catch(e){lastError=e;lastStatus=0;lastBody=String(e?.message||e)}
   if(attempt<2)await sleep(700*(attempt+1));
  }
- const item={name:characterName(url),status:lastStatus,body:lastBody||lastError?.message||'network error'};
- failures.push(item);
+ failures.push({name:characterName(url),status:lastStatus,body:lastBody||lastError?.message||'network error'});
  throw lastError||new Error('Bible connector request failed after retries.');
 };
-const installDiagnostics=()=>{const status=document.querySelector('#status');if(!status)return;let previous='';new MutationObserver(()=>{const text=status.textContent||'';if(text!==previous){previous=text;if(/^Refreshing character profiles/i.test(text))failures.length=0;if(/^Refreshed /i.test(text)&&failures.length){const detail=failures.map(x=>`${x.name}: ${x.status?`HTTP ${x.status}`:'network error'}${x.body?` — ${x.body}`:''}`).join(' | ');status.textContent=`${text} ${detail}`}}}).observe(status,{childList:true,subtree:true,characterData:true})};
+const installDiagnostics=()=>{const status=document.querySelector('#status');if(!status)return;let previous='';let reported=false;new MutationObserver(()=>{const text=status.textContent||'';if(text===previous)return;previous=text;if(/^Refreshing character profiles/i.test(text)){failures.length=0;reported=false;return}if(/^Refreshed /i.test(text)&&failures.length&&!reported){reported=true;const detail=failures.map(x=>`${x.name}: ${x.status?`HTTP ${x.status}`:'network error'}${x.body?` — ${x.body}`:''}`).join(' | ');status.textContent=`${text} ${detail}`}}).observe(status,{childList:true,subtree:true,characterData:true})};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installDiagnostics,{once:true});else installDiagnostics();
 })();
