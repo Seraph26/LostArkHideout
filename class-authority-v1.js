@@ -1,5 +1,6 @@
 /* Bible class authority: derive the actual subclass from the character's canonical
-   raid profile data. Never infer a subclass from incidental page text. */
+   profile page. The visible profile class is authoritative; never infer it from
+   incidental page data when the profile itself states the class. */
 (() => {
   const CLASS_IDS = {
     berserker:'Berserker', destroyer:'Destroyer', gunlancer:'Gunlancer', paladin:'Paladin', slayer:'Slayer', valkyrie:'Valkyrie',
@@ -11,15 +12,21 @@
     weather_artist:'Aeromancer', yinyangshi:'Yinyangshi', alchemist:'Alchemist'
   };
   const normalizeId = v => String(v || '').trim().toLowerCase().replace(/[ -]+/g, '_');
-
-  function mapped(v) { return CLASS_IDS[normalizeId(v)] || null; }
+  const mapped = v => CLASS_IDS[normalizeId(v)] || null;
 
   function classFromHtml(html) {
     const source = String(html || '');
 
-    // Bible can include multiple classId values on one page. The page contains
-    // raid-loadout data as well as unrelated class data, so a global first-match
-    // lookup is unsafe. Prefer classId values belonging to the raid_merged object.
+    // The Bible character page itself displays the authoritative class in its
+    // profile header, e.g. <div class="class">Souleater</div>. Prefer this over
+    // classId fields because Bible pages can contain multiple unrelated classId
+    // values for loadouts, presets, or other embedded data.
+    const visibleClass = source.match(/<[^>]*class=["'][^"']*\bclass\b[^"']*["'][^>]*>\s*([^<]+?)\s*<\//i);
+    if (visibleClass) {
+      const text = visibleClass[1].replace(/\s+/g, ' ').trim();
+      if (text && text.length < 40) return text;
+    }
+
     const raidWindows = [];
     const raidRe = /raid_merged/ig;
     let rm;
@@ -31,35 +38,22 @@
       ];
       for (const re of patterns) {
         let m;
-        while ((m = re.exec(windowText))) {
-          const name = mapped(m[1]);
-          if (name) return name;
-        }
+        while ((m = re.exec(windowText))) { const name = mapped(m[1]); if (name) return name; }
       }
     }
 
-    // Prefer an explicit character/profile object if Bible exposes one.
     const profilePatterns = [
       /(?:character|profile|characterProfile)[\s\S]{0,1800}?classId\s*[:=]\s*["']([a-z_]+)["']/ig,
       /(?:character|profile|characterProfile)[\s\S]{0,1800}?["']classId["']\s*:\s*["']([a-z_]+)["']/ig
     ];
     for (const re of profilePatterns) {
       let m;
-      while ((m = re.exec(source))) {
-        const name = mapped(m[1]);
-        if (name) return name;
-      }
+      while ((m = re.exec(source))) { const name = mapped(m[1]); if (name) return name; }
     }
 
-    // Only as a last resort, inspect classId fields globally. This is preferable
-    // to scanning visible page text, which may contain other classes.
     const all = /(?:classId|["']classId["'])\s*[:=]\s*["']([a-z_]+)["']/ig;
     let m;
-    while ((m = all.exec(source))) {
-      const name = mapped(m[1]);
-      if (name) return name;
-    }
-
+    while ((m = all.exec(source))) { const name = mapped(m[1]); if (name) return name; }
     return null;
   }
 
@@ -67,7 +61,7 @@
     if (typeof html !== 'string') return html;
     const cls = classFromHtml(html);
     if (!cls) return html;
-    const marker = `<span data-bible-authoritative-class="${cls}" aria-label="${cls}"></span>`;
+    const marker = `<span data-bible-authoritative-class="${String(cls).replace(/"/g, '&quot;')}" aria-label="${String(cls).replace(/"/g, '&quot;')}"></span>`;
     return html.replace(/<body[^>]*>/i, m => `${m}${marker}`);
   }
 
@@ -83,9 +77,7 @@
       if (!htmlKey) return response;
       const next = {...data, [htmlKey]: inject(data[htmlKey])};
       return new Response(JSON.stringify(next), {status: response.status, statusText: response.statusText, headers: {'Content-Type':'application/json'}});
-    } catch {
-      return response;
-    }
+    } catch { return response; }
   };
   window.LostArkHideoutClassAuthority = { CLASS_IDS, classFromHtml };
 })();
