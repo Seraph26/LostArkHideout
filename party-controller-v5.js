@@ -9,9 +9,9 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const chars=()=>{for(const k of KEYS){try{const x=JSON.parse(localStorage.getItem(k)||'null');if(Array.isArray(x?.characters))return x.characters.filter(c=>c?.profile)}catch{}}return[]};
 const assignments=()=>{try{const x=JSON.parse(localStorage.getItem(PK)||'null');if(Array.isArray(x?.party1)&&Array.isArray(x?.party2))return x}catch{}return{party1:[],party2:[]}};
 const save=x=>localStorage.setItem(PK,JSON.stringify(x));
-function norm(v){try{const u=new URL(v,location.href);return decodeURIComponent(u.pathname.replace(/\/$/,'')).normalize('NFC').toLowerCase()}catch{return String(v||'').replace(/\/$/,'').normalize('NFC').toLowerCase()}}
-function topCard(c){const target=norm(c?.url),name=String(c?.profile?.name||c?.name||'').trim().normalize('NFC').toLowerCase();return [...document.querySelectorAll('#roster article.character')].find(card=>{const a=card.querySelector('a.character-bible-link[href]');return a&&(norm(a.getAttribute('href'))===target||a.textContent.trim().normalize('NFC').toLowerCase()===name)})||null}
-function cls(c){const el=topCard(c)?.querySelector('.class');return String(el?.textContent||'').trim()||'Unknown'}
+function normUrl(v){try{const u=new URL(v,location.href);return decodeURIComponent(u.pathname.replace(/\/$/,'')).normalize('NFC').toLowerCase()}catch{return String(v||'').replace(/\/$/,'').normalize('NFC').toLowerCase()}}
+function topCard(c){const target=normUrl(c?.url);if(!target)return null;return [...document.querySelectorAll('#roster article.character')].find(card=>{const a=card.querySelector('a.character-bible-link[href]');return a&&normUrl(a.getAttribute('href'))===target})||null}
+function cls(c){const el=topCard(c)?.querySelector('.class');const value=String(el?.textContent||'').trim();return value||String(c?.profile?.class||'Unknown').trim()||'Unknown'}
 function icon(c){return topCard(c)?.querySelector('img.class-icon')?.getAttribute('src')||''}
 function role(c){return SUPPORT.has(cls(c))?'Support':'DPS'}
 function cp(c){return Number(c?.profile?.cp)||0}
