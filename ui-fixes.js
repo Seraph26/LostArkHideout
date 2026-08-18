@@ -23,20 +23,16 @@
   function classIcon(cls){
     try{return window.LostArkHideoutClassData?.iconUrl?.(cls)||''}catch{return ''}
   }
-  function fixClasses(){
+  function fixRosterClasses(){
     const profiles=storedProfiles();
-    document.querySelectorAll('#roster .character,#suggestedParties .party,.party .slot,.party-member').forEach(root=>{
-      const nameEl=root.querySelector('.character-bible-link,.party-character-link,.party-character-title span,h3 a,h3 span');
+    document.querySelectorAll('#roster .character').forEach(root=>{
+      const nameEl=root.querySelector('.character-bible-link');
       if(!nameEl)return;
       const name=normalizeName(nameEl.textContent);
       const p=profiles.get(name);
       const cls=canonicalClass(p?.class);
       if(!cls)return;
       root.querySelectorAll('.class').forEach(e=>e.textContent=cls);
-      root.querySelectorAll('.party-member-main>span,small').forEach(e=>{
-        const text=e.textContent||'';
-        if(/\b(Soul Eater|Souleater)\b/i.test(text))e.textContent=text.replace(/\b(Soul Eater|Souleater)\b/i,cls);
-      });
       const src=classIcon(cls);
       if(src)root.querySelectorAll('img.class-icon').forEach(img=>{img.src=src;img.removeAttribute('srcset');img.alt=cls;});
     });
@@ -48,12 +44,6 @@
       const img=card.querySelector('img.class-icon');
       if(name&&img?.src)rosterIcons.set(name,img.src);
     });
-    document.querySelectorAll('#suggestedParties .slot').forEach(slot=>{
-      const name=normalizeName(slot.querySelector('h4 span')?.textContent||slot.querySelector('h4')?.textContent);
-      const img=slot.querySelector('img.class-icon');
-      const src=rosterIcons.get(name);
-      if(img&&src){img.src=src;img.removeAttribute('srcset');img.alt='';}
-    });
     document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
       const name=normalizeName(member.querySelector('.party-character-link')?.textContent||member.querySelector('.party-member-main')?.textContent);
       const img=member.querySelector('img.class-icon');
@@ -61,7 +51,7 @@
       if(img&&src){img.src=src;img.removeAttribute('srcset');img.alt='';}
     });
   }
-  function repair(){fixClasses();bridgePartyIcons()}
+  function repair(){fixRosterClasses();bridgePartyIcons()}
   let queued=false;
   const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;repair()})};
   const observer=new MutationObserver(schedule);
