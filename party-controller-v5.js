@@ -1,7 +1,7 @@
-/* Lost Ark Hideout — party optimizer with swap impact */
+/* Lost Ark Hideout — party optimizer with real party-aware swap impact */
 (()=>{
 const KEYS=['lostark-hideout-private-v3','lostark-hideout-private-v2'],PK='lostark-hideout-party-assignments-v2',MAX=4;
-const SYN={Berserker:['damage'],Destroyer:['damage'],Gunlancer:['damage','positional'],Paladin:['support'],Slayer:['damage'],Arcanist:['crit'],Arcana:['crit'],Summoner:['damage','mana'],Sorceress:['damage'],Bard:['support'],Gunslinger:['crit'],Deadeye:['crit'],Sharpshooter:['damage'],Artillerist:['damage'],Machinist:['attackPower'],Striker:['crit','attackSpeed'],Wardancer:['crit','attackSpeed'],Scrapper:['damage'],Soulfist:['attackPower'],Glavier:['critDamage'],Glaivier:['critDamage'],Deathblade:['positional','attackSpeed'],Shadowhunter:['damage'],Reaper:['damage'],Artist:['support','mana'],Aeromancer:['crit'],Breaker:['damage'],Valkyrie:['damage'],'Soul Eater':['damage'],Souleater:['damage']};
+const SYN={Berserker:['damage'],Destroyer:['damage'],Gunlancer:['damage','positional'],Paladin:['support'],Slayer:['damage'],Arcanist:['crit'],Arcana:['crit'],Summoner:['damage','mana'],Sorceress:['damage'],Bard:['support'],Gunslinger:['crit'],Deadeye:['crit'],Sharpshooter:['damage'],Artillerist:['damage'],Machinist:['attackPower'],Striker:['crit','attackSpeed'],Wardancer:['crit','attackSpeed'],Scrapper:['damage'],Soulfist:['attackPower'],Glavier:['critDamage'],Glaivier:['critDamage'],Deathblade:['positional','attackSpeed'],Shadowhunter:['damage'],Reaper:['damage'],Artist:['support','mana'],Aeromancer:['crit'],Breaker:['damage'],Valkyrie:['damage','support'],'Soul Eater':['damage'],Souleater:['damage']};
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function state(){for(const k of KEYS){try{const x=JSON.parse(localStorage.getItem(k)||'null');if(x&&Array.isArray(x.characters))return x}catch{}}return{characters:[]}}
 function chars(){return state().characters.filter(c=>c&&c.profile)}
@@ -10,15 +10,65 @@ const save=x=>localStorage.setItem(PK,JSON.stringify(x));
 const role=c=>c?.profile?.role==='Support'?'Support':c?.profile?.role==='DPS'?'DPS':'DPS';
 const cp=c=>Number(c?.profile?.cp)||0,il=c=>Number(c?.profile?.ilvl)||0,tags=c=>SYN[c?.profile?.class]||['damage'];
 function strength(c){return cp(c)*.76+il(c)*2.5}
-function syn(p){if(!p.length)return{mult:0,reasons:[]};const su=p.filter(c=>role(c)==='Support'),d=p.filter(c=>role(c)==='DPS');let m=1,r=[];if(su.length){m+=.14;r.push(`${su[0].profile.class} support amplification`)}else if(d.length){m*=.84;r.push('no support in this party')}const set=new Set(p.flatMap(tags));if(set.has('crit')){m*=1.035;r.push('crit synergy')}if(set.has('critDamage')){m*=1.045;r.push('crit-damage synergy')}if(set.has('damage')){m*=1.035;r.push('damage synergy')}if(set.has('attackPower')){m*=1.022;r.push('attack-power synergy')}if(set.has('attackSpeed')){m*=1.018;r.push('attack-speed synergy')}if(set.has('positional')){m*=1.018;r.push('positional synergy')}if(set.has('mana')){m*=1.012;r.push('mana synergy')}return{mult:m,reasons:r}}
-function score(p){return p.reduce((s,c)=>s+strength(c),0)*syn(p).mult}function total(a,b){return score(a)+score(b)}function fmt(n){return Math.round(n).toLocaleString()}
-function model(){const a=chars(),m=new Map(a.map(c=>[c.id,c])),x=assigns(),valid=new Set(a.map(c=>c.id)),seen=new Set(),p1=[],p2=[];for(const id of x.party1||[])if(valid.has(id)&&!seen.has(id)&&p1.length<4){p1.push(id);seen.add(id)}for(const id of x.party2||[])if(valid.has(id)&&!seen.has(id)&&p2.length<4){p2.push(id);seen.add(id)}for(const c of a){if(seen.has(c.id))continue;if(p1.length<4)p1.push(c.id);else if(p2.length<4)p2.push(c.id);seen.add(c.id)}const n={party1:p1,party2:p2};save(n);return{chars:a,map:m,assignments:n,p1:p1.map(id=>m.get(id)).filter(Boolean),p2:p2.map(id=>m.get(id)).filter(Boolean)}}
-function party(name,id,p){const su=p.filter(c=>role(c)==='Support').length;return `<article class="party authoritative-party" data-party="${id}"><div class="party-heading"><div><h3>${name}</h3><div class="party-score">Estimated potential: <strong>${fmt(score(p))}</strong></div></div><div class="party-meta">${p.length}/4 · ${su} support</div></div><div class="party-dropzone authoritative-dropzone" data-drop-party="${id}">${p.length?p.map(c=>`<div class="party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><div class="party-member-main"><a class="party-character-link" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${esc(c.profile.name||c.name)}</a><span>${esc(c.profile.class||'Unknown')} · CP ${cp(c).toLocaleString(undefined,{maximumFractionDigits:2})}</span></div></div>`).join(''):'<div class="party-empty">Drop a character here</div>'}</div></article>`}
+function partyMultiplier(p){
+ if(!p.length)return 0;
+ const supports=p.filter(c=>role(c)==='Support');
+ const dps=p.filter(c=>role(c)!=='Support');
+ let m=1;
+ if(supports.length)m+=0.14;
+ else if(dps.length)m*=0.84;
+ const present=new Set(p.flatMap(tags));
+ if(present.has('crit'))m*=1+0.012*Math.min(2,p.filter(c=>tags(c).includes('crit')).length);
+ if(present.has('critDamage'))m*=1.018;
+ if(present.has('damage'))m*=1.012;
+ if(present.has('attackPower'))m*=1.012;
+ if(present.has('attackSpeed'))m*=1.010;
+ if(present.has('positional'))m*=1.010;
+ if(present.has('mana'))m*=1.008;
+ return m;
+}
+function syn(p){
+ const supports=p.filter(c=>role(c)==='Support'),present=new Set(p.flatMap(tags)),r=[];
+ if(supports.length)r.push(`${supports[0].profile.class} support amplification`);else r.push('no support in this party');
+ if(present.has('crit'))r.push('crit synergy');
+ if(present.has('critDamage'))r.push('crit-damage synergy');
+ if(present.has('damage'))r.push('damage synergy');
+ if(present.has('attackPower'))r.push('attack-power synergy');
+ if(present.has('attackSpeed'))r.push('attack-speed synergy');
+ if(present.has('positional'))r.push('positional synergy');
+ if(present.has('mana'))r.push('mana synergy');
+ return{mult:partyMultiplier(p),reasons:r};
+}
+function score(p){return p.reduce((s,c)=>s+strength(c),0)*partyMultiplier(p)}
+function total(a,b){return score(a)+score(b)}
+function fmt(n){return Math.round(n).toLocaleString()}
+function combinations(a,k,start=0,prefix=[],out=[]){if(prefix.length===k){out.push(prefix.slice());return out}for(let i=start;i<=a.length-(k-prefix.length);i++)combinations(a,k,i+1,prefix.concat(a[i]),out);return out}
+function bestAssignment(a){
+ if(a.length<=4)return{party1:a.map(c=>c.id),party2:[]};
+ const su=a.filter(c=>role(c)==='Support');
+ const candidates=combinations(a,4);
+ let best=null,bestScore=-Infinity;
+ for(const p1 of candidates){
+  const ids=new Set(p1.map(c=>c.id)),p2=a.filter(c=>!ids.has(c.id));
+  if(p2.length>4)continue;
+  if(su.length>=2 && (p1.filter(c=>role(c)==='Support').length!==1 || p2.filter(c=>role(c)==='Support').length!==1))continue;
+  const s=total(p1,p2);if(s>bestScore){bestScore=s;best={party1:p1.map(c=>c.id),party2:p2.map(c=>c.id)}}
+ }
+ return best||{party1:a.slice(0,4).map(c=>c.id),party2:a.slice(4,8).map(c=>c.id)};
+}
+function model(useSaved=true){
+ const a=chars(),m=new Map(a.map(c=>[c.id,c])),x=useSaved?assigns():null,valid=new Set(a.map(c=>c.id)),seen=new Set(),p1=[],p2=[];
+ if(x){for(const id of x.party1||[])if(valid.has(id)&&!seen.has(id)&&p1.length<4){p1.push(id);seen.add(id)}for(const id of x.party2||[])if(valid.has(id)&&!seen.has(id)&&p2.length<4){p2.push(id);seen.add(id)}}
+ for(const c of a){if(seen.has(c.id))continue;if(p1.length<4)p1.push(c.id);else if(p2.length<4)p2.push(c.id);seen.add(c.id)}
+ const n={party1:p1,party2:p2};save(n);return{chars:a,map:m,assignments:n,p1:p1.map(id=>m.get(id)).filter(Boolean),p2:p2.map(id=>m.get(id)).filter(Boolean)}}
+function iconFor(c){const cls=c?.profile?.class||'';const map={Berserker:'ClassIcon-Warrior-Berserker.png',Destroyer:'ClassIcon-Warrior-Destroyer.png',Gunlancer:'ClassIcon-Warrior-Gunlancer.png',Paladin:'ClassIcon-Warrior-Paladin.png',Slayer:'ClassIcon-Warrior-Slayer.png',Arcanist:'ClassIcon-Mage-Arcanist.png',Arcana:'ClassIcon-Mage-Arcanist.png',Summoner:'ClassIcon-Mage-Summoner.png',Sorceress:'ClassIcon-Mage-Sorceress.png',Bard:'ClassIcon-Mage-Bard.png',Gunslinger:'ClassIcon-Gunner-Gunslinger.png',Deadeye:'ClassIcon-Gunner-Deadeye.png',Sharpshooter:'ClassIcon-Gunner-Sharpshooter.png',Artillerist:'ClassIcon-Gunner-Artillerist.png',Machinist:'ClassIcon-Gunner-Artillerist.png',Striker:'ClassIcon-Martial Artist-Striker.png',Wardancer:'ClassIcon-Martial Artist-Wardancer.png',Scrapper:'ClassIcon-Martial Artist-Scrapper.png',Soulfist:'ClassIcon-Martial Artist-Soulfist.png',Glavier:'ClassIcon-Martial Artist-Glaivier.png',Glaivier:'ClassIcon-Martial Artist-Glaivier.png',Deathblade:'ClassIcon-Assassin-Deathblade.png',Shadowhunter:'ClassIcon-Assassin-Shadowhunter.png',Reaper:'ClassIcon-Assassin-Reaper.png','Soul Eater':'ClassIcon-Assassin-Souleater.png',Souleater:'ClassIcon-Assassin-Souleater.png',Artist:'ClassIcon-Specialist-Artist.png',Aeromancer:'ClassIcon-Specialist-Aeromancer.png'};return map[cls]?`https://lostark.fandom.com/wiki/Special:Redirect/file/${encodeURIComponent(map[cls])}`:''}
+function party(name,id,p){const su=p.filter(c=>role(c)==='Support').length;return `<article class="party authoritative-party" data-party="${id}"><div class="party-heading"><div><h3>${name}</h3><div class="party-score">Estimated potential: <strong>${fmt(score(p))}</strong></div></div><div class="party-meta">${p.length}/4 · ${su} support</div></div><div class="party-dropzone authoritative-dropzone" data-drop-party="${id}">${p.length?p.map(c=>`<div class="party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><div class="party-member-main"><a class="party-character-link" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${iconFor(c)?`<img class="class-icon" src="${iconFor(c)}" alt="">`:''}${esc(c.profile.name||c.name)}</a><span>${esc(c.profile.class||'Unknown')} · ${role(c)} · CP ${cp(c).toLocaleString(undefined,{maximumFractionDigits:2})}</span></div></div>`).join(''):'<div class="party-empty">Drop a character here</div>'}</div></article>`}
 function render(impactData){const el=$('#suggestedParties');if(!el)return;const m=model();if(!m.chars.length){el.innerHTML='<div class="empty-roster">Add specific character profiles to generate the party setup.</div>';return}const impact=impactData?`<div id="swapImpact" class="swap-impact ${impactData.cls}" aria-live="polite">${impactData.label}: <strong class="swap-impact-number ${impactData.cls}">${impactData.pct>=0?'+':''}${impactData.pct.toFixed(2)}%</strong> combined estimated potential damage (${fmt(impactData.before)} → ${fmt(impactData.after)}). <span class="swap-reason">${esc(impactData.reason)}</span></div>`:'<div id="swapImpact" class="swap-impact neutral" aria-live="polite"></div>';el.innerHTML=`<div class="authoritative-summary"><strong>Combined estimated potential: ${fmt(total(m.p1,m.p2))}</strong><span class="potential-explanation"> — profile-aware relative damage score using CP, iLvl, class role, and party synergy. Higher is better; not a literal in-game DPS value.</span></div><div class="authoritative-parties">${party('Party 1','party1',m.p1)}${party('Party 2','party2',m.p2)}</div>${impact}`}
 function pfor(id,a){return a.party1.includes(id)?'party1':a.party2.includes(id)?'party2':null}
-function explain(before,after){const oldIds=new Set(before.map(c=>c.id)),newIds=new Set(after.map(c=>c.id)),r=[];for(const c of after)if(!oldIds.has(c.id))r.push(`${c.profile.class} adds ${fmt(strength(c))} profile power`);for(const c of before)if(!newIds.has(c.id))r.push(`${c.profile.class} removes ${fmt(strength(c))} profile power`);r.push(...syn(after).reasons.slice(0,2));return r.slice(0,3).join('; ')||'the overall profile and synergy balance changed'}
-function move(id,to){const m=model(),from=pfor(id,m.assignments);if(!from||from===to||m.assignments[to].length>=4)return;const before=total(m.p1,m.p2),old=[...m.p1,...m.p2];m.assignments[from]=m.assignments[from].filter(x=>x!==id);m.assignments[to].push(id);save(m.assignments);const n=model(),after=total(n.p1,n.p2),pct=before?((after-before)/before)*100:0;render({label:'Move applied',before,after,pct,reason:explain(old,[...n.p1,...n.p2]),cls:pct>0.0001?'positive':pct<-0.0001?'negative':'neutral'})}
-function swap(a,b){const m=model(),pa=pfor(a,m.assignments),pb=pfor(b,m.assignments);if(!pa||!pb||pa===pb)return;const before=total(m.p1,m.p2),old=pa==='party1'?m.p1.slice():m.p2.slice(),i=m.assignments[pa].indexOf(a),j=m.assignments[pb].indexOf(b);m.assignments[pa][i]=b;m.assignments[pb][j]=a;save(m.assignments);const n=model(),after=total(n.p1,n.p2),newParty=pa==='party1'?n.p1:n.p2,pct=before?((after-before)/before)*100:0;render({label:'Swap applied',before,after,pct,reason:explain(old,newParty),cls:pct>0.0001?'positive':pct<-0.0001?'negative':'neutral'})}
-function install(){const ob=$('#optimizeBtn');if(ob&&!ob.dataset.v5){ob.dataset.v5=1;ob.onclick=()=>render()}const z=$('#suggestedParties');if(z&&!z.dataset.v5){z.dataset.v5=1;z.addEventListener('dragstart',e=>{const m=e.target.closest('.authoritative-member');if(m)e.dataTransfer.setData('text/plain',m.dataset.characterId)});z.addEventListener('dragover',e=>{if(e.target.closest('.authoritative-member')||e.target.closest('.authoritative-dropzone'))e.preventDefault()});z.addEventListener('drop',e=>{const id=e.dataTransfer.getData('text/plain'),m=e.target.closest('.authoritative-member'),d=e.target.closest('.authoritative-dropzone');if(!id)return;e.preventDefault();m?swap(id,m.dataset.characterId):d&&move(id,d.dataset.dropParty)})}render()}
+function explain(beforeAfter){const {before,after}=beforeAfter;const oldP=[before.p1,before.p2],newP=[after.p1,after.p2],r=[];for(let i=0;i<2;i++){const o=oldP[i],n=newP[i];const os=syn(o),ns=syn(n);if(os.mult!==ns.mult)r.push(`${i===0?'Party 1':'Party 2'} synergy changed from ${os.reasons.slice(0,2).join(' + ')} to ${ns.reasons.slice(0,2).join(' + ')}`)}return r.slice(0,2).join('; ')||'the profile-power balance between the two parties changed'}
+function move(id,to){const m=model(),from=pfor(id,m.assignments);if(!from||from===to||m.assignments[to].length>=4)return;const before={p1:m.p1.slice(),p2:m.p2.slice()},beforeScore=total(before.p1,before.p2);m.assignments[from]=m.assignments[from].filter(x=>x!==id);m.assignments[to].push(id);save(m.assignments);const n=model(),after={p1:n.p1.slice(),p2:n.p2.slice()},afterScore=total(after.p1,after.p2),pct=beforeScore?((afterScore-beforeScore)/beforeScore)*100:0;render({label:'Move applied',before:beforeScore,after:afterScore,pct,reason:explain({before,after}),cls:pct>0.0001?'positive':pct<-0.0001?'negative':'neutral'})}
+function swap(a,b){const m=model(),pa=pfor(a,m.assignments),pb=pfor(b,m.assignments);if(!pa||!pb||pa===pb)return;const before={p1:m.p1.slice(),p2:m.p2.slice()},beforeScore=total(before.p1,before.p2),i=m.assignments[pa].indexOf(a),j=m.assignments[pb].indexOf(b);m.assignments[pa][i]=b;m.assignments[pb][j]=a;save(m.assignments);const n=model(),after={p1:n.p1.slice(),p2:n.p2.slice()},afterScore=total(after.p1,after.p2),pct=beforeScore?((afterScore-beforeScore)/beforeScore)*100:0;render({label:'Swap applied',before:beforeScore,after:afterScore,pct,reason:explain({before,after}),cls:pct>0.0001?'positive':pct<-0.0001?'negative':'neutral'})}
+function optimize(){const a=chars();if(!a.length)return;const best=bestAssignment(a);save(best);render()}
+function install(){const ob=$('#optimizeBtn');if(ob&&!ob.dataset.v6){ob.dataset.v6=1;ob.onclick=optimize}const z=$('#suggestedParties');if(z&&!z.dataset.v6){z.dataset.v6=1;z.addEventListener('dragstart',e=>{const m=e.target.closest('.authoritative-member');if(m)e.dataTransfer.setData('text/plain',m.dataset.characterId)});z.addEventListener('dragover',e=>{if(e.target.closest('.authoritative-member')||e.target.closest('.authoritative-dropzone'))e.preventDefault()});z.addEventListener('drop',e=>{const id=e.dataTransfer.getData('text/plain'),m=e.target.closest('.authoritative-member'),d=e.target.closest('.authoritative-dropzone');if(!id)return;e.preventDefault();m?swap(id,m.dataset.characterId):d&&move(id,d.dataset.dropParty)})}render()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
