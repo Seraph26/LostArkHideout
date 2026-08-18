@@ -1,12 +1,11 @@
 // Correct known Lost Ark class names when the Bible page text contains unrelated class names.
-// This is a narrow correction layer; the underlying profile parser remains unchanged.
+// Character-specific corrections are intentionally limited to legacy profiles that predate
+// the authoritative Bible class-id parser. New profiles use class-data-v1.js instead.
 (() => {
   const KEY = 'lostark-hideout-private-v3';
   const CORRECTIONS = new Map([
     ['ryohaku', 'Glavier'],
-    ['bailsxo', 'Artist'],
-    ['diamarté', 'Soul Eater'],
-    ['diamarte', 'Soul Eater']
+    ['bailsxo', 'Artist']
   ]);
 
   function apply() {
