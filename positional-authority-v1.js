@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — positional build authority v2 */
+/* Lost Ark Hideout — positional build authority v3 */
 (()=>{
 'use strict';
 const V3='lostark-hideout-build-profiles-v3',V2='lostark-hideout-build-profiles-v2';
@@ -9,13 +9,7 @@ const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
 const norm=s=>clean(s).toLowerCase().replace(/[’']/g,"'");
 function infer(b){
  const cls=norm(b.className||b.class||b.characterClass||'');
- const t=norm([
-  b.className,b.class,b.characterClass,b.text,
-  ...(b.engravings||[]),...(b.grid||[]).map(x=>`${x.name} ${x.type} ${x.branch}`),
-  ...(b.arkPassive||[]).map(x=>`${x.name} ${x.level}`),
-  ...(b.tripods||[]).map(x=>`${x.skill||''} ${x.name||''} ${x.tier||''}`),
-  b.skillsText,b.skillText,b.tripodsText,b.arkGridText,b.arkPassiveText,b.rawText
- ].filter(Boolean).join(' '));
+ const t=norm([b.className,b.class,b.characterClass,b.text,...(b.engravings||[]),...(b.grid||[]).map(x=>`${x.name} ${x.type} ${x.branch}`),...(b.arkPassive||[]).map(x=>`${x.name} ${x.level}`),...(b.tripods||[]).map(x=>`${x.skill||''} ${x.name||''} ${x.tier||''}`),b.skillsText,b.skillText,b.tripodsText,b.arkGridText,b.arkPassiveText,b.rawText].filter(Boolean).join(' '));
  if(SUPPORTS.has(b.className||b.class||b.characterClass))return'N/A';
  if(/ambush master|back attack|back-attack|backattack|entropy set|entropy armor/.test(t))return'Back Attack';
  if(/master brawler|front attack|front-attack|frontattack/.test(t))return'Front Attack';
@@ -52,5 +46,15 @@ function sync(){
  if(changed){save(V3,v3);save(V2,legacy)}
  window.LostArkPositionalAuthorityV1={infer,get:url=>v3[url]||legacy[url]||null,sync};
 }
-sync();window.addEventListener('lostark-build-profiles-v3-ready',sync);
+function wireRefresh(){
+ const btn=document.getElementById('refreshBtn');
+ if(!btn||btn.dataset.positionalAuthorityRefresh==='1')return;
+ btn.dataset.positionalAuthorityRefresh='1';
+ btn.addEventListener('click',async()=>{
+  try{if(window.LostArkBuildProfilesV3?.refresh)await window.LostArkBuildProfilesV3.refresh();sync()}catch(e){console.warn('Authoritative build refresh failed',e)}
+ },true);
+}
+sync();
+window.addEventListener('lostark-build-profiles-v3-ready',sync);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wireRefresh,{once:true});else wireRefresh();
 })();
