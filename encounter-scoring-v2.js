@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — encounter scoring engine v3 */
+/* Lost Ark Hideout — encounter scoring engine v4 */
 (()=>{
 'use strict';
 const CLASS_RANGED=new Set(['Sorceress','Sharpshooter','Artillerist','Machinist','Scouter','Summoner','Aeromancer','Gunslinger','Deadeye','Arcana','Arcanist']);
@@ -20,11 +20,57 @@ function selected(){const m=window.LostArkOptimizerMode;return m&&!m.general&&m.
 function profile(){const id=selected();return id?PROFILES[id]||null:null}
 function text(c){try{return JSON.stringify(c||{}).toLowerCase()}catch{return ''}}
 function build(c){try{return window.LostArkBuildProfilesV3?.get(c.url)||window.LostArkBuildProfilesV2?.get(c.url)||{}}catch{return{}}}
-function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=String(p.class||p.className||p.characterClass||'');let position=b.positional&&b.positional!=='Unknown'?b.positional:'unknown';const bh=b.behavior||{};
+function behaviorFor(cls,eng,low,bh){
+ const e=eng.join(' ').toLowerCase();
+ const b={mobility:bh.mobility||'standard',uptime:bh.uptime||'sustained',burstDependency:bh.burstDependency||'low',pushResilience:bh.pushResilience||'standard',supportPlacement:bh.supportPlacement||'none',evidence:Array.isArray(bh.evidence)?bh.evidence.slice():[]};
+ const set=(mob,up,burst,pos,push,ev)=>{if(mob)b.mobility=mob;if(up)b.uptime=up;if(burst)b.burstDependency=burst;if(pos)b.positioning=pos;if(push)b.pushResilience=push;if(ev)b.evidence.push(ev)};
+ if(/igniter/.test(e))set('low','burst','high','hitmaster','standard','Igniter stationary burst');
+ else if(/reflux/.test(e))set('standard','sustained','low','hitmaster','standard','Reflux sustained Hit Master');
+ if(/surge/.test(e))set('high','burst','high','back','standard','Surge burst cycle');
+ else if(/remaining energy/.test(e))set('high','sustained','low','back','standard','Remaining Energy sustained back attack');
+ if(/hunger/.test(e))set('high','sustained','low','back','standard','Hunger mobile sustained back attack');
+ else if(/full moon harvester/.test(e))set('standard','burst','high',null,'standard','Full Moon identity burst');
+ else if(/night.?s edge/.test(e))set('high','burst','high',null,'standard',"Night's Edge mobile burst");
+ if(/punisher/.test(e))set('standard','burst','high',null,'standard','Punisher burst window');
+ else if(/predator/.test(e))set('high','sustained','low',null,'high','Predator sustained uptime');
+ if(/master summoner/.test(e)||(/summoner/.test(low)&&/ancient spear/.test(low)))set('low','burst','high','hitmaster','standard','Master Summoner stationary Ancient-skill burst');
+ else if(/communication overflow/.test(e))set('standard','sustained','low',null,'standard','Communication Overflow sustained summon uptime');
+ if(/death strike/.test(e))set('standard','burst','high',null,'standard','Death Strike burst cycle');
+ else if(/loyal companion/.test(e))set('high','sustained','low',null,'standard','Loyal Companion sustained uptime');
+ if(/pistoleer/.test(e))set('high','sustained','low','hitmaster','standard','Pistoleer mobile Hit Master');
+ if(/enhanced weapon/.test(e))set('high','burst','high','back','standard','Enhanced Weapon positional shotgun burst');
+ if(/barrage enhancement/.test(e))set('low','burst','high','hitmaster','high','Barrage stationary burst');
+ else if(/firepower enhancement/.test(e))set('standard','sustained','low','hitmaster','standard','Firepower sustained Hit Master');
+ if(/legacy of evolution/.test(e))set('standard','burst','high',null,'standard','Evolution legacy cycle');
+ else if(/steady state/.test(e))set('high','sustained','low',null,'standard','Machinist sustained mobility');
+ if(/shock training/.test(e))set('standard','burst','high','back','high','Shock Training back-attack burst');
+ else if(/ultimate skill: taijutsu|taijutsu/.test(e))set('high','sustained','low','back','high','Taijutsu mobile sustained back attack');
+ if(/robust spirit/.test(e))set('standard','burst','high',null,'standard','Robust Spirit identity burst');
+ else if(/energy overflow/.test(e))set('high','sustained','low',null,'standard','Energy Overflow sustained uptime');
+ if(/deathblow/.test(e))set('standard','burst','high','back','standard','Deathblow back-attack burst');
+ else if(/eso striker|esoteric flurry/.test(e))set('high','sustained','low','back','standard','Esoteric mobile back attack');
+ if(/first intention/.test(e))set('high','sustained','low',null,'standard','First Intention sustained uptime');
+ if(/berserker technique/.test(e))set('standard','burst','high',null,'standard','Berserker Technique burst cycle');
+ if(/asura.?s path/.test(e))set('high','burst','high','back','high','Asura high-mobility back-attack burst');
+ else if(/brawl king storm/.test(e))set('high','burst','high',null,'high','Brawl King burst/brawler build');
+ if(/emperor/.test(e))set('high','sustained','low','hitmaster','standard','Emperor mobile Hit Master cycle');
+ else if(/empress/.test(e))set('standard','burst','high','hitmaster','standard','Empress card burst cycle');
+ if(/predator|first intention|taijutsu|hunger|loyal companion|reflux|communication overflow|energy overflow/.test(e))b.burstDependency='low';
+ if(cls==='Paladin'||/blessed aura/.test(e)){b.mobility='standard';b.supportPlacement='flexible';b.evidence.push('Paladin support profile')}
+ if(cls==='Bard'){b.mobility='standard';b.supportPlacement='placement-sensitive';b.evidence.push('Bard support placement')}
+ if(cls==='Artist'){b.mobility='high';b.supportPlacement='placement-sensitive';b.evidence.push('Artist mobile placement support')}
+ if(cls==='Valkyrie'){b.mobility='high';b.supportPlacement='flexible';b.evidence.push('Valkyrie flexible support')}
+ if(cls==='Gunlancer'){b.mobility='low';b.pushResilience='high';b.evidence.push('Gunlancer defensive/push resilience')}
+ if(cls==='Destroyer'){b.mobility='low';b.pushResilience='high';b.uptime='burst';b.burstDependency='high';b.evidence.push('Destroyer slow burst profile')}
+ return b;
+}
+function parseClassName(v){const x=String(v||'').trim().toLowerCase();const map={arcana:'Arcanist',arcanist:'Arcanist',souleater:'Souleater',soul_eater:'Souleater',guardianknight:'Guardianknight'};return map[x]||String(v||'Unknown').trim()||'Unknown'}
+function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=parseClassName(p.class||p.className||p.characterClass||'');let position=b.positional&&b.positional!=='Unknown'?b.positional:'unknown';const bh=behaviorFor(cls,b.engravings||[],t,b.behavior||{});
+ if(bh.positioning)position=bh.positioning==='back'?'Back Attack':bh.positioning==='hitmaster'?'Hit Master':bh.positioning==='front'?'Front Attack':position;
  if(position==='unknown'){if(POSITIONAL.back.test(t))position='Back Attack';else if(POSITIONAL.front.test(t))position='Front Attack';else if(POSITIONAL.hitmaster.test(t))position='Hit Master'}
- const burst=Boolean(b.burst)||/igniter|punisher|full moon|surge|death strike|identity burst|master summoner|asura.?s path|brawl king storm/i.test(t);
+ const burst=Boolean(b.burst)||bh.burstDependency==='high'||/igniter|punisher|full moon|surge|death strike|identity burst|master summoner|asura.?s path|brawl king storm|robust spirit|deathblow/i.test(t);
  const support=SUPPORT_CLASSES.has(cls);
- return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:{mobility:bh.mobility||'standard',uptime:bh.uptime||'sustained',burstDependency:bh.burstDependency||'low',pushResilience:bh.pushResilience||'standard',supportPlacement:bh.supportPlacement||'none',evidence:Array.isArray(bh.evidence)?bh.evidence:[]}}}
+ return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:bh};}
 function mobilityFactor(level,mechanics){const m=mechanics?.movement||'low';if(level==='high')return 1;if(level==='low'){if(m==='very-high')return .975;if(m==='high')return .98;if(m==='moderate-high')return .985;if(m==='moderate')return .992}return 1}
 function burstFactor(level,mechanics){const w=mechanics?.burstWindows||'low';if(level==='high'){if(w==='very-high')return 1.012;if(w==='high')return 1.008;if(w==='moderate')return 1.003}return 1}
 function pushFactor(level,mechanics){if(level==='high'&&mechanics?.forcedPositioning==='very-high')return 1.005;return 1}
