@@ -1,6 +1,4 @@
-// Correct known Lost Ark class names when the Bible page text contains unrelated class names.
-// Character-specific corrections are intentionally limited to legacy profiles that predate
-// the authoritative Bible class-id parser. New profiles use class-data-v1.js instead.
+// Character-specific class corrections and final DOM guard for legacy/stale profiles.
 (() => {
   const KEY = 'lostark-hideout-private-v3';
   const CORRECTIONS = new Map([
@@ -9,14 +7,17 @@
     ['diamarte', 'Souleater']
   ]);
 
-  function apply() {
+  function correctedName(character) {
+    return String(character?.profile?.name || character?.name || '').trim().toLowerCase();
+  }
+
+  function applyStoredCorrections() {
     try {
       const state = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (!state || !Array.isArray(state.characters)) return;
       let changed = false;
       for (const character of state.characters) {
-        const name = String(character?.profile?.name || character?.name || '').trim().toLowerCase();
-        const corrected = CORRECTIONS.get(name);
+        const corrected = CORRECTIONS.get(correctedName(character));
         if (corrected && character.profile && character.profile.class !== corrected) {
           character.profile.class = corrected;
           changed = true;
@@ -26,6 +27,46 @@
     } catch {}
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(apply, 50), {once:true});
-  else setTimeout(apply, 50);
+  function forceDiamartePartyDisplay() {
+    const root = document.querySelector('#suggestedParties');
+    if (!root) return;
+    root.querySelectorAll('.authoritative-member, .slot').forEach(member => {
+      const text = String(member.textContent || '').toLowerCase();
+      if (!text.includes('diamarte')) return;
+      const classNodes = member.querySelectorAll('span, small');
+      classNodes.forEach(node => {
+        if (/wardancer|summoner|souleater/i.test(node.textContent || '')) {
+          node.textContent = (node.textContent || '')
+            .replace(/Wardancer|Summoner|Souleater/ig, 'Souleater');
+        }
+      });
+      const img = member.querySelector('img.class-icon');
+      if (img) {
+        const icon = window.LostArkHideoutClassData?.iconUrl?.('Souleater');
+        if (icon) {
+          img.src = icon;
+          img.alt = 'Souleater';
+        }
+      }
+    });
+  }
+
+  function apply() {
+    applyStoredCorrections();
+    forceDiamartePartyDisplay();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(apply, 50), {once:true});
+  } else {
+    setTimeout(apply, 50);
+  }
+
+  const rootObserver = new MutationObserver(() => forceDiamartePartyDisplay());
+  const startObserver = () => {
+    const root = document.querySelector('#suggestedParties');
+    if (root) rootObserver.observe(root, {childList:true, subtree:true});
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startObserver, {once:true});
+  else startObserver();
 })();
