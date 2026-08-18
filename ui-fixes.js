@@ -55,6 +55,10 @@
   let queued=false;
   const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;repair()})};
   const observer=new MutationObserver(schedule);
-  function start(){repair();observer.observe(document.body,{childList:true,subtree:true})}
+  function start(){repair();observer.observe(document.body,{childList:true,subtree:true});
+    const load=(src)=>{const s=document.createElement('script');s.src=src;s.defer=false;document.head.appendChild(s)};
+    load('build-profile-v1.js?v=20260818build1');
+    load('deep-optimizer-v1.js?v=20260818deep1');
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
