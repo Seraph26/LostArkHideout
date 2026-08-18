@@ -1,0 +1,7 @@
+name = "lostark-bible-connector"
+main = "worker/src/index.js"
+compatibility_date = "2026-08-17"
+
+[[kv_namespaces]]
+binding = "VISITS"
+id = "cc913d05a0bb4cee8e72aee63f635ebb"
