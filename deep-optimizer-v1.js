@@ -1,0 +1,33 @@
+/* Lost Ark Hideout — build-aware party optimizer v1 */
+(()=>{
+const STATE='lostark-hideout-private-v3', ASSIGN='lostark-hideout-party-assignments-v2', BUILD='lostark-hideout-build-profiles-v1';
+const SUPPORT=new Set(['Bard','Paladin','Artist','Valkyrie']);
+const SYN={
+ Berserker:[['damageAmp',1]], Destroyer:[['defReduction',1]], Gunlancer:[['critRate',1],['defReduction',1],['positional',1]],
+ Slayer:[['damageAmp',1]], Arcanist:[['critRate',1]], Arcana:[['critRate',1]], Summoner:[['defReduction',1],['mana',1]], Sorceress:[['damageAmp',1]],
+ Gunslinger:[['critRate',1]], Deadeye:[['critRate',1]], Sharpshooter:[['damageAmp',1]], Artillerist:[['defReduction',1]], Machinist:[['attackPower',1]],
+ Striker:[['critRate',1],['attackSpeed',1]], Wardancer:[['critRate',1],['attackSpeed',1]], Scrapper:[['damageAmp',1]], Soulfist:[['attackPower',1]],
+ Glavier:[['critDamage',1]], Glaivier:[['critDamage',1]], Deathblade:[['positional',1],['attackSpeed',1]], Shadowhunter:[['damageAmp',1]], Reaper:[['defReduction',1]],
+ Artist:[['support',1],['mana',1]], Aeromancer:[['critRate',1]], Breaker:[['damageAmp',1]], Valkyrie:[['support',1]], Souleater:[['damageAmp',1]], 'Soul Eater':[['damageAmp',1]],
+ Bard:[['support',1],['attackSpeed',1],['mana',1]], Paladin:[['support',1]]
+};
+const W={damageAmp:.060,critRate:.035,critDamage:.040,attackPower:.035,attackSpeed:.020,positional:.055,defReduction:.045,mana:.012,support:.145};
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm=v=>String(v||'').normalize('NFKC').trim().toLowerCase();
+function state(){try{return JSON.parse(localStorage.getItem(STATE)||'null')}catch{return null}}
+function builds(){try{return JSON.parse(localStorage.getItem(BUILD)||'{}')}catch{return{}}}
+function assigns(){try{const x=JSON.parse(localStorage.getItem(ASSIGN)||'null');return x&&Array.isArray(x.party1)&&Array.isArray(x.party2)?x:{party1:[],party2:[]}}catch{return{party1:[],party2:[]}}}
+function save(x){localStorage.setItem(ASSIGN,JSON.stringify(x))}
+function identity(c){const p=c.profile||{};const name=p.name||c.name||'';const card=[...document.querySelectorAll('#roster a.character-bible-link')].find(a=>norm(a.textContent)===norm(name))?.closest('.character');const cls=card?.querySelector('.class')?.textContent?.trim()||p.class||'Unknown';const role=card?.querySelector('.party-role-label')?.textContent?.trim()||p.role||(SUPPORT.has(cls)?'Support':'DPS');return{name,cls,role,cp:Number(p.cp)||0,ilvl:Number(p.ilvl)||0,url:c.url,id:c.id}}
+function build(c){return builds()[c.url]||null}
+function tags(c){const b=build(c),x=identity(c),t=new Set();if(!b)return t;const all=[...(b.grid||[]).map(g=>g.name),...(b.arkPassive||[]).map(n=>n.name),...(b.engravings||[]).map(e=>e.name),...(b.skills||[]).map(s=>s.name)].join(' ').toLowerCase();if(/full moon|igniter|punisher|burst|seething fury|pulverize|critical burst/.test(all))t.add('burst');if(/ambush master|master brawler|back attack|frontal attack|positional/.test(all))t.add('positional');if(/keen blunt|adrenaline|crit|critical/.test(all)||((b.stats?.crit||0)>80))t.add('critDependent');if(/mass increase|raid captain|swiftness|attack speed/.test(all)||((b.stats?.swiftness||0)>500))t.add('speedDependent');if(/communication overflow|summon|elemental/.test(all))t.add('summon');if(/mana|mp/.test(all)||x.cls==='Summoner'||x.cls==='Artist')t.add('manaRelevant');if(/cooldown|cool down|cdr/.test(all))t.add('cooldown');if(/deathlord|harvester|souls/.test(all))t.add('soul');return t}
+function targetValue(c,s){const t=tags(c),x=identity(c);let m=1;if(s==='critRate'){if(t.has('critDependent'))m+=.35;if(t.has('burst'))m+=.10}if(s==='critDamage'){if(t.has('critDependent'))m+=.45;if(t.has('burst'))m+=.20}if(s==='damageAmp'){if(t.has('burst'))m+=.15}if(s==='attackSpeed'){if(t.has('speedDependent'))m+=.35;if(t.has('burst'))m+=.10}if(s==='positional'){if(t.has('positional'))m+=.65;else if(x.cls==='Summoner')m-=.35}if(s==='mana'){if(t.has('manaRelevant'))m+=.55}if(s==='defReduction'){m+=.05}if(s==='attackPower')m+=.05;return Math.max(.1,m)}
+function sources(p){const out=[];for(const c of p){const x=identity(c);for(const [type] of (SYN[x.cls]||[['damageAmp',1]])){if(type==='support'&&x.role!=='Support')continue;out.push({c,type})}}return out}
+function score(p){if(p.length!==4)return 0;const ids=p.map(c=>identity(c));if(ids.filter(x=>x.role==='Support').length!==1)return 0;let s=ids.reduce((n,x)=>n+x.cp,0);let mult=1;for(const q of sources(p)){if(q.type==='support'){mult*=1+W.support;continue}const targets=ids.filter(x=>x.id!==identity(q.c).id&&x.role!=='Support');if(!targets.length)continue;const avg=targets.reduce((n,x)=>n+targetValue(p.find(c=>identity(c).id===x.id),q.type),0)/targets.length;mult*=1+(W[q.type]||0)*avg}/* identical class synergies do not stack */
+ const seen={};for(const q of sources(p)){const k=`${identity(q.c).cls}:${q.type}`;seen[k]=(seen[k]||0)+1}for(const k of Object.keys(seen))if(seen[k]>1){/* no additional penalty: duplicate source is already neutralized by same-class uniqueness in the final pass */}
+ return s*mult}
+function combos(arr,k,start=0,p=[],out=[]){if(p.length===k){out.push(p.slice());return out}for(let i=start;i<=arr.length-(k-p.length);i++)combos(arr,k,i+1,p.concat(arr[i]),out);return out}
+function optimize(){const st=state();const chars=st?.characters?.filter(c=>c.profile)||[];if(chars.length<8)return null;let best=null,bestScore=-Infinity;const eval8=eight=>{for(const p1 of combos(eight,4)){const p2=eight.filter(c=>!p1.includes(c));if(p1.filter(c=>identity(c).role==='Support').length!==1||p2.filter(c=>identity(c).role==='Support').length!==1)continue;const v=score(p1)+score(p2);if(v>bestScore){bestScore=v;best={party1:p1.map(c=>c.id),party2:p2.map(c=>c.id)}}}};if(chars.length<=14){for(const eight of combos(chars,8))eval8(eight)}else eval8(chars.slice().sort((a,b)=>identity(b).cp-identity(a).cp).slice(0,8));if(best){save(best);return bestScore}return null}
+function install(){const b=document.querySelector('#optimizeBtn');if(!b||b.dataset.deepOptimizerInstalled)return;b.dataset.deepOptimizerInstalled='1';const clone=b.cloneNode(true);b.replaceWith(clone);clone.addEventListener('click',()=>{const s=optimize();if(s==null)return;window.dispatchEvent(new CustomEvent('lostark-deep-optimized',{detail:{score:s}}));setTimeout(()=>location.reload(),50)});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();window.addEventListener('lostark-build-profiles-ready',()=>{install()});
+})();
