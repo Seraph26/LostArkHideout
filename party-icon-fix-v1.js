@@ -1,6 +1,4 @@
 (() => {
-  const CONNECTOR = 'https://lostark-bible-connector.seraph0226.workers.dev/character';
-  const CACHE = new Map();
   const STORAGE_KEYS = ['lostark-hideout-private-v3', 'lostark-hideout-private-v2'];
 
   function normalizePath(href) {
@@ -12,18 +10,21 @@
     }
   }
 
-  function canonicalClassForUrl(characterUrl) {
-    const target = normalizePath(characterUrl);
-    if (!target) return '';
+  function profiles() {
     for (const key of STORAGE_KEYS) {
       try {
         const state = JSON.parse(localStorage.getItem(key) || 'null');
-        for (const c of state?.characters || []) {
-          if (normalizePath(c?.url) === target && c?.profile?.class) return c.profile.class;
-        }
+        if (state?.characters?.length) return state.characters;
       } catch {}
     }
-    return '';
+    return [];
+  }
+
+  function canonicalClassForUrl(characterUrl) {
+    const target = normalizePath(characterUrl);
+    if (!target) return '';
+    const match = profiles().find(c => normalizePath(c?.url) === target);
+    return match?.profile?.class || '';
   }
 
   function canonicalIconForClass(cls) {
@@ -34,79 +35,45 @@
     }
   }
 
-  function extractBibleSvg(html, characterUrl) {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const target = normalizePath(characterUrl);
-    if (!target) return '';
-
-    for (const a of doc.querySelectorAll('a[href]')) {
-      if (normalizePath(a.getAttribute('href')) !== target) continue;
-      const svg = a.querySelector('svg.size-14, svg[class*="size-14"]');
-      if (svg) {
-        const clone = svg.cloneNode(true);
-        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        clone.removeAttribute('id');
-        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(clone.outerHTML)}`;
-      }
-    }
-    return '';
-  }
-
-  async function getIcon(characterUrl) {
-    const key = normalizePath(characterUrl);
-    if (!key) return '';
-    if (CACHE.has(key)) return CACHE.get(key);
-
-    const promise = (async () => {
-      try {
-        const r = await fetch(`${CONNECTOR}?url=${encodeURIComponent(characterUrl)}`, {
-          method: 'GET',
-          cache: 'no-store',
-          headers: { Accept: 'application/json' }
-        });
-        if (!r.ok) return '';
-        const data = await r.json();
-        return extractBibleSvg(data.html || data.characterHtml || data.content || data.page || '', characterUrl);
-      } catch {
-        return '';
-      }
-    })();
-
-    CACHE.set(key, promise);
-    return promise;
-  }
-
-  function findCharacterUrls() {
-    const urls = new Set();
-    document.querySelectorAll('a.character-bible-link[href]').forEach(a => urls.add(a.href));
-    document.querySelectorAll('a.party-character-link[href]').forEach(a => urls.add(a.href));
-    return [...urls];
+  function replaceIcons(root, src) {
+    if (!root || !src) return;
+    root.querySelectorAll('img.class-icon').forEach(img => {
+      if (img.src !== src) img.src = src;
+    });
   }
 
   function applyIcon(url, src) {
     if (!src) return;
     const target = normalizePath(url);
+
     document.querySelectorAll('a.character-bible-link[href], a.party-character-link[href]').forEach(link => {
       if (normalizePath(link.href) !== target) return;
-      const img = link.querySelector('img.class-icon');
-      if (img) {
-        if (img.src !== src) img.src = src;
-      } else {
-        const icon = document.createElement('img');
-        icon.className = 'class-icon';
-        icon.alt = '';
-        icon.src = src;
-        link.prepend(icon);
-      }
+
+      // Available Characters: the icon is a sibling of the Bible link inside
+      // the character article, not a child of the link itself.
+      const article = link.closest('article.character');
+      if (article) replaceIcons(article, src);
+
+      // Optimized Party: the icon normally lives in the same slot/title.
+      const slot = link.closest('.slot, .party, article');
+      if (slot) replaceIcons(slot, src);
+
+      // Retain the old behavior for any link that does contain its own icon.
+      replaceIcons(link, src);
     });
   }
 
-  async function run() {
+  function findCharacterUrls() {
+    const urls = new Set();
+    document.querySelectorAll('a.character-bible-link[href], a.party-character-link[href]').forEach(a => urls.add(a.href));
+    return [...urls];
+  }
+
+  function run() {
     for (const url of findCharacterUrls()) {
-      const canonical = canonicalClassForUrl(url);
-      const canonicalIcon = canonicalIconForClass(canonical);
-      const src = canonicalIcon || await getIcon(url);
-      applyIcon(url, src);
+      const cls = canonicalClassForUrl(url);
+      const src = canonicalIconForClass(cls);
+      if (src) applyIcon(url, src);
     }
   }
 
