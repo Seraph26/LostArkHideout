@@ -8,7 +8,6 @@ function load(k){try{return JSON.parse(localStorage.getItem(k)||'null')||{}}catc
 function className(p,b){return clean(p?.class||p?.className||p?.characterClass||b?.className||b?.class||'')}
 function specFor(p,b){
  const cls=norm(className(p,b));
- if(['bard','artist','paladin','valkyrie'].includes(cls))return 'N/A';
  const t=norm([p?.engravings,p?.arkGrid,p?.arkPassive,p?.skills,p?.tripods,p?.skillsText,p?.skillText,p?.tripodsText,p?.arkGridText,p?.arkPassiveText,p?.rawText,b?.text,...(b?.engravings||[]),...(b?.grid||[]).map(x=>`${x.name} ${x.type} ${x.branch}`),...(b?.arkPassive||[]).map(x=>`${x.name} ${x.level}`)].flat().join(' '));
  const rules={
   berserker:[["berserker's technique","Berserker Technique"],['berserker technique','Berserker Technique'],['mayhem','Mayhem']],
@@ -19,7 +18,8 @@ function specFor(p,b){
   striker:[['deathblow','Deathblow'],['esoteric flurry','Esoteric Flurry']],gunslinger:[['peacemaker','Peacemaker'],['time to hunt','Time to Hunt']],deadeye:[['pistoleer','Pistoleer'],['enhanced weapon','Enhanced Weapon']],
   artillerist:[['barrage enhancement','Barrage Enhancement'],['firepower enhancement','Firepower Enhancement']],slayer:[['predator','Predator'],['punisher','Punisher']],breaker:[["asura's path","Asura's Path"],['asura','Asura'],['brawl king storm','Brawl King Storm']],
   destroyer:[['gravity training','Gravity Training'],['rage hammer','Rage Hammer']],gunlancer:[['combat readiness','Combat Readiness'],['lone knight','Lone Knight']],soulfist:[['energy overflow','Energy Overflow'],['robust spirit','Robust Spirit']],
-  sharpshooter:[['death strike','Death Strike'],['loyal companion','Loyal Companion']],aeromancer:[['wind fury','Wind Fury'],['drizzle','Drizzle']],arcanist:[['emperor','Emperor'],['empress','Empress']],arcana:[['emperor','Emperor'],['empress','Empress']],sorceress:[['igniter','Igniter'],['reflux','Reflux']]
+  sharpshooter:[['death strike','Death Strike'],['loyal companion','Loyal Companion']],aeromancer:[['wind fury','Wind Fury'],['drizzle','Drizzle']],arcanist:[['emperor','Emperor'],['empress','Empress']],arcana:[['emperor','Emperor'],['empress','Empress']],sorceress:[['igniter','Igniter'],['reflux','Reflux']],
+  artist:[['full bloom','Full Bloom']],bard:[['desperate salvation','Desperate Salvation'],['true courage','True Courage']],paladin:[['blessed aura','Blessed Aura'],['judgment','Judgment']],valkyrie:[['blessed aura','Blessed Aura']]
  };
  for(const [needle,label] of (rules[cls]||[]))if(t.includes(needle))return label;
  return clean(p?.specialization||b?.specialization||'')||'';
