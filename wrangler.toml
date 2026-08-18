@@ -1,5 +1,5 @@
 name = "lostark-bible-connector"
-main = "worker/src/index.js"
+main = "worker/src/index-support-v2.js"
 compatibility_date = "2026-08-17"
 
 [[kv_namespaces]]
