@@ -34,6 +34,7 @@ function classBehavior(cls,engr,low){
  if(cls==='Destroyer'){b.mobility='low';b.pushResilience='high';b.uptime='burst';b.burstDependency='high';b.evidence.push('Destroyer slow burst profile')}
  return b;
 }
+function canonicalClass(x){const m={arcana:'Arcanist',arcanist:'Arcanist',souleater:'Souleater',guardianknight:'Guardianknight'};return m[x.toLowerCase()]||x.charAt(0).toUpperCase()+x.slice(1).toLowerCase()}
 function parse(html){const d=new DOMParser().parseFromString(html,'text/html'),t=raidText(d),ls=t.split(/\n+/).map(clean).filter(Boolean),low=t.toLowerCase();
  const engr=[];for(const x of ls){const m=x.match(/^(.+?)\s+(\d+)\/20(?:\s*\+\d+)?$/);if(m)engr.push(m[1].trim())}
  const grid=[];for(const x of ls){const m=x.match(/^(.*?)\s+(\d+)\s*\|\s*(Order|Chaos)\s+(Sun|Moon|Star)$/i);if(m)grid.push({name:m[1].trim(),points:+m[2],type:m[3],branch:m[4]})}
@@ -42,7 +43,7 @@ function parse(html){const d=new DOMParser().parseFromString(html,'text/html'),t
  const positional=engr.some(x=>/ambush master/i.test(x))||/back attack/.test(low)?'Back Attack':engr.some(x=>/master brawler/i.test(x))||/front attack/.test(low)?'Front Attack':engr.some(x=>/hit master/i.test(x))?'Hit Master':/positional/.test(low)?'Mixed':'Unknown';
  const burst=/(igniter|punisher|full moon|burst|death strike|surge|identity burst|master summoner|asura.?s path|brawl king storm)/i.test(t);
  const classMatch=low.match(/\b(berserker|destroyer|gunlancer|paladin|slayer|valkyrie|arcanist|arcana|bard|sorceress|summoner|glaivier|scrapper|soulfist|striker|wardancer|breaker|artillerist|deadeye|machinist|sharpshooter|gunslinger|deathblade|shadowhunter|reaper|souleater|artist|aeromancer|wildsoul|guardianknight)\b/i);
- const className=classMatch?classMatch[1].replace(/^arcana$/,'Arcanist').replace(/^souleater$/,'Souleater'):'Unknown';
+ const className=classMatch?canonicalClass(classMatch[1]):'Unknown';
  const behavior=classBehavior(className,engr,low);
  const buildText=clean([engr.join(' '),grid.map(x=>x.name+' '+x.points+' '+x.type+' '+x.branch).join(' '),arkPassive.map(x=>x.name+' '+x.level).join(' '),t].join(' '));
  return{engravings:engr,grid,arkPassive,stats,positional,burst,behavior,text:buildText,retrievedAt:new Date().toISOString()}}
