@@ -1,0 +1,26 @@
+{
+  "source": "lostark.bible raid filter",
+  "updatedAt": null,
+  "raids": [
+    {"id":"behemoth-g1","label":"Behemoth — Gate 1","boss":"Behemoth Gate 1","kind":"raid"},
+    {"id":"behemoth-g2","label":"Behemoth — Gate 2","boss":"Behemoth Gate 2","kind":"raid"},
+    {"id":"aegir-g1","label":"Aegir — Gate 1","boss":"Aegir Gate 1","kind":"raid"},
+    {"id":"aegir-g2","label":"Aegir — Gate 2","boss":"Aegir Gate 2","kind":"raid"},
+    {"id":"brelshaza-g1","label":"Brelshaza — Gate 1","boss":"Brelshaza Gate 1","kind":"raid"},
+    {"id":"brelshaza-g2","label":"Brelshaza — Gate 2","boss":"Brelshaza Gate 2","kind":"raid"},
+    {"id":"mordum-g1","label":"Mordum — Gate 1","boss":"Mordum Gate 1","kind":"raid"},
+    {"id":"mordum-g2","label":"Mordum — Gate 2","boss":"Mordum Gate 2","kind":"raid"},
+    {"id":"mordum-g3","label":"Mordum — Gate 3","boss":"Mordum Gate 3","kind":"raid"},
+    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Armoche Gate 1","kind":"raid"},
+    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche Gate 2","kind":"raid"},
+    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Kazeros Gate 1","kind":"raid"},
+    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Kazeros Gate 2","kind":"raid"},
+    {"id":"serca-g1","label":"Serca — Gate 1","boss":"Serca Gate 1","kind":"raid"},
+    {"id":"serca-g2","label":"Serca — Gate 2","boss":"Corvus Tul Rak","kind":"raid"}
+  ],
+  "events": [
+    {"id":"extreme-aegir","label":"Extreme Aegir","boss":"Extreme Aegir","kind":"event"},
+    {"id":"extreme-brelshaza","label":"Extreme Brelshaza","boss":"Extreme Brelshaza","kind":"event"},
+    {"id":"act4","label":"Abyssal Dungeon — Act 4","boss":"Act 4","kind":"event"}
+  ]
+}
