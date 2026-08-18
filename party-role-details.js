@@ -1,40 +1,13 @@
 (() => {
-  const STORAGE_KEY = 'lostark-hideout-private-v3';
-  const SUPPORTS = new Set(['Bard', 'Paladin', 'Artist']);
-
-  function load() {
-    try {
-      const state = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-      return Array.isArray(state?.characters) ? state.characters : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function render() {
-    const characters = load();
-    document.querySelectorAll('.authoritative-member[data-character-id]').forEach((member) => {
-      if (member.querySelector('.party-role')) return;
-      const character = characters.find((item) => item.id === member.dataset.characterId);
-      const className = character?.profile?.class || '';
-      if (!className) return;
-      const role = SUPPORTS.has(className) ? 'Support' : 'DPS';
-      const span = document.createElement('span');
-      span.className = `party-role ${role.toLowerCase()}`;
-      span.textContent = role;
-      member.querySelector('.party-member-main')?.appendChild(span);
-    });
-  }
-
-  function install() {
-    render();
-    const target = document.querySelector('#suggestedParties');
-    if (target && !target.dataset.roleObserver) {
-      target.dataset.roleObserver = '1';
-      new MutationObserver(render).observe(target, { childList: true, subtree: true });
-    }
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once: true });
-  else install();
+  const STORAGE_KEY='lostark-hideout-private-v3';
+  const SUPPORTS=new Set(['Bard','Paladin','Artist']);
+  const SYN={Berserker:['damage'],Destroyer:['damage'],Gunlancer:['damage','positional'],Paladin:['support'],Slayer:['damage'],Arcanist:['crit'],Arcana:['crit'],Summoner:['damage','mana'],Sorceress:['damage'],Bard:['support'],Gunslinger:['crit'],Deadeye:['crit'],Sharpshooter:['damage'],Artillerist:['damage'],Machinist:['attackPower'],Striker:['crit','attackSpeed'],Wardancer:['crit','attackSpeed'],Scrapper:['damage'],Soulfist:['attackPower'],Glavier:['critDamage'],Glaivier:['critDamage'],Deathblade:['positional','attackSpeed'],Shadowhunter:['damage'],Reaper:['damage'],Artist:['support','mana'],Aeromancer:['crit'],Breaker:['damage'],Valkyrie:['damage']};
+  const load=()=>{try{const s=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');return Array.isArray(s?.characters)?s.characters:[]}catch{return[]}};
+  const role=c=>c?.profile?.role==='Support'?'Support':c?.profile?.role==='DPS'?'DPS':SUPPORTS.has(c?.profile?.class)?'Support':'DPS';
+  const cp=c=>Number(c?.profile?.cp)||0,il=c=>Number(c?.profile?.ilvl)||0;
+  function score(members){let mult=1,hasSupport=false,tags=new Set();for(const c of members){if(role(c)==='Support')hasSupport=true;(SYN[c.profile?.class]||['damage']).forEach(t=>tags.add(t))}mult=hasSupport?1.14:.84;const bonus={crit:1.035,critDamage:1.045,damage:1.035,attackPower:1.022,attackSpeed:1.018,positional:1.018,mana:1.012};tags.forEach(t=>mult*=bonus[t]||1);return members.reduce((s,c)=>s+cp(c)*.76+il(c)*2.5,0)*mult}
+  function currentTotal(){const chars=load(),map=new Map(chars.map(c=>[c.id,c]));let a;try{a=JSON.parse(localStorage.getItem('lostark-hideout-party-assignments-v2')||'{}')}catch{a={}}const members=[...(a.party1||[]),...(a.party2||[])].map(id=>map.get(id)).filter(Boolean);return score(members)}
+  function render(){const characters=load();document.querySelectorAll('.authoritative-member[data-character-id]').forEach(member=>{if(member.querySelector('.party-role'))return;const c=characters.find(x=>x.id===member.dataset.characterId);if(!c?.profile)return;const span=document.createElement('span');const r=role(c);span.className=`party-role ${r.toLowerCase()}`;span.textContent=r;member.querySelector('.party-member-main')?.appendChild(span)})}
+  function install(){render();const target=document.querySelector('#suggestedParties');if(!target||target.dataset.roleObserver)return;target.dataset.roleObserver='1';new MutationObserver(render).observe(target,{childList:true,subtree:true});let before=null;target.addEventListener('dragstart',()=>{before=currentTotal()},{capture:true});target.addEventListener('drop',()=>{if(before==null)return;setTimeout(()=>{const after=currentTotal(),change=before?((after-before)/before)*100:0,el=document.querySelector('#swapImpact');if(!el)return;const cls=change>.0001?'positive':change<-.0001?'negative':'neutral',reason=change>.0001?'This arrangement increases the combined optimizer score.':change<-.0001?'This arrangement decreases the combined optimizer score.':'This arrangement leaves the combined optimizer score essentially unchanged.';el.className=`swap-impact ${cls}`;el.innerHTML=`Swap applied: <strong class="swap-impact-number ${cls}">${change>=0?'+':''}${change.toFixed(2)}%</strong> combined estimated potential damage (${Math.round(before).toLocaleString()} → ${Math.round(after).toLocaleString()}).<span class="swap-reason">${reason}</span>`;before=null},75)},{capture:true})}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
