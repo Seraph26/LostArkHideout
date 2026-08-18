@@ -3,9 +3,12 @@
   const KEY='lostark-hideout-private-v3';
   const SOUL_EATER_ICON='https://lostark.bible/_next/image?url=%2Fimages%2Fclasses%2Fsouleater.png&w=64&q=75';
   const normalizeName=v=>String(v||'').normalize('NFKC').trim().toLowerCase();
-  const canonicalClass=v=>{
+  const CLASS_OVERRIDES=new Map([['diamarté','Souleater'],['diamarte','Souleater']]);
+  const canonicalClass=(v,name='')=>{
+    const override=CLASS_OVERRIDES.get(normalizeName(name));
+    if(override)return override;
     const s=normalizeName(v);
-    if(s==='soul eater'||s==='souleater'||s==='soul_eater')return 'Souleater';
+    if(s==='soul eater'||s==='souleater'||s==='soul_eater'||s==='soul-eater')return 'Souleater';
     if(s==='guardian knight'||s==='guardianknight'||s==='guardian_knight')return 'Guardian Knight';
     return String(v||'').trim();
   };
@@ -28,15 +31,14 @@
       if(!nameEl)return;
       const name=normalizeName(nameEl.textContent);
       const p=profiles.get(name);
-      if(!p)return;
-      const cls=canonicalClass(p.class);
+      const cls=canonicalClass(p?.class,name);
       if(!cls)return;
       root.querySelectorAll('.class').forEach(e=>e.textContent=cls);
       root.querySelectorAll('.party-member-main>span,small').forEach(e=>{
         const text=e.textContent||'';
-        if(/\b(Soul Eater|Souleater|Reaper)\b/i.test(text))e.textContent=text.replace(/\b(Soul Eater|Souleater|Reaper)\b/i,cls);
+        if(/\b(Soul Eater|Souleater|Reaper|Berserker)\b/i.test(text))e.textContent=text.replace(/\b(Soul Eater|Souleater|Reaper|Berserker)\b/i,cls);
       });
-      if(cls==='Souleater')root.querySelectorAll('img.class-icon').forEach(img=>{img.src=SOUL_EATER_ICON;img.alt='Souleater';});
+      if(cls==='Souleater')root.querySelectorAll('img.class-icon').forEach(img=>{img.src=SOUL_EATER_ICON;img.removeAttribute('srcset');img.alt='Souleater';});
     });
   }
   function bridgePartyIcons(){
@@ -49,13 +51,13 @@
     document.querySelectorAll('#suggestedParties .slot').forEach(slot=>{
       const name=normalizeName(slot.querySelector('h4 span')?.textContent||slot.querySelector('h4')?.textContent);
       const img=slot.querySelector('img.class-icon');
-      const src=rosterIcons.get(name);
+      const src=rosterIcons.get(name)||CLASS_OVERRIDES.has(name)&&SOUL_EATER_ICON;
       if(img&&src){img.src=src;img.removeAttribute('srcset');img.alt='';}
     });
     document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
       const name=normalizeName(member.querySelector('.party-character-link')?.textContent||member.querySelector('.party-member-main')?.textContent);
       const img=member.querySelector('img.class-icon');
-      const src=rosterIcons.get(name);
+      const src=rosterIcons.get(name)||CLASS_OVERRIDES.has(name)&&SOUL_EATER_ICON;
       if(img&&src){img.src=src;img.removeAttribute('srcset');img.alt='';}
     });
   }
