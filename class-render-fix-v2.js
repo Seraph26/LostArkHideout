@@ -1,36 +1,25 @@
-/* Use the Bible roster-derived class icon as the authoritative class identity in both sections. */
+/* Render class identity from Bible's authoritative subclass data in both sections. */
 (() => {
   const KEY = 'lostark-hideout-private-v3';
   const data = () => window.LostArkHideoutClassData;
-  const normalize = v => String(v || '').replace(/\s+/g, '').toLowerCase();
   const iconFor = cls => { try { return data()?.iconUrl?.(cls) || ''; } catch { return ''; } };
-  const isSouleaterIcon = src => { try { return data()?.isSouleaterSvg?.(decodeURIComponent(String(src || ''))) || /M524\.5,356\.5/.test(String(src || '')); } catch { return /M524\.5,356\.5/.test(String(src || '')); } };
+  const canonical = cls => { try { return data()?.canonical?.(cls) || cls; } catch { return cls; } };
 
   function apply() {
     try {
       const state = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (!state || !Array.isArray(state.characters)) return;
       let changed = false;
-
       for (const c of state.characters) {
         const p = c?.profile;
         if (!p) continue;
-
-        // The class icon captured from the Bible roster is authoritative. This
-        // prevents unrelated class names found elsewhere in the page from
-        // changing the displayed class (the exact problem seen in the party
-        // section for Diamarte).
-        if (p.classIcon && isSouleaterIcon(p.classIcon)) {
-          if (p.class !== 'Souleater') { p.class = 'Souleater'; changed = true; }
-          const canonicalIcon = iconFor('Souleater');
-          if (canonicalIcon && p.classIcon !== canonicalIcon) { p.classIcon = canonicalIcon; changed = true; }
-          continue;
-        }
-
-        const canonical = data()?.canonical?.(p.class) || p.class;
-        if (canonical && canonical !== p.class) { p.class = canonical; changed = true; }
-        const icon = iconFor(p.class);
-        if (icon && !p.classIcon) { p.classIcon = icon; changed = true; }
+        const cls = canonical(p.class);
+        if (cls && cls !== p.class) { p.class = cls; changed = true; }
+        const icon = iconFor(cls);
+        // Always prefer the canonical class icon over a stale icon captured by
+        // the generic SVG lookup. This is what prevents an Assassin subclass
+        // such as Souleater from inheriting the Reaper icon.
+        if (icon && p.classIcon !== icon) { p.classIcon = icon; changed = true; }
       }
       if (changed) localStorage.setItem(KEY, JSON.stringify(state));
     } catch {}
@@ -46,7 +35,7 @@
         const c = byUrl.get(key);
         if (!c?.profile) return;
         const p = c.profile;
-        const cls = p.class || 'Unknown';
+        const cls = canonical(p.class) || 'Unknown';
         const icon = iconFor(cls) || p.classIcon || '';
         const root = link.closest('article.character, .slot, .party, .party-card') || link.parentElement;
         if (!root) return;
@@ -55,8 +44,12 @@
           img.alt = cls;
         });
         root.querySelectorAll('.class').forEach(el => { el.textContent = cls; });
-        root.querySelectorAll('.party-character-title + small').forEach(el => {
-          el.textContent = el.textContent.replace(/^[^·]+/, `${cls} `);
+        root.querySelectorAll('small').forEach(el => {
+          const text = String(el.textContent || '');
+          if (/·\s*iLvl\s/i.test(text)) {
+            const rest = text.replace(/^[^·]+·\s*/i, '');
+            el.textContent = `${cls} · ${rest}`;
+          }
         });
       });
     } catch {}
