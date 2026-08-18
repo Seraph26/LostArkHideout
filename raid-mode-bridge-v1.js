@@ -1,13 +1,33 @@
-/* Lost Ark Hideout — encounter scoring bridge v1 */
+/* Lost Ark Hideout — encounter scoring bridge v2 */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3';
 const btn=()=>document.getElementById('optimizeBtn');
 function load(){try{return JSON.parse(localStorage.getItem(STORE)||'null')||{characters:[]}}catch{return{characters:[]}}}
-function save(v){localStorage.setItem(STORE,JSON.stringify(v))}
 function active(){return window.LostArkOptimizerMode&&!window.LostArkOptimizerMode.general&&window.LostArkOptimizerMode.raid}
-function annotate(){const label=document.getElementById('optimizerModeLabel');if(!label)return;let el=document.getElementById('encounterModelStatus');if(!el){el=document.createElement('span');el.id='encounterModelStatus';el.style.cssText='display:block;margin-top:4px;font-size:11px;color:#9aa0a6';label.parentElement?.appendChild(el)}const p=window.LostArkEncounterModel?.getProfile?.();if(!active()){el.textContent='Encounter model inactive';return}if(p)el.textContent=`Encounter profile: ${p.name} · ${p.confidence}`;else el.textContent='Encounter selected · profile not yet modeled; General model retained'}
-function effectiveCharacters(chars){const model=window.LostArkEncounterModel;if(!model?.getProfile?.())return null;return chars.map(c=>{const factor=model.factor(c);const p=c.profile||c.data||{};const cpKey=p.cp!=null?'cp':p.combatPower!=null?'combatPower':null;if(!cpKey||factor===1)return c;const clone=JSON.parse(JSON.stringify(c));clone.profile=clone.profile||{};clone.profile[cpKey]=Number(clone.profile[cpKey]||0)*factor;return clone})}
-function intercept(){const b=btn();if(!b||b.dataset.raidBridge)return;b.dataset.raidBridge='1';annotate();document.getElementById('raidSpecificSelect')?.addEventListener('change',()=>setTimeout(annotate,0));document.getElementById('generalOptimization')?.addEventListener('change',()=>setTimeout(annotate,0));b.addEventListener('click',e=>{if(e.__raidBridgeBypass)return;const model=window.LostArkEncounterModel?.getProfile?.();if(!active()||!model)return;const original=load();const effective=effectiveCharacters(original.characters||[]);if(!effective)return;const previous=JSON.stringify(original);save({...original,characters:effective});const ev=new MouseEvent('click',{bubbles:true,cancelable:true});Object.defineProperty(ev,'__raidBridgeBypass',{value:true});b.dispatchEvent(ev);const restore=()=>{try{if(localStorage.getItem(STORE)!==previous)localStorage.setItem(STORE,previous)}catch{}};const poll=setInterval(()=>{if(b.getAttribute('aria-busy')!=='true'){clearInterval(poll);restore();annotate()}},50);setTimeout(()=>{clearInterval(poll);restore();annotate()},15000)},{capture:true})}
+function annotate(){
+ const label=document.getElementById('optimizerModeLabel'); if(!label)return;
+ let el=document.getElementById('encounterModelStatus');
+ if(!el){el=document.createElement('span');el.id='encounterModelStatus';el.style.cssText='display:block;margin-top:4px;font-size:11px;color:#9aa0a6';label.parentElement?.appendChild(el)}
+ const p=window.LostArkEncounterScoring?.profile?.();
+ if(!active()){el.textContent='Encounter model inactive';return}
+ if(p)el.textContent=`Encounter scoring: ${p.name} · ${p.confidence}`;
+ else el.textContent='Encounter selected · no scoring profile; General model retained';
+}
+function intercept(){
+ const b=btn(); if(!b||b.dataset.raidBridgeV2)return; b.dataset.raidBridgeV2='1'; annotate();
+ document.getElementById('raidSpecificSelect')?.addEventListener('change',()=>setTimeout(annotate,0));
+ document.getElementById('generalOptimization')?.addEventListener('change',()=>setTimeout(annotate,0));
+ b.addEventListener('click',()=>{
+   if(!active()||!window.LostArkEncounterScoring?.profile?.())return;
+   const original=load();
+   const result=window.LostArkEncounterScoring.partyScore(original.characters||[]);
+   window.LostArkEncounterResult=result;
+   annotate();
+   /* Deliberately do not modify localStorage or character CP. The existing
+      optimizer remains the source of its normal character data. Encounter
+      scoring is exposed separately for the optimizer/UI integration layer. */
+ },{capture:true});
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',intercept,{once:true});else intercept();
 })();
