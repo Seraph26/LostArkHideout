@@ -1,0 +1,2 @@
+/* Loader for optimizer-v8 using the live Bible connector already deployed for this project. */
+(async()=>{try{const r=await fetch('./optimizer-v8.js?v=20260818v8');if(!r.ok)throw Error('optimizer-v8 unavailable');const src=(await r.text()).replace('https://lostark-hideout-connector.seraph0226.workers.dev/character','https://lostark-bible-connector.seraph0226.workers.dev/character');(0,eval)(src)}catch(e){console.error('Lost Ark Hideout optimizer load error',e)}})();
