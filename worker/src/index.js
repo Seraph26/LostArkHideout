@@ -5,10 +5,9 @@ const ALLOWED_ORIGINS = [
 
 const BIBLE_HOST = "lostark.bible";
 const VISIT_KEY = "page_visits";
-const BIBLE_SEARCH = "https://lostark.bible/_app/remote/ngsbie/search";
 
 function corsHeaders(origin) {
-  const allowed = ALLOWED_ORIGINS.includes(origin);
+  const allowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/[^.]+\.github\.io$/.test(origin);
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "null",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -46,12 +45,37 @@ function extractRegion(url) {
   return parts.length >= 2 ? decodeURIComponent(parts[1]) : null;
 }
 
-function makeSearchPayload(name, region) {
-  const value = JSON.stringify([["__skrao", 1], { name: 2, region: 3 }, String(name), String(region)]);
-  return btoa(unescape(encodeURIComponent(value)))
-    .replace(/=+$/, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
+function parseSearchHtml(html, region, requestedName) {
+  const results = [];
+  const seen = new Set();
+  const re = /href=["'](https:\/\/lostark\.bible)?(\/character\/([^/"']+)\/([^"'#?]+))["']/gi;
+  let match;
+  while ((match = re.exec(html || ""))) {
+    try {
+      const foundRegion = decodeURIComponent(match[3]).toUpperCase();
+      if (foundRegion !== region) continue;
+      const name = decodeURIComponent(match[4]);
+      const key = `${foundRegion}|${name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push({
+        name,
+        region: foundRegion,
+        url: `https://lostark.bible/character/${encodeURIComponent(foundRegion)}/${encodeURIComponent(name)}`,
+      });
+    } catch {}
+  }
+
+  if (!results.length && requestedName) {
+    results.push({
+      name: requestedName,
+      region,
+      url: `https://lostark.bible/character/${encodeURIComponent(region)}/${encodeURIComponent(requestedName)}`,
+      exact: true,
+    });
+  }
+
+  return results.slice(0, 20);
 }
 
 export default {
@@ -82,17 +106,17 @@ export default {
       if (name.length < 2) return json({ ok: true, results: [] }, 200, origin);
 
       try {
-        const payload = makeSearchPayload(name, region);
-        const response = await fetch(`${BIBLE_SEARCH}?payload=${encodeURIComponent(payload)}`, {
-          headers: { Accept: "application/json" },
+        const searchUrl = `https://lostark.bible/search?query=${encodeURIComponent(name)}`;
+        const response = await fetch(searchUrl, {
+          headers: {
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 (compatible; LostArkHideout/1.0)",
+          },
           cf: { cacheTtl: 0, cacheEverything: false },
         });
-        const text = await response.text();
+        const html = await response.text();
         if (!response.ok) return json({ ok: false, error: `Bible search returned HTTP ${response.status}.` }, 502, origin);
-        return new Response(JSON.stringify({ ok: true, data: text }), {
-          status: 200,
-          headers: { ...corsHeaders(origin), "Content-Type": "application/json; charset=utf-8" },
-        });
+        return json({ ok: true, results: parseSearchHtml(html, region, name) }, 200, origin);
       } catch {
         return json({ ok: false, error: "Unable to reach the Bible search service." }, 502, origin);
       }
