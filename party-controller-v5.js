@@ -7,83 +7,21 @@ const SUPPORT=new Set(['Bard','Paladin','Artist','Valkyrie']);
 // Party-synergy model. CP remains the character's individual-power metric;
 // these values only model interactions between characters in the same party.
 const SYNERGIES={
-  Berserker:['damage'],
-  Destroyer:['damage'],
-  Gunlancer:['damage','positional'],
-  Paladin:['supportDamage'],
-  Slayer:['damage'],
-  Arcanist:['crit'],
-  Arcana:['crit'],
-  Summoner:['damage'],
-  Sorceress:['damage'],
-  Bard:['supportDamage','attackSpeed'],
-  Gunslinger:['crit'],
-  Deadeye:['crit'],
-  Sharpshooter:['damage'],
-  Artillerist:['damage'],
-  Machinist:['attackPower'],
-  Striker:['crit','attackSpeed'],
-  Wardancer:['crit','attackSpeed'],
-  Scrapper:['damage'],
-  Soulfist:['attackPower'],
-  Glavier:['crit'],
-  Glaivier:['crit'],
-  Deathblade:['positional','attackSpeed'],
-  Shadowhunter:['damage'],
-  Reaper:['damage'],
-  Artist:['supportDamage','mana'],
-  Aeromancer:['crit'],
-  Breaker:['damage'],
-  Valkyrie:['supportDamage'],
-  Souleater:['damage'],
-  'Soul Eater':['damage']
+  Berserker:['damage'], Destroyer:['damage'], Gunlancer:['damage','positional'],
+  Paladin:['supportDamage'], Slayer:['damage'], Arcanist:['crit'], Arcana:['crit'],
+  Summoner:['damage'], Sorceress:['damage'], Bard:['supportDamage','attackSpeed'],
+  Gunslinger:['crit'], Deadeye:['crit'], Sharpshooter:['damage'], Artillerist:['damage'],
+  Machinist:['attackPower'], Striker:['crit','attackSpeed'], Wardancer:['crit','attackSpeed'],
+  Scrapper:['damage'], Soulfist:['attackPower'], Glavier:['critDamage'], Glaivier:['critDamage'],
+  Deathblade:['positional','attackSpeed'], Shadowhunter:['damage'], Reaper:['damage'],
+  Artist:['supportDamage','mana'], Aeromancer:['crit'], Breaker:['damage'], Valkyrie:['supportDamage'],
+  Souleater:['damage'], 'Soul Eater':['damage']
 };
-
-// Relative benefit of each synergy. These are optimizer weights, not literal
-// in-game DPS percentages. A target's build is not inferred from CP components.
-const SYNERGY_WEIGHT={
-  damage:0.014,
-  crit:0.018,
-  attackPower:0.012,
-  attackSpeed:0.007,
-  positional:0.014,
-  mana:0.003,
-  supportDamage:0.12
-};
-
-// Some classes are especially sensitive to crit availability. This lets the
-// optimizer distinguish two otherwise equal parties without inventing gear data.
-const CRIT_AFFINITY={
-  Souleater:1.30,
-  'Soul Eater':1.30,
-  Berserker:1.10,
-  Scrapper:1.08,
-  Glaivier:0.95,
-  Glavier:0.95,
-  Summoner:0.90,
-  Wardancer:0.75
-};
-const ATTACK_SPEED_AFFINITY={
-  Wardancer:1.15,
-  Scrapper:1.05,
-  Glaivier:1.05,
-  Glavier:1.05,
-  Berserker:1.00,
-  Souleater:0.95,
-  'Soul Eater':0.95,
-  Summoner:0.85
-};
-const POSITIONAL_AFFINITY={
-  Scrapper:1.15,
-  Glaivier:1.10,
-  Glavier:1.10,
-  Souleater:1.05,
-  'Soul Eater':1.05,
-  Berserker:0.95,
-  Summoner:0.50,
-  Wardancer:0.90
-};
-
+const SYNERGY_WEIGHT={damage:0.014,crit:0.018,critDamage:0.020,attackPower:0.012,attackSpeed:0.007,positional:0.014,mana:0.003,supportDamage:0.12};
+const CRIT_AFFINITY={Souleater:1.30,'Soul Eater':1.30,Berserker:1.10,Scrapper:1.08,Glaivier:0.95,Glavier:0.95,Summoner:0.90,Wardancer:0.75};
+const CRIT_DAMAGE_AFFINITY={Souleater:1.25,'Soul Eater':1.25,Summoner:1.18,Glaivier:1.12,Glavier:1.12,Berserker:1.05,Scrapper:1.02,Wardancer:0.95};
+const ATTACK_SPEED_AFFINITY={Wardancer:1.15,Scrapper:1.05,Glaivier:1.05,Glavier:1.05,Berserker:1.00,Souleater:0.95,'Soul Eater':0.95,Summoner:0.85};
+const POSITIONAL_AFFINITY={Scrapper:1.15,Glaivier:1.10,Glavier:1.10,Souleater:1.05,'Soul Eater':1.05,Berserker:0.95,Summoner:0.50,Wardancer:0.90};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const chars=()=>{for(const k of KEYS){try{const x=JSON.parse(localStorage.getItem(k)||'null');if(Array.isArray(x?.characters))return x.characters.filter(c=>c?.profile)}catch{}}return[]};
 const assignments=()=>{try{const x=JSON.parse(localStorage.getItem(PK)||'null');if(Array.isArray(x?.party1)&&Array.isArray(x?.party2))return x}catch{}return{party1:[],party2:[]}};
@@ -91,45 +29,11 @@ const save=x=>localStorage.setItem(PK,JSON.stringify(x));
 function norm(v){try{const u=new URL(v,location.href);return decodeURIComponent(u.pathname.replace(/\/$/,'')).normalize('NFC').toLowerCase()}catch{return String(v||'').replace(/\/$/,'').normalize('NFC').toLowerCase()}}
 function topCard(c){const target=norm(c?.url);if(!target)return null;const links=[...document.querySelectorAll('#roster a.character-bible-link[href]')];const link=links.find(a=>norm(a.getAttribute('href'))===target);return link?.closest('.character')||link?.closest('article')||link?.parentElement?.parentElement||null}
 function identity(c){const card=topCard(c);if(!card)return {name:c?.profile?.name||c?.name||'',cls:'Unknown',icon:'',role:'DPS',il:Number(c?.profile?.ilvl)||0,cp:Number(c?.profile?.cp)||0};const name=card.querySelector('a.character-bible-link')?.textContent?.trim()||c?.profile?.name||c?.name||'';const classEl=card.querySelector('.class');const cls=classEl?.textContent?.trim()||'Unknown';const img=card.querySelector('img.class-icon');const icon=img?.currentSrc||img?.src||'';const roleEl=[...card.querySelectorAll('*')].find(e=>e.textContent?.trim()==='DPS'||e.textContent?.trim()==='Support');const role=roleEl?.textContent?.trim()||(SUPPORT.has(cls)?'Support':'DPS');const ilEl=[...card.querySelectorAll('*')].find(e=>/^iLvl\s/i.test(e.textContent?.trim()||''));const cpEl=[...card.querySelectorAll('*')].find(e=>/^CP\s/i.test(e.textContent?.trim()||''));const il=ilEl?Number(ilEl.textContent.replace(/[^0-9.]/g,'')):Number(c?.profile?.ilvl)||0;const cp=cpEl?Number(cpEl.textContent.replace(/[^0-9.]/g,'')):Number(c?.profile?.cp)||0;return {name,cls,icon,role,il,cp}}
-function role(c){return identity(c).role}
-function cp(c){return identity(c).cp}
-function il(c){return identity(c).il}
-function cls(c){return identity(c).cls}
-function icon(c){return identity(c).icon}
+function role(c){return identity(c).role} function cp(c){return identity(c).cp} function il(c){return identity(c).il} function cls(c){return identity(c).cls} function icon(c){return identity(c).icon}
 function sourceSynergies(c){return SYNERGIES[cls(c)]||['damage']}
-function targetAffinity(c,synergy){const cl=cls(c);if(synergy==='crit')return CRIT_AFFINITY[cl]??1;if(synergy==='attackSpeed')return ATTACK_SPEED_AFFINITY[cl]??1;if(synergy==='positional')return POSITIONAL_AFFINITY[cl]??1;return 1}
-function uniqueSources(p){const seen=new Set(),out=[];for(const c of p){for(const s of sourceSynergies(c)){if(s==='supportDamage')continue;const key=`${s}:${cls(c)}`;if(!seen.has(key)){seen.add(key);out.push({source:c,synergy:s})}}}return out}
-function partyScore(p){if(!p.length)return 0;
-  // CP is the individual-power input. iLvl is deliberately not added again.
-  const base=p.reduce((sum,c)=>sum+cp(c),0);
-  const supports=p.filter(c=>role(c)==='Support');
-  if(supports.length!==1)return base*0.75;
-  let multiplier=1;
-  // One support is mandatory for a valid four-player party. Support-specific
-  // contribution is represented separately from DPS synergies.
-  const support=supports[0];
-  multiplier*=1+SYNERGY_WEIGHT.supportDamage;
-  if(cls(support)==='Artist')multiplier*=1.004;
-  if(cls(support)==='Bard')multiplier*=1.006;
-  if(cls(support)==='Paladin')multiplier*=1.002;
-
-  const dps=p.filter(c=>role(c)!=='Support');
-  // Same-type synergies from different classes can stack; repeated copies of
-  // the same class/type are not counted twice.
-  const active=new Set();
-  for(const source of uniqueSources(p)){
-    const key=source.synergy;
-    if(active.has(key))continue;
-    active.add(key);
-    const targets=dps.filter(c=>c!==source.source);
-    if(!targets.length)continue;
-    const weight=SYNERGY_WEIGHT[key]||0;
-    const avg=targets.reduce((s,c)=>s+targetAffinity(c,key),0)/targets.length;
-    multiplier*=1+weight*avg;
-  }
-  return base*multiplier;
-}
-const score=partyScore;
+function targetAffinity(c,s){const cl=cls(c);if(s==='crit')return CRIT_AFFINITY[cl]??1;if(s==='critDamage')return CRIT_DAMAGE_AFFINITY[cl]??1;if(s==='attackSpeed')return ATTACK_SPEED_AFFINITY[cl]??1;if(s==='positional')return POSITIONAL_AFFINITY[cl]??1;return 1}
+function uniqueSources(p){const seen=new Set(),out=[];for(const c of p)for(const s of sourceSynergies(c)){if(s==='supportDamage')continue;const key=`${s}:${cls(c)}`;if(!seen.has(key)){seen.add(key);out.push({source:c,synergy:s})}}return out}
+function score(p){if(!p.length)return 0;const base=p.reduce((sum,c)=>sum+cp(c),0);const supports=p.filter(c=>role(c)==='Support');if(supports.length!==1)return base*.75;let m=1;m*=1+SYNERGY_WEIGHT.supportDamage;const support=supports[0];if(cls(support)==='Artist')m*=1.004;if(cls(support)==='Bard')m*=1.006;if(cls(support)==='Paladin')m*=1.002;const dps=p.filter(c=>role(c)!=='Support');const active=new Set();for(const src of uniqueSources(p)){if(active.has(src.synergy))continue;active.add(src.synergy);const targets=dps.filter(c=>c!==src.source);if(!targets.length)continue;const avg=targets.reduce((s,c)=>s+targetAffinity(c,src.synergy),0)/targets.length;m*=1+(SYNERGY_WEIGHT[src.synergy]||0)*avg}return base*m}
 const fmt=n=>Math.round(n).toLocaleString();
 function model(){const a=chars(),map=new Map(a.map(c=>[c.id,c])),x=assignments(),seen=new Set(),p1=[],p2=[];for(const id of x.party1||[]){if(map.has(id)&&!seen.has(id)&&p1.length<4){p1.push(id);seen.add(id)}}for(const id of x.party2||[]){if(map.has(id)&&!seen.has(id)&&p2.length<4){p2.push(id);seen.add(id)}}for(const c of a){if(seen.has(c.id))continue;if(p1.length<4)p1.push(c.id);else if(p2.length<4)p2.push(c.id);seen.add(c.id)}const n={party1:p1,party2:p2};save(n);return{map,n,p1:p1.map(id=>map.get(id)).filter(Boolean),p2:p2.map(id=>map.get(id)).filter(Boolean)}}
 function member(c){const x=identity(c),color=x.role==='DPS'?'#e07a7a':'#79c98b';return `<div class="party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><div class="party-member-main"><a class="party-character-link" href="${esc(c.url)}" target="_blank" rel="noopener noreferrer">${x.icon?`<img class="class-icon" src="${esc(x.icon)}" alt="${esc(x.cls)}">`:''}${esc(x.name)}</a><span class="party-class-label">${esc(x.cls)}</span><span class="party-role-label" style="color:${color} !important">${x.role}</span><span class="party-stat-label">iLvl ${x.il.toLocaleString(undefined,{maximumFractionDigits:2})} · CP ${x.cp.toLocaleString(undefined,{maximumFractionDigits:2})}</span></div></div>`}
@@ -139,10 +43,23 @@ function impactHtml(beforeScore,afterScore,label){const pct=beforeScore?((afterS
 function render(impact=''){const host=document.querySelector('#suggestedParties');if(!host)return;const m=model();if(!m.p1.length&&!m.p2.length){host.innerHTML='<div class="empty-roster">Add specific character profiles to generate the party setup.</div>';return}host.innerHTML=`<div class="authoritative-summary"><strong>Combined estimated potential: ${fmt(score(m.p1)+score(m.p2))}</strong><span class="potential-explanation"> — CP-based individual power with party-specific synergy interactions. Higher is better; not a literal in-game DPS value.</span></div><div class="authoritative-parties">${party('Party 1','party1',m.p1)}${party('Party 2','party2',m.p2)}</div>${impact}`}
 function currentParty(id,a){return a.party1.includes(id)?'party1':a.party2.includes(id)?'party2':null}
 function partyArrays(a){const cs=chars();return[cs.filter(c=>a.party1.includes(c.id)),cs.filter(c=>a.party2.includes(c.id))]}
-function applyMove(id,targetParty){const a=assignments(),from=currentParty(id,a);if(!from||from===targetParty||a[targetParty].length>=4)return false;const before=partyArrays(a),beforeScore=score(before[0])+score(before[1]);a[from]=a[from].filter(x=>x!==id);a[targetParty].push(id);save(a);const after=partyArrays(a),afterScore=score(after[0])+score(after[1]);render(impactHtml(beforeScore,afterScore,'Move applied'));return true}
-function applySwap(id1,id2){const a=assignments(),p1=currentParty(id1,a),p2=currentParty(id2,a);if(!p1||!p2||p1===p2)return false;const before=partyArrays(a),beforeScore=score(before[0])+score(before[1]);const i=a[p1].indexOf(id1),j=a[p2].indexOf(id2);a[p1][i]=id2;a[p2][j]=id1;save(a);const after=partyArrays(a),afterScore=score(after[0])+score(after[1]);render(impactHtml(beforeScore,afterScore,'Swap applied'));return true}
+function applyMove(id,targetParty){const a=assignments(),from=currentParty(id,a);if(!from||from===targetParty||a[targetParty].length>=4)return false;const b=partyArrays(a),bs=score(b[0])+score(b[1]);a[from]=a[from].filter(x=>x!==id);a[targetParty].push(id);save(a);const af=partyArrays(a),as=score(af[0])+score(af[1]);render(impactHtml(bs,as,'Move applied'));return true}
+function applySwap(id1,id2){const a=assignments(),p1=currentParty(id1,a),p2=currentParty(id2,a);if(!p1||!p2||p1===p2)return false;const b=partyArrays(a),bs=score(b[0])+score(b[1]);const i=a[p1].indexOf(id1),j=a[p2].indexOf(id2);a[p1][i]=id2;a[p2][j]=id1;save(a);const af=partyArrays(a),as=score(af[0])+score(af[1]);render(impactHtml(bs,as,'Swap applied'));return true}
 function combinations(arr,k,start=0,p=[],out=[]){if(p.length===k){out.push(p.slice());return out}for(let i=start;i<=arr.length-(k-p.length);i++)combinations(arr,k,i+1,p.concat(arr[i]),out);return out}
-function optimize(){const a=chars();if(a.length!==8)return;let best=null,bestScore=-Infinity;for(const p1 of combinations(a,4)){const p2=a.filter(c=>!p1.includes(c));if(p1.filter(c=>role(c)==='Support').length!==1)continue;if(p2.filter(c=>role(c)==='Support').length!==1)continue;const s=score(p1)+score(p2);if(s>bestScore){bestScore=s;best={party1:p1.map(c=>c.id),party2:p2.map(c=>c.id)}}}if(best){save(best);render(`<div class="optimizer-result"><strong>Optimization complete.</strong> Best valid 4/4 arrangement: <strong>${fmt(bestScore)}</strong>.</div>`)} }
+function optimize(){const a=chars();if(a.length<8)return;const supports=a.filter(c=>role(c)==='Support');if(supports.length<2)return;let best=null,bestScore=-Infinity;
+  // The raid always has eight slots: choose the best eight characters from the
+  // available roster and split those eight into two valid four-player parties.
+  // For <=14 characters this exhaustive search is cheap enough for the browser.
+  const rosterCombos=a.length<=14?combinations(a,8):null;
+  const evaluateEight=eight=>{const p1s=combinations(eight,4);for(const p1 of p1s){const p2=eight.filter(c=>!p1.includes(c));if(p1.filter(c=>role(c)==='Support').length!==1)continue;if(p2.filter(c=>role(c)==='Support').length!==1)continue;const s=score(p1)+score(p2);if(s>bestScore){bestScore=s;best={party1:p1.map(c=>c.id),party2:p2.map(c=>c.id)}}}};
+  if(rosterCombos){for(const eight of rosterCombos)evaluateEight(eight)}else{
+    // Large-roster fallback: seed with the strongest characters, then test
+    // swaps. This prevents a very large roster from freezing the browser.
+    const seed=a.slice().sort((x,y)=>cp(y)-cp(x)).slice(0,8);evaluateEight(seed);
+    let improved=true;while(improved){improved=false;const chosen=new Set([...best.party1,...best.party2]);for(const out of [...chosen])for(const inn of a){if(chosen.has(inn.id))continue;const candidate=[...a.filter(c=>chosen.has(c.id)&&c.id!==out),inn];if(candidate.length!==8)continue;const before=bestScore;evaluateEight(candidate);if(bestScore>before){improved=true;break}if(improved)break} }
+  }
+  if(best){save(best);render(`<div class="optimizer-result"><strong>Optimization complete.</strong> Best valid 8-character arrangement: <strong>${fmt(bestScore)}</strong>.</div>`)}
+}
 function install(){const host=document.querySelector('#suggestedParties'),button=document.querySelector('#optimizeBtn');if(!host||host.dataset.dragDropInstalled)return;host.dataset.dragDropInstalled='1';if(button&&!button.dataset.optimizerInstalled){button.dataset.optimizerInstalled='1';button.addEventListener('click',optimize)}host.addEventListener('dragstart',e=>{const item=e.target.closest('.authoritative-member');if(!item)return;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',item.dataset.characterId)});host.addEventListener('dragover',e=>{const zone=e.target.closest('.authoritative-dropzone');if(zone){e.preventDefault();e.dataTransfer.dropEffect='move'}});host.addEventListener('drop',e=>{e.preventDefault();const zone=e.target.closest('.authoritative-dropzone');if(!zone)return;const id=e.dataTransfer.getData('text/plain');if(!id)return;const target=e.target.closest('.authoritative-member');if(target&&target.dataset.characterId!==id)applySwap(id,target.dataset.characterId);else applyMove(id,zone.dataset.dropParty)});setTimeout(render,500)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
