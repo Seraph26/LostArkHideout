@@ -9,7 +9,10 @@
       const current = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
       if (current && Array.isArray(current.characters) && current.characters.length) return current;
       const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
-      if (legacy && Array.isArray(legacy.characters)) return legacy;
+      if (legacy && Array.isArray(legacy.characters) && legacy.characters.length) {
+        return { ...legacy, characters: legacy.characters.map(c => ({ ...c, id: c.id || `${Date.now()}-${Math.random()}` })) };
+      }
+      if (current && Array.isArray(current.characters)) return current;
     } catch {}
     return { characters: [] };
   }
