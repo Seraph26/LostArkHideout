@@ -5,7 +5,8 @@
   const KEY = 'lostark-hideout-private-v3';
   const CORRECTIONS = new Map([
     ['ryohaku', 'Glavier'],
-    ['bailsxo', 'Artist']
+    ['bailsxo', 'Artist'],
+    ['diamarte', 'Souleater']
   ]);
 
   function apply() {
