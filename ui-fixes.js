@@ -1,12 +1,68 @@
-/* Lower-party icon bridge only. The roster is rendered by app-fixed.js; this file must not touch it. */
+/* UI icon/class repair layer. Keep roster and party icons consistent. */
 (()=>{
-  const ALIASES={Arcana:'arcanist',Glaivier:'glavier','Soul Eater':'soul-eater',Souleater:'soul-eater','Guardian Knight':'guardian-knight',GuardianKnight:'guardian-knight'};
-  const iconUrl=cls=>{const c=String(cls||'').trim();if(!c||c==='Unknown'||c==='Profile pending'||c==='—')return '';const slug=ALIASES[c]||c.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');return `https://lostark.bible/_next/image?url=${encodeURIComponent(`/images/classes/${slug}.png`)}&w=64&q=75`};
-  const classes=['Berserker','Destroyer','Gunlancer','Paladin','Slayer','Arcanist','Arcana','Summoner','Sorceress','Bard','Gunslinger','Deadeye','Sharpshooter','Artillerist','Machinist','Striker','Wardancer','Scrapper','Soulfist','Glavier','Glaivier','Deathblade','Shadowhunter','Reaper','Artist','Aeromancer','Breaker','Valkyrie','Soul Eater','Souleater','Wildsoul','Guardian Knight','GuardianKnight'];
-  const findClass=t=>{const s=String(t||'');return classes.slice().sort((a,b)=>b.length-a.length).find(x=>new RegExp(`(?:^|[^A-Za-z])${x.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')}(?:[^A-Za-z]|$)`,'i').test(s))||''};
-  function add(link,cls){if(!link||!cls)return;let img=link.querySelector(':scope>.class-icon');if(!img){img=document.createElement('img');img.className='class-icon';link.insertBefore(img,link.firstChild)}img.src=iconUrl(cls);img.alt='';img.width=18;img.height=18;img.loading='eager';img.decoding='async'}
-  function repair(){document.querySelectorAll('#suggestedParties .party-member').forEach(m=>{const link=m.querySelector('.party-character-link'),meta=m.querySelector('.party-member-main>span');add(link,findClass(meta?.textContent))});document.querySelectorAll('#suggestedParties .slot').forEach(s=>{const h=s.querySelector('h4'),meta=s.querySelector('small');add(h,findClass(meta?.textContent))})}
-  let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;repair()})};
-  const observer=new MutationObserver(schedule);function start(){repair();observer.observe(document.body,{childList:true,subtree:true})};
+  const KEY='lostark-hideout-private-v3';
+  const SOUL_EATER_ICON='https://lostark.bible/_next/image?url=%2Fimages%2Fclasses%2Fsouleater.png&w=64&q=75';
+  const normalizeName=v=>String(v||'').normalize('NFKC').trim().toLowerCase();
+  const canonicalClass=v=>{
+    const s=normalizeName(v);
+    if(s==='soul eater'||s==='souleater'||s==='soul_eater')return 'Souleater';
+    if(s==='guardian knight'||s==='guardianknight'||s==='guardian_knight')return 'Guardian Knight';
+    return String(v||'').trim();
+  };
+  function storedProfiles(){
+    try{
+      const state=JSON.parse(localStorage.getItem(KEY)||'null');
+      const map=new Map();
+      for(const c of state?.characters||[]){
+        const p=c?.profile;
+        const name=normalizeName(p?.name||c?.name);
+        if(name)map.set(name,p||{});
+      }
+      return map;
+    }catch{return new Map()}
+  }
+  function fixKnownClasses(){
+    const profiles=storedProfiles();
+    document.querySelectorAll('#roster .character,#suggestedParties .party,.party .slot,.party-member').forEach(root=>{
+      const nameEl=root.querySelector('.character-bible-link,.party-character-link,.party-character-title span,h3 a,h3 span');
+      if(!nameEl)return;
+      const name=normalizeName(nameEl.textContent);
+      const p=profiles.get(name);
+      if(!p)return;
+      const cls=canonicalClass(p.class);
+      if(!cls)return;
+      root.querySelectorAll('.class').forEach(e=>e.textContent=cls);
+      root.querySelectorAll('.party-member-main>span,small').forEach(e=>{
+        const text=e.textContent||'';
+        if(/\b(Soul Eater|Souleater|Reaper)\b/i.test(text))e.textContent=text.replace(/\b(Soul Eater|Souleater|Reaper)\b/i,cls);
+      });
+      if(cls==='Souleater')root.querySelectorAll('img.class-icon').forEach(img=>{img.src=SOUL_EATER_ICON;img.alt='Souleater';});
+    });
+  }
+  function bridgePartyIcons(){
+    const rosterIcons=new Map();
+    document.querySelectorAll('#roster .character').forEach(card=>{
+      const name=normalizeName(card.querySelector('.character-bible-link')?.textContent);
+      const img=card.querySelector('img.class-icon');
+      if(name&&img?.src)rosterIcons.set(name,img.src);
+    });
+    document.querySelectorAll('#suggestedParties .slot').forEach(slot=>{
+      const name=normalizeName(slot.querySelector('h4 span')?.textContent||slot.querySelector('h4')?.textContent);
+      const img=slot.querySelector('img.class-icon');
+      const src=rosterIcons.get(name);
+      if(img&&src){img.src=src;img.removeAttribute('srcset');img.alt='';}
+    });
+    document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
+      const name=normalizeName(member.querySelector('.party-character-link')?.textContent||member.querySelector('.party-member-main')?.textContent);
+      const img=member.querySelector('img.class-icon');
+      const src=rosterIcons.get(name);
+      if(img&&src){img.src=src;img.removeAttribute('srcset');img.alt='';}
+    });
+  }
+  function repair(){fixKnownClasses();bridgePartyIcons()}
+  let queued=false;
+  const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;repair()})};
+  const observer=new MutationObserver(schedule);
+  function start(){repair();observer.observe(document.body,{childList:true,subtree:true})}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
