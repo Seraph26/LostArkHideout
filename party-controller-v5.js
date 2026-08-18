@@ -9,13 +9,27 @@ function chars(){return state().characters.filter(c=>c&&c.profile)}
 function assigns(){try{const x=JSON.parse(localStorage.getItem(PK)||'null');if(x&&Array.isArray(x.party1)&&Array.isArray(x.party2))return x}catch{}return{party1:[],party2:[]}}
 const save=x=>localStorage.setItem(PK,JSON.stringify(x));
 function canonicalClass(c){
+  // The roster above is the single source of truth for class display. It already
+  // comes from the supplied Bible character page. Find that exact character by
+  // its Bible URL/name and reuse the class rendered there instead of parsing the
+  // page a second time or inferring a class from unrelated page text.
+  const href=String(c?.url||'').toLowerCase();
   const name=String(c?.profile?.name||c?.name||'').trim().toLowerCase();
-  const url=String(c?.url||'').toLowerCase();
-  if(name==='diamarte' || /\/character\/[^/]+\/diamarte(?:\/|$)/i.test(url)) return 'Souleater';
-  try { if(typeof window.correctedClassForCharacter==='function'){const x=window.correctedClassForCharacter(c);if(x)return x;} } catch {}
-  const raw=c?.profile?.class||'';
-  try { const canonical=window.LostArkHideoutClassData?.canonical?.(raw); if(canonical)return canonical; } catch {}
-  return raw;
+  const links=[...document.querySelectorAll('#roster .character')];
+  for(const el of links){
+    const a=el.querySelector('.character-bible-link');
+    const displayed=el.querySelector('.class');
+    if(!a||!displayed)continue;
+    const rosterHref=String(a.getAttribute('href')||'').toLowerCase();
+    const rosterName=String(a.textContent||'').trim().toLowerCase();
+    if((href&&rosterHref===href)||(name&&rosterName===name)){
+      const cls=String(displayed.textContent||'').trim();
+      if(cls)return cls;
+    }
+  }
+  // Fallback is the profile value that generated the roster, never a character
+  // name override. This keeps every class tied to the supplied Bible profile.
+  return String(c?.profile?.class||'Unknown').trim()||'Unknown';
 }
 function role(c){const cls=canonicalClass(c),r=c?.profile?.role;if(r==='Support'&&cls!=='Souleater')return r;return SUPPORT_CLASSES.has(cls)?'Support':'DPS'}
 function cp(c){return Number(c?.profile?.cp)||0} function il(c){return Number(c?.profile?.ilvl)||0}
@@ -36,6 +50,6 @@ function explain(before,after){const r=[];for(let i=0;i<2;i++){const o=i?before.
 function move(id,to){const m=model(),from=pfor(id,m.assignments);if(!from||from===to||m.assignments[to].length>=4)return;const before={p1:m.p1.slice(),p2:m.p2.slice()},beforeScore=total(before.p1,before.p2);m.assignments[from]=m.assignments[from].filter(x=>x!==id);m.assignments[to].push(id);save(m.assignments);const n=model(),after={p1:n.p1.slice(),p2:n.p2.slice()},afterScore=total(after.p1,after.p2),pct=beforeScore?((afterScore-beforeScore)/beforeScore)*100:0;render({label:'Move applied',before:beforeScore,after:afterScore,pct,reason:explain(before,after),cls:pct>0.0001?'positive':pct<-0.0001?'negative':'neutral'})}
 function swap(a,b){const m=model(),pa=pfor(a,m.assignments),pb=pfor(b,m.assignments);if(!pa||!pb||pa===pb)return;const before={p1:m.p1.slice(),p2:m.p2.slice()},beforeScore=total(before.p1,before.p2),i=m.assignments[pa].indexOf(a),j=m.assignments[pb].indexOf(b);m.assignments[pa][i]=b;m.assignments[pb][j]=a;save(m.assignments);const n=model(),after={p1:n.p1.slice(),p2:n.p2.slice()},afterScore=total(after.p1,after.p2),pct=beforeScore?((afterScore-beforeScore)/beforeScore)*100:0;render({label:'Swap applied',before:beforeScore,after:afterScore,pct,reason:explain(before,after),cls:pct>0.0001?'positive':pct<-0.0001?'negative':'neutral'})}
 function optimize(){const a=chars();if(!a.length)return;save(bestAssignment(a));render()}
-function install(){const ob=$('#optimizeBtn');if(ob&&!ob.dataset.v7){ob.dataset.v7='1';ob.onclick=optimize}const z=$('#suggestedParties');if(!z||z.dataset.v7)return;z.dataset.v7='1';z.addEventListener('dragstart',e=>{const m=e.target.closest('.authoritative-member');if(m)e.dataTransfer.setData('text/plain',m.dataset.characterId)});z.addEventListener('dragover',e=>{if(e.target.closest('.authoritative-member')||e.target.closest('.authoritative-dropzone'))e.preventDefault()});z.addEventListener('drop',e=>{const id=e.dataTransfer.getData('text/plain'),m=e.target.closest('.authoritative-member'),d=e.target.closest('.authoritative-dropzone');if(!id)return;e.preventDefault();m?swap(id,m.dataset.characterId):d&&move(id,d.dataset.dropParty)});let timer=0;new MutationObserver(()=>{if(timer)return;timer=setTimeout(()=>{timer=0;if(document.querySelector('.authoritative-party')==null)render()},0)}).observe(z,{childList:true});render()}
+function install(){const ob=$('#optimizeBtn');if(ob&&!ob.dataset.v8){ob.dataset.v8='1';ob.onclick=optimize}const z=$('#suggestedParties');if(!z||z.dataset.v8)return;z.dataset.v8='1';z.addEventListener('dragstart',e=>{const m=e.target.closest('.authoritative-member');if(m)e.dataTransfer.setData('text/plain',m.dataset.characterId)});z.addEventListener('dragover',e=>{if(e.target.closest('.authoritative-member')||e.target.closest('.authoritative-dropzone'))e.preventDefault()});z.addEventListener('drop',e=>{const id=e.dataTransfer.getData('text/plain'),m=e.target.closest('.authoritative-member'),d=e.target.closest('.authoritative-dropzone');if(!id)return;e.preventDefault();m?swap(id,m.dataset.characterId):d&&move(id,d.dataset.dropParty)});let timer=0;new MutationObserver(()=>{if(timer)return;timer=setTimeout(()=>{timer=0;if(document.querySelector('.authoritative-party')==null)render()},0)}).observe(z,{childList:true});render()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
