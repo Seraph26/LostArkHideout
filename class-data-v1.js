@@ -34,9 +34,14 @@
       const htmlKey = ['html','characterHtml','content','page'].find(k => typeof data?.[k] === 'string');
       if (!htmlKey) return response;
       const html = data[htmlKey];
-      const matches = [...html.matchAll(/(?:class|classId)\s*:\s*["']([a-z_]+)["']/g)].map(m => m[1]);
       let cls = null;
-      for (const id of matches) { const c = canonical(id); if (c) { cls = c; break; } }
+      const raid = html.match(/classification:\s*["']raid_merged["']([\s\S]{0,7000}?)/i);
+      const raidClass = raid?.[1]?.match(/classId:\s*["']([a-z_]+)["']/i)?.[1];
+      if (raidClass) cls = canonical(raidClass);
+      if (!cls) {
+        const matches = [...html.matchAll(/(?:class|classId)\s*:\s*["']([a-z_]+)["']/g)].map(m => m[1]);
+        for (const id of matches) { const c = canonical(id); if (c) { cls = c; break; } }
+      }
       if (!cls) return response;
       data[htmlKey] = html.replace(/<head([^>]*)>/i, `<head$1><meta data-character-class="${cls}">`);
       return new Response(JSON.stringify(data), {status: response.status, statusText: response.statusText, headers: response.headers});
