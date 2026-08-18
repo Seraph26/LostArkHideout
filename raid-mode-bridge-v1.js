@@ -1,33 +1,11 @@
-/* Lost Ark Hideout — encounter scoring bridge v2 */
+/* Lost Ark Hideout — encounter scoring bridge v3 */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3';
 const btn=()=>document.getElementById('optimizeBtn');
-function load(){try{return JSON.parse(localStorage.getItem(STORE)||'null')||{characters:[]}}catch{return{characters:[]}}}
 function active(){return window.LostArkOptimizerMode&&!window.LostArkOptimizerMode.general&&window.LostArkOptimizerMode.raid}
-function annotate(){
- const label=document.getElementById('optimizerModeLabel'); if(!label)return;
- let el=document.getElementById('encounterModelStatus');
- if(!el){el=document.createElement('span');el.id='encounterModelStatus';el.style.cssText='display:block;margin-top:4px;font-size:11px;color:#9aa0a6';label.parentElement?.appendChild(el)}
- const p=window.LostArkEncounterScoring?.profile?.();
- if(!active()){el.textContent='Encounter model inactive';return}
- if(p)el.textContent=`Encounter scoring: ${p.name} · ${p.confidence}`;
- else el.textContent='Encounter selected · no scoring profile; General model retained';
-}
-function intercept(){
- const b=btn(); if(!b||b.dataset.raidBridgeV2)return; b.dataset.raidBridgeV2='1'; annotate();
- document.getElementById('raidSpecificSelect')?.addEventListener('change',()=>setTimeout(annotate,0));
- document.getElementById('generalOptimization')?.addEventListener('change',()=>setTimeout(annotate,0));
- b.addEventListener('click',()=>{
-   if(!active()||!window.LostArkEncounterScoring?.profile?.())return;
-   const original=load();
-   const result=window.LostArkEncounterScoring.partyScore(original.characters||[]);
-   window.LostArkEncounterResult=result;
-   annotate();
-   /* Deliberately do not modify localStorage or character CP. The existing
-      optimizer remains the source of its normal character data. Encounter
-      scoring is exposed separately for the optimizer/UI integration layer. */
- },{capture:true});
-}
+function parameterText(p){const parts=[];const pos=[['Hit Master',Number(p?.hitmaster)||0],['Front Attack',Number(p?.front)||0],['Back Attack',Number(p?.back)||0]].sort((a,b)=>b[1]-a[1]);if(pos[0][1]>0&&pos[0][1]>pos[pos.length-1][1])parts.push(`${pos[0][0]} favored`);const range=Number(p?.ranged)||0,melee=Number(p?.melee)||0;if(range>melee)parts.push('Ranged favored');else if(melee>range)parts.push('Melee favored');if((Number(p?.burst)||0)>1)parts.push('Burst windows favored');const mv=p?.mechanics?.movement;if(mv&&mv!=='low')parts.push(`${String(mv).replace(/-/g,' ')} mobility pressure`);const fp=p?.mechanics?.forcedPositioning;if(fp&&fp!=='low')parts.push(`${String(fp).replace(/-/g,' ')} forced positioning`);if(p?.mechanics?.stagger==='high')parts.push('High stagger demand');if(p?.mechanics?.destruction==='high')parts.push('High destruction demand');return parts.join(' · ')||'Standard encounter parameters'}
+function annotate(){const label=document.getElementById('optimizerModeLabel');if(!label)return;let el=document.getElementById('encounterModelStatus');if(!el){el=document.createElement('span');el.id='encounterModelStatus';el.style.cssText='display:block;margin-top:4px;font-size:11px;color:#9aa0a6';label.parentElement?.appendChild(el)}const p=window.LostArkEncounterScoring?.profile?.();if(!active()){el.textContent='Encounter model inactive';return}if(p)el.textContent=`Encounter scoring: ${p.name} · ${p.confidence} · ${parameterText(p)}`;else el.textContent='Encounter selected · no scoring profile; General model retained'}
+function intercept(){const b=btn();if(!b||b.dataset.raidBridgeV3)return;b.dataset.raidBridgeV3='1';annotate();document.getElementById('raidSpecificSelect')?.addEventListener('change',()=>setTimeout(annotate,50));document.getElementById('generalOptimization')?.addEventListener('change',()=>setTimeout(annotate,50));b.addEventListener('click',()=>setTimeout(annotate,150),{capture:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',intercept,{once:true});else intercept();
 })();
