@@ -2,22 +2,25 @@
   "source": "lostark.bible raid filter",
   "updatedAt": null,
   "raids": [
-    {"id":"aegir-g1","label":"Aegir — Gate 1","boss":"Aegir Gate 1","kind":"raid"},
-    {"id":"aegir-g2","label":"Aegir — Gate 2","boss":"Aegir Gate 2","kind":"raid"},
-    {"id":"brelshaza-g1","label":"Brelshaza — Gate 1","boss":"Brelshaza Gate 1","kind":"raid"},
-    {"id":"brelshaza-g2","label":"Brelshaza — Gate 2","boss":"Brelshaza Gate 2","kind":"raid"},
-    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Armoche Gate 1","kind":"raid"},
-    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche Gate 2","kind":"raid"},
-    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Kazeros Gate 1","kind":"raid"},
-    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Kazeros Gate 2","kind":"raid"},
+    {"id":"horizon-cathedral-l1-g1","label":"Horizon Cathedral — Level 1, Gate 1","boss":"Horizon Cathedral Level 1 Gate 1","kind":"raid"},
+    {"id":"horizon-cathedral-l1-g2","label":"Horizon Cathedral — Level 1, Gate 2","boss":"Horizon Cathedral Level 1 Gate 2","kind":"raid"},
+    {"id":"horizon-cathedral-l2-g1","label":"Horizon Cathedral — Level 2, Gate 1","boss":"Horizon Cathedral Level 2 Gate 1","kind":"raid"},
+    {"id":"horizon-cathedral-l2-g2","label":"Horizon Cathedral — Level 2, Gate 2","boss":"Horizon Cathedral Level 2 Gate 2","kind":"raid"},
+    {"id":"horizon-cathedral-l3-g1","label":"Horizon Cathedral — Level 3, Gate 1","boss":"Horizon Cathedral Level 3 Gate 1","kind":"raid"},
+    {"id":"horizon-cathedral-l3-g2","label":"Horizon Cathedral — Level 3, Gate 2","boss":"Horizon Cathedral Level 3 Gate 2","kind":"raid"},
     {"id":"serca-g1","label":"Serca — Gate 1","boss":"Serca Gate 1","kind":"raid"},
-    {"id":"serca-g2","label":"Serca — Gate 2","boss":"Corvus Tul Rak","kind":"raid"}
+    {"id":"serca-g2","label":"Serca — Gate 2","boss":"Corvus Tul Rak","kind":"raid"},
+    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Kazeros Gate 1","kind":"raid"},
+    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Kazeros Gate 2","kind":"raid"}
+  ],
+  "optional": [
+    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Armoche Gate 1","kind":"optional"},
+    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche Gate 2","kind":"optional"}
   ],
   "events": [
-    {"id":"extreme-aegir","label":"[EXTREME] Aegir — Gate 1","boss":"Extreme Aegir Gate 1","kind":"event"},
+    {"id":"extreme-aegir-g1","label":"[EXTREME] Aegir — Gate 1","boss":"Extreme Aegir Gate 1","kind":"event"},
     {"id":"extreme-aegir-g2","label":"[EXTREME] Aegir — Gate 2","boss":"Extreme Aegir Gate 2","kind":"event"},
     {"id":"extreme-brelshaza-g1","label":"[EXTREME] Brelshaza — Gate 1","boss":"Extreme Brelshaza Gate 1","kind":"event"},
-    {"id":"extreme-brelshaza-g2","label":"[EXTREME] Brelshaza — Gate 2","boss":"Extreme Brelshaza Gate 2","kind":"event"},
-    {"id":"act4","label":"Abyssal Dungeon — Act 4","boss":"Act 4","kind":"event"}
+    {"id":"extreme-brelshaza-g2","label":"[EXTREME] Brelshaza — Gate 2","boss":"Extreme Brelshaza Gate 2","kind":"event"}
   ]
 }
