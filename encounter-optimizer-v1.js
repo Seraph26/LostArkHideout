@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — encounter-aware optimizer integration v1 */
+/* Lost Ark Hideout — encounter-aware optimizer integration v2 */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3',PARTY='lostark-hideout-party-assignments-v2';
@@ -9,21 +9,14 @@ function load(){try{return JSON.parse(localStorage.getItem(STORE)||'null')||{cha
 function roster(){return(load().characters||[]).filter(c=>c&&c.id&&c.profile)}
 function info(c){const p=c.profile||{};const cls=String(p.class||p.className||p.characterClass||'Unknown');const role=p.role||(['Bard','Artist','Paladin','Valkyrie'].includes(cls)?'Support':'DPS');return{name:String(p.name||c.name||'Unknown'),cls,role:role==='Support'?'Support':'DPS',cp:num(p.cp??p.combatPower),ilvl:num(p.ilvl??p.itemLevel),url:c.url||p.url||''}}
 function charValue(c){const r=window.LostArkEncounterScoring.characterScore(c);return Math.max(.75,Math.min(1.15,num(r.score)||1))}
-function supportFit(p){const supports=p.filter(c=>info(c).role==='Support');if(supports.length!==1)return supports.length===0?.93:.86;return .98}
-function positionalCoherence(p){const pos=p.map(c=>window.LostArkEncounterScoring.traits(c).position).filter(x=>x&&x!=='unknown');if(!pos.length)return .96;const unique=new Set(pos);if(unique.size===1)return 1;if(unique.size===2)return .985;return .96}
-function synergyCompatibility(p){
- let x=1;
- const texts=p.map(c=>JSON.stringify(c).toLowerCase()).join(' ');
- if(/deathblade|gunlancer/.test(texts)&&p.some(c=>window.LostArkEncounterScoring.traits(c).position==='back'))x+=.006;
- if(/summoner/.test(texts))x+=.003;
- return x;
-}
 function scoreParty(p){
  if(p.length!==4)return-1;
  const dps=p.filter(c=>info(c).role==='DPS');
  if(dps.length!==3)return-1;
- const raw=dps.reduce((s,c)=>s+info(c).cp*charValue(c),0);
- return raw*supportFit(p)*positionalCoherence(p)*synergyCompatibility(p);
+ /* Encounter performance is applied independently to each character. There is
+    deliberately no blanket party CP multiplier, support bonus, or class-pair
+    bonus here. Those require measured encounter-specific data. */
+ return dps.reduce((s,c)=>s+info(c).cp*charValue(c),0);
 }
 function partitions(chars){
  const out=[];if(chars.length!==8)return out;
@@ -41,10 +34,10 @@ function saveAssignments(a,b){localStorage.setItem(PARTY,JSON.stringify({party1:
 function renderParty(title,p,score){
  const model=window.LostArkEncounterScoring.profile();
  const fit=(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1);
- return `<article class="party encounter-optimized-party"><h3>${esc(title)}</h3><div class="score">Encounter score ${Math.round(score).toLocaleString()} · Fit ${fit}%</div><div class="slots">${p.map(c=>{const i=info(c),t=window.LostArkEncounterScoring.traits(c),r=window.LostArkEncounterScoring.characterScore(c);return `<div class="slot party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><h4 class="party-character-title">${esc(i.name)}</h4><small>${esc(i.cls)} · ${esc(i.role)} · CP ${Math.round(i.cp).toLocaleString()} · ${esc(t.position)} · Encounter ${Math.round(r.score*100)}%</small><div class="encounter-reason">${esc(r.reasons.join(' · ')||'Neutral encounter profile')}</div></div>`}).join('')}</div></article>`
+ return `<article class="party encounter-optimized-party"><h3>${esc(title)}</h3><div class="score">Encounter score ${Math.round(score).toLocaleString()} · Fit ${fit}%</div><div class="slots">${p.map(c=>{const i=info(c),t=window.LostArkEncounterScoring.traits(c),r=window.LostArkEncounterScoring.characterScore(c);return `<div class="slot party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><h4 class="party-character-title">${esc(i.name)}</h4><small>${esc(i.cls)} · ${esc(i.role)} · CP ${Math.round(i.cp).toLocaleString()} · ${esc(t.positionLabel)} · Encounter ${Math.round(r.score*100)}%</small><div class="encounter-reason">${esc(r.reasons.join(' · ')||'Neutral encounter profile')}</div></div>`}).join('')}</div></article>`
 }
-function render(best){const root=document.getElementById('suggestedParties');if(!root)return;const model=window.LostArkEncounterScoring.profile();root.innerHTML=renderParty('Party 1',best.a,best.s1)+renderParty('Party 2',best.b,best.s2)+`<div class="encounter-optimization-note">${esc(model.name)} · ${esc(model.confidence)} · Ranked with encounter performance, positional coherence, and support composition. Actual CP is unchanged.</div>`}
+function render(best){const root=document.getElementById('suggestedParties');if(!root)return;const model=window.LostArkEncounterScoring.profile();root.innerHTML=renderParty('Party 1',best.a,best.s1)+renderParty('Party 2',best.b,best.s2)+`<div class="encounter-optimization-note">${esc(model.name)} · ${esc(model.confidence)} · Character performance is encounter-adjusted before party ranking. Actual CP is unchanged.</div>`}
 function optimize(){if(!active())return false;const chars=roster();if(chars.length!==8)return false;const all=partitions(chars);if(!all.length)return false;const best=all[0];saveAssignments(best.a,best.b);window.LostArkEncounterOptimization={best,alternatives:all.slice(1,6),encounter:window.LostArkEncounterScoring.profile().name};render(best);return true}
-function install(){const b=document.getElementById('optimizeBtn');if(!b||b.dataset.encounterOptimizerV1)return;b.dataset.encounterOptimizerV1='1';b.addEventListener('click',()=>setTimeout(()=>{if(active())optimize()},80));const rerender=()=>setTimeout(()=>{if(active())window.LostArkEncounterOptimization&&optimize()},80);document.getElementById('raidSpecificSelect')?.addEventListener('change',()=>{window.LostArkEncounterOptimization=null});document.getElementById('generalOptimization')?.addEventListener('change',()=>{window.LostArkEncounterOptimization=null});}
+function install(){const b=document.getElementById('optimizeBtn');if(!b||b.dataset.encounterOptimizerV2)return;b.dataset.encounterOptimizerV2='1';b.addEventListener('click',()=>setTimeout(()=>{if(active())optimize()},80));document.getElementById('raidSpecificSelect')?.addEventListener('change',()=>{window.LostArkEncounterOptimization=null});document.getElementById('generalOptimization')?.addEventListener('change',()=>{window.LostArkEncounterOptimization=null});}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
