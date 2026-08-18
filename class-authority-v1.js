@@ -1,5 +1,6 @@
-/* Bible class authority: derive the actual subclass from the page's canonical class id,
-   rather than treating the broad family name (e.g. Assassin) as the subclass. */
+/* Bible class authority: derive the actual subclass from the character's canonical
+   classId/class field in the embedded page data. Never infer a subclass from the
+   broad family name or incidental text elsewhere on the page. */
 (() => {
   const CLASS_IDS = {
     berserker:'Berserker', destroyer:'Destroyer', gunlancer:'Gunlancer', paladin:'Paladin', slayer:'Slayer', valkyrie:'Valkyrie',
@@ -10,19 +11,32 @@
     artist:'Artist', aeromancer:'Aeromancer', wildsoul:'Wildsoul', dragon_knight:'Guardianknight', holyknight:'Paladin', holyknight_female:'Paladin',
     weather_artist:'Aeromancer', yinyangshi:'Yinyangshi', alchemist:'Alchemist'
   };
-
-  const SOULEATER_SVG_RE = /M524\.5,356\.5/;
   const normalizeId = v => String(v || '').trim().toLowerCase().replace(/[ -]+/g, '_');
 
   function classFromHtml(html) {
     const source = String(html || '');
-    const patterns = [
-      /class\s*:\s*["']([a-z_]+)["']/i,
-      /["']class["']\s*:\s*["']([a-z_]+)["']/i,
-      /classId\s*:\s*["']([a-z_]+)["']/i,
-      /["']classId["']\s*:\s*["']([a-z_]+)["']/i
+    // IMPORTANT: classId is the canonical subclass field used by Bible's raid
+    // data. Check it before generic `class:` fields, because the page can contain
+    // unrelated class text (including another roster character's class).
+    const canonicalPatterns = [
+      /classId\s*:\s*["']([a-z_]+)["']/ig,
+      /["']classId["']\s*:\s*["']([a-z_]+)["']/ig,
+      /classification\s*:\s*["']raid_merged["'][\s\S]{0,2500}?classId\s*:\s*["']([a-z_]+)["']/i,
+      /classification\s*:\s*["']raid_merged["'][\s\S]{0,2500}?["']classId["']\s*:\s*["']([a-z_]+)["']/i
     ];
-    for (const re of patterns) {
+    for (const re of canonicalPatterns) {
+      const m = source.match(re);
+      if (m) {
+        const name = CLASS_IDS[normalizeId(m[1])];
+        if (name) return name;
+      }
+    }
+    // Fall back only when canonical raid data is absent.
+    const fallbackPatterns = [
+      /class\s*:\s*["']([a-z_]+)["']/i,
+      /["']class["']\s*:\s*["']([a-z_]+)["']/i
+    ];
+    for (const re of fallbackPatterns) {
       const m = source.match(re);
       const name = m && CLASS_IDS[normalizeId(m[1])];
       if (name) return name;
@@ -34,8 +48,6 @@
     if (typeof html !== 'string') return html;
     const cls = classFromHtml(html);
     if (!cls) return html;
-    // Make the canonical subclass visible to the existing Bible parser before it
-    // falls back to incidental text such as "Reaper" elsewhere on the page.
     const marker = `<span data-bible-authoritative-class="${cls}" aria-label="${cls}"></span>`;
     return html.replace(/<body[^>]*>/i, m => `${m}${marker}`);
   }
@@ -56,6 +68,5 @@
       return response;
     }
   };
-
   window.LostArkHideoutClassAuthority = { CLASS_IDS, classFromHtml };
 })();
