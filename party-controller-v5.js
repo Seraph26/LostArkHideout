@@ -9,11 +9,10 @@ function chars(){return state().characters.filter(c=>c&&c.profile)}
 function assigns(){try{const x=JSON.parse(localStorage.getItem(PK)||'null');if(x&&Array.isArray(x.party1)&&Array.isArray(x.party2))return x}catch{}return{party1:[],party2:[]}}
 const save=x=>localStorage.setItem(PK,JSON.stringify(x));
 function canonicalClass(c){
-  // Use the exact same character-specific class resolver as the Available Characters section.
-  // This keeps both sections on one source of truth.
-  try { if(typeof window.correctedClassForCharacter==='function') return window.correctedClassForCharacter(c); } catch {}
   const name=String(c?.profile?.name||c?.name||'').trim().toLowerCase();
-  if(name==='diamarte')return 'Souleater';
+  const url=String(c?.url||'').toLowerCase();
+  if(name==='diamarte' || /\/character\/[^/]+\/diamarte(?:\/|$)/i.test(url)) return 'Souleater';
+  try { if(typeof window.correctedClassForCharacter==='function'){const x=window.correctedClassForCharacter(c);if(x)return x;} } catch {}
   const raw=c?.profile?.class||'';
   try { const canonical=window.LostArkHideoutClassData?.canonical?.(raw); if(canonical)return canonical; } catch {}
   return raw;
