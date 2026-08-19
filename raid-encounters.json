@@ -14,7 +14,7 @@
     {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche, Sentinel of the Abyss","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810}
   ],
   "events": [
-    {"id":"extreme-aegir-g2","label":"[EXTREME] Aegir — Gate 2","boss":"Aegir, the Oppressor","kind":"event","schema":"extreme","gate":2},
-    {"id":"extreme-brelshaza-g2","label":"[EXTREME] Brelshaza — Gate 2","boss":"Phantom Manifester Brelshaza","kind":"event","schema":"extreme","gate":2}
+    {"id":"extreme-aegir-g2","label":"[EXTREME] Aegir — Gate 2","boss":"Aegir, the Oppressor","kind":"event","schema":"extreme","difficulty":"Extreme Nightmare","patch":"nov25","gate":2},
+    {"id":"extreme-brelshaza-g2","label":"[EXTREME] Brelshaza — Gate 2","boss":"Phantom Manifester Brelshaza","kind":"event","schema":"extreme","difficulty":"Extreme Nightmare","patch":"nov25","gate":2}
   ]
 }
