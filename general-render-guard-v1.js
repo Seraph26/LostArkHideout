@@ -1,65 +1,30 @@
-/* Preserves the authoritative General Optimization DOM when the legacy app renderer runs. */
+/* Lost Ark Hideout — General Optimization render guard + canonical DPS hover */
 (()=>{
 'use strict';
 const root=()=>document.querySelector('#suggestedParties');
-const active=()=>document.querySelector('#generalOptimization')?.checked!==false && window.LostArkOptimizerMode?.general!==false;
-let snapshot='';
-let restoring=false;
-function observe(){
- const h=root(); if(!h)return;
- const capture=()=>{if(!restoring&&h.querySelector('.authoritative-party'))snapshot=h.innerHTML};
- new MutationObserver(()=>{
-   if(restoring)return;
-   if(h.querySelector('.authoritative-party')){capture();return}
-   if(active()&&snapshot){restoring=true;h.innerHTML=snapshot;restoring=false;}
- }).observe(h,{childList:true,subtree:false});
- capture();
-}
-function install(){
- window.__GENERAL_PARTY_RENDER_GUARD__=true;
- observe();
- document.addEventListener('change',e=>{if(e.target?.id==='generalOptimization'&&!e.target.checked)snapshot=''});
- const btn=document.getElementById('refreshBtn');
- if(!btn)return;
- const KEY='lostark-hideout-private-v3';
- const sleep=ms=>new Promise(r=>setTimeout(r,ms));
- const isRateLimit=e=>/429|too many requests|rate.?limit/i.test(String(e?.message||e));
- function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||'null');return s&&Array.isArray(s.characters)?s:null}catch{return null}}
- async function safeRefresh(){
-   const state=load();
-   if(!state||!state.characters.length)return;
-   if(btn.dataset.refreshing==='1')return;
-   btn.dataset.refreshing='1';btn.disabled=true;btn.textContent='Refreshing...';
-   let ok=0,failed=0,rateLimited=false;const errors=[];
-   try{
-     for(let i=0;i<state.characters.length;i++){
-       const c=state.characters[i];
-       if(rateLimited)break;
-       try{
-         if(typeof window.fetchCharacter!=='function')throw new Error('Profile loader unavailable.');
-         c.profile=await window.fetchCharacter(c);delete c.profileError;ok++;
-       }catch(e){
-         const msg=String(e?.message||e);c.profileError=msg;failed++;errors.push(`${c.name}: ${msg}`);
-         if(isRateLimit(e))rateLimited=true;
-         if(!rateLimited&&i<state.characters.length-1)await sleep(1200);
-       }
-     }
-     localStorage.setItem(KEY,JSON.stringify(state));
-     const remaining=state.characters.length-ok-failed;
-     if(rateLimited){
-       const first=errors.find(x=>/429|too many requests|rate.?limit/i.test(x))||'Bible rate limit reached.';
-       document.getElementById('status').textContent=`Refreshed ${ok}; ${failed} failed. Bible rate limit reached; ${remaining} remaining profile${remaining===1?'':'s'} not requested. ${first}`;
-     }else if(failed){
-       document.getElementById('status').textContent=`Refreshed ${ok}; ${failed} failed. ${errors.join(' | ')}`;
-     }else{
-       document.getElementById('status').textContent=`Refreshed ${ok} profile${ok===1?'':'s'} from Bible.`;
-     }
-     setTimeout(()=>location.reload(),250);
-   }finally{
-     btn.dataset.refreshing='';btn.disabled=false;btn.textContent='Refresh Profiles';
-   }
- }
- btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();safeRefresh();},true);
-}
+const active=()=>document.querySelector('#generalOptimization')?.checked!==false&&window.LostArkOptimizerMode?.general!==false;
+let snapshot='',restoring=false;
+function observe(){const h=root();if(!h)return;const capture=()=>{if(!restoring&&h.querySelector('.authoritative-party'))snapshot=h.innerHTML};new MutationObserver(()=>{if(restoring)return;if(h.querySelector('.authoritative-party')){capture();formatGeneralHovers();return}if(active()&&snapshot){restoring=true;h.innerHTML=snapshot;restoring=false;formatGeneralHovers()}}).observe(h,{childList:true,subtree:true,characterData:true});capture();}
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim(),num=v=>{const n=Number(String(v??'').replace(/,/g,''));return Number.isFinite(n)?n:0},fmt=v=>Math.round(num(v)).toLocaleString(),pct=v=>`${v>=0?'+':''}${v.toFixed(2)}%`,esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LABELS={damage:'Damage',mana:'Mana',crit:'Critical Rate',critDamage:'Critical Damage',attackSpeed:'Attack Speed',attackPower:'Attack Power',supportAmplification:'Support Amplification',positional:'Positional Damage'};
+const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
+function store(){try{return JSON.parse(localStorage.getItem('lostark-hideout-private-v3')||'null')||{characters:[]}}catch{return{characters:[]}}}
+function roster(){return(store().characters||[]).filter(c=>c&&c.id)}
+function profile(c){return c.profile||c.data||{}}
+function build(c){try{return window.LostArkBuildProfilesV3?.get(c.url)||window.LostArkBuildProfilesV2?.get(c.url)||{}}catch{return{}}}
+function text(c){const p=profile(c),b=build(c);return clean([p.rawText,p.text,p.characterText,p.arkGridText,p.arkPassiveText,p.engravingsText,p.gemsText,p.tripodsText,b.text,b.className,b.engravings?.join(' '),b.grid?.map(x=>x.name+' '+x.points).join(' '),b.arkPassive?.map(x=>x.name+' '+x.level).join(' ')].filter(Boolean).join(' ')).toLowerCase()}
+function cls(c){const p=profile(c),b=build(c),v=clean(p.class||p.className||p.characterClass||b.className);if(v&&v.toLowerCase()!=='unknown')return({'Soul Eater':'Souleater','Arcana':'Arcanist','Glavier':'Glaivier'}[v]||v);const t=text(c),m=[['Summoner',/\bsummoner\b|master summoner|ancient spear/],['Souleater',/souleater|soul eater|full moon harvester|night.?s edge/],['Arcanist',/arcanist|arcana|empress grace|emperor.?s decree/],['Glaivier',/glaivier|glavier|pinnacle|control/],['Bard',/\bbard\b|desperate salvation|true courage/],['Artist',/\bartist\b|full bloom|recurrence/],['Paladin',/\bpaladin\b|blessed aura/],['Valkyrie',/\bvalkyrie\b/]];for(const[n,r]of m)if(r.test(t))return n;return'Unknown'}
+function role(c){const p=profile(c);return p.role==='Support'||SUPPORTS.has(cls(c))?'Support':'DPS'}
+function positional(c){const b=build(c),t=text(c);if(b.positional&&b.positional!=='Unknown')return b.positional;if(/ambush master|back attack/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';return'Unknown'}
+function effects(c){try{const x=window.LostArkPartySynergyAuthorityV1?.provided?.(cls(c),build(c),text(c));if(Array.isArray(x)&&x.length)return x}catch{}const map={Summoner:['damage','mana'],Glaivier:['crit','critDamage'],Arcanist:['crit'],Wardancer:['crit','attackSpeed'],Striker:['crit','attackSpeed'],Deathblade:['attackSpeed'],Gunlancer:['attackSpeed','damage'],Soulfist:['attackPower']},out=[];for(const k of(map[cls(c)]||[]))out.push({type:k,value:k==='crit'?.10:k==='critDamage'?.08:.06});return out}
+function weight(c,type){const t=text(c),p=positional(c);let w=1;if(type==='crit'&&/keen blunt|adrenaline|burst|full moon/.test(t))w+=.35;if(type==='critDamage'&&/keen blunt|burst/.test(t))w+=.30;if(type==='attackSpeed'&&/raid captain|swiftness/.test(t))w+=.35;if(type==='positional')w=p==='Back Attack'||p==='Front Attack'?1.35:p==='Hit Master'?.55:.85;if(type==='mana')w=/summoner|mana|boundless/.test(t)?1.55:.2;if(type==='damage'&&/summoner/.test(t))w+=.10;return w}
+function supportEffects(c){switch(cls(c)){case'Bard':return[{type:'supportAmplification',value:.10},{type:'mana',value:.12},{type:'attackSpeed',value:.035}];case'Artist':return[{type:'supportAmplification',value:.10},{type:'mana',value:.08},{type:'attackSpeed',value:.04}];case'Paladin':return[{type:'supportAmplification',value:.10},{type:'damage',value:.03}];case'Valkyrie':return[{type:'supportAmplification',value:.095},{type:'attackSpeed',value:.06}];default:return[{type:'supportAmplification',value:.09}]}}
+function characterByName(name){const n=clean(name).toLowerCase();return roster().find(c=>clean(profile(c).name||c.name).toLowerCase()===n)||null}
+function parseSummary(card,label){const m=clean(card.textContent).match(new RegExp(label+'\\s*:?\\s*([+-]?[\\d,]+(?:\\.\\d+)?)','i'));return m?num(m[1]):0}
+function canonical(card,member){if(!active()||!card||!member||role(member)!=='DPS')return;const raw=clean(card.textContent);if(!/Contribution\s*:?\s*[\d,]+/i.test(raw)&&!card.querySelector('.chb-head'))return;const baseMatch=raw.match(/(?:Base CP|CP)\s*:?\s*([\d,]+(?:\.\d+)?)/i);const contributionMatch=raw.match(/Contribution\s*:?\s*([\d,]+(?:\.\d+)?)/i);const base=num(baseMatch?.[1])||num(profile(member).cp||profile(member).combatPower);const total=num(contributionMatch?.[1]);if(!base||!total)return;const party=[...member.closest('.party')?.querySelectorAll('.party-member')||[]].map(el=>characterByName(el.querySelector('.party-character-link')?.textContent||'' )).filter(Boolean);if(party.length!==4)return;const sources=[];for(const src of party.filter(c=>c!==member&&role(c)==='DPS'))for(const e of effects(src)){const v=base*num(e.magnitude??e.value)*weight(member,e.type);if(v>0)sources.push({source:profile(src).name||src.name,type:e.type,raw:v,group:'synergy'})}const sup=party.find(c=>role(c)==='Support');if(sup)for(const e of supportEffects(sup)){const v=base*e.value*weight(member,e.type);if(v>0)sources.push({source:profile(sup).name||sup.name,type:e.type,raw:v,group:'support'})}const synergy= Math.max(0,parseSummary(card,'Party Synergy')),support=Math.max(0,parseSummary(card,'Support Impact'));for(const group of ['synergy','support']){const rows=sources.filter(x=>x.group===group),sum=rows.reduce((a,x)=>a+x.raw,0),target=group==='synergy'?synergy:support;if(sum>0)for(const r of rows)r.value=r.raw/sum*target}const lines=sources.map(r=>`${LABELS[r.type]||r.type} from ${r.source}: ${fmt(r.value)} estimated contribution · ${(r.value/base*100).toFixed(2)}% of base power`).join('');const partyPct=base?synergy/base*100:0,supportPct=base?support/base*100:0;card.className='character-hover-breakdown chb-canonical-dps';card.innerHTML=`<div class="chb-head"><strong>${esc(profile(member).name||member.name)}</strong><span>CP ${fmt(base)} · Contribution ${fmt(total)}</span></div><div class="chb-stats"><span>Party Synergy ${pct(partyPct)}</span><span>Support Impact ${pct(supportPct)}</span></div><div class="chb-detail">Support compatibility uses general party model</div><div class="chb-detail">${lines||'<div>No direct party effects detected.</div>'}</div>`;card.dataset.generalCanonical='1'}
+function formatGeneralHovers(){if(!active())return;document.querySelectorAll('#suggestedParties .authoritative-party .party-member').forEach(member=>canonical(member.querySelector('.character-hover-breakdown'),characterByName(member.querySelector('.party-character-link')?.textContent||'')))}
+function hoverStyles(){let s=document.getElementById('general-canonical-hover-style');if(!s){s=document.createElement('style');s.id='general-canonical-hover-style';document.head.appendChild(s)}s.textContent='.chb-canonical-dps{width:430px!important;text-align:left}.chb-canonical-dps .chb-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:5px}.chb-canonical-dps .chb-stats{display:flex;gap:16px;margin:3px 0 5px}.chb-canonical-dps .chb-detail{margin-top:5px}.chb-canonical-dps .chb-synergy{display:block;margin:2px 0}'}
+function installRefresh(){const btn=document.getElementById('refreshBtn');if(!btn)return;const KEY='lostark-hideout-private-v3',sleep=ms=>new Promise(r=>setTimeout(r,ms)),isRate=e=>/429|too many requests|rate.?limit/i.test(String(e?.message||e));function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||'null');return s&&Array.isArray(s.characters)?s:null}catch{return null}}async function safeRefresh(){const state=load();if(!state||!state.characters.length||btn.dataset.refreshing==='1')return;btn.dataset.refreshing='1';btn.disabled=true;btn.textContent='Refreshing...';let ok=0,failed=0,limited=false;const errors=[];try{for(let i=0;i<state.characters.length;i++){const c=state.characters[i];if(limited)break;try{if(typeof window.fetchCharacter!=='function')throw new Error('Profile loader unavailable.');c.profile=await window.fetchCharacter(c);delete c.profileError;ok++}catch(e){const msg=String(e?.message||e);c.profileError=msg;failed++;errors.push(`${c.name}: ${msg}`);if(isRate(e))limited=true;if(!limited&&i<state.characters.length-1)await sleep(1200)}}localStorage.setItem(KEY,JSON.stringify(state));const remaining=state.characters.length-ok-failed;const status=document.getElementById('status');if(limited)status.textContent=`Refreshed ${ok}; ${failed} failed. Bible rate limit reached; ${remaining} remaining profile${remaining===1?'':'s'} not requested.`;else if(failed)status.textContent=`Refreshed ${ok}; ${failed} failed. ${errors.join(' | ')}`;else status.textContent=`Refreshed ${ok} profile${ok===1?'':'s'} from Bible.`;setTimeout(()=>location.reload(),250)}finally{btn.dataset.refreshing='';btn.disabled=false;btn.textContent='Refresh Profiles'}}btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();safeRefresh()},true)}
+function install(){window.__GENERAL_PARTY_RENDER_GUARD__=true;hoverStyles();observe();installRefresh();formatGeneralHovers();[50,150,300,600,1200,2500].forEach(ms=>setTimeout(formatGeneralHovers,ms));setInterval(formatGeneralHovers,250);document.addEventListener('change',e=>{if(e.target?.id==='generalOptimization')setTimeout(formatGeneralHovers,50)})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
