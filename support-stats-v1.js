@@ -13,12 +13,12 @@ const ALIASES={
  'horizon-cathedral-g2':['Vanguard of Fanaticism','Horizon Cathedral Gate 2'],
  'serca-g1':['Witch of Agony, Serca','Witch of Agony Serca','Serca Gate 1','Serca'],
  'serca-g2':['Corvus Tul Rak','Corvus Tul Rat','Serca Gate 2','Serca'],
- 'kazeros-g1':['Kazeros','Kazeros Gate 1'],
+ 'kazeros-g1':['Abyss Lord Kazeros','Kazeros Gate 1','Kazeros'],
  'kazeros-g2':['Death Incarnate Kazeros','Kazeros Gate 2','Kazeros'],
- 'armoche-g1':['Mistress of Desire Echidna','Covetous Master Echidna','Armoche Gate 1'],
- 'armoche-g2':['Armoche','Armoche Gate 2'],
- 'extreme-aegir-g2':['Aegir','Extreme Aegir Gate 2'],
- 'extreme-brelshaza-g2':['Brelshaza','Extreme Brelshaza Gate 2']
+ 'armoche-g1':['Brelshaza, Ember in the Ashes','Mistress of Desire Echidna','Covetous Master Echidna','Armoche Gate 1'],
+ 'armoche-g2':['Armoche, Sentinel of the Abyss','Armoche','Armoche Gate 2'],
+ 'extreme-aegir-g2':['Aegir, the Oppressor','Aegir','Extreme Aegir Gate 2'],
+ 'extreme-brelshaza-g2':['Phantom Manifester Brelshaza','Brelshaza','Extreme Brelshaza Gate 2']
 };
 function encodePayload(o){const bytes=new TextEncoder().encode(JSON.stringify(o));let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s)}
 function payloadFor(enc,bossOverride){const boss=bossOverride||enc?.boss||'';const difficulty=enc?.difficulty||'Nightmare';const patch=enc?.patch||window.LostArkWesternDataAuthority?.patch||'jun26';const maxIlvl=Number(enc?.maxIlvl||1810),minIlvl=Number(enc?.minIlvl||1740);return encodePayload([["__skrao",1],{boss:2,difficulty:3,dpsType:4,filterBy:5,includeBus:-1,includeWeird:-1,isSupport:6,maxCombatPower:-1,maxGearScore:7,minCombatPower:-1,minGearScore:8,patch:9},boss,difficulty,'ndps','ilvl',true,maxIlvl,minIlvl,patch])}
