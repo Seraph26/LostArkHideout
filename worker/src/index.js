@@ -1,4 +1,5 @@
 const BIBLE_HOST = "lostark.bible";
+const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
 const VISIT_KEY = "page_visits";
 
 function corsHeaders() {
@@ -48,8 +49,30 @@ export default {
       }
     }
 
+    if (u.pathname === "/raid-stats") {
+      const payload = u.searchParams.get("payload");
+      if (!payload) return json({ ok: false, error: "Missing raidStatsSearch payload." }, 400);
+      if (payload.length > 20000) return json({ ok: false, error: "Raid stats payload is too large." }, 400);
+      try {
+        const response = await fetch(`${BIBLE_REMOTE}?payload=${encodeURIComponent(payload)}`, {
+          headers: {
+            Accept: "application/json,text/plain,*/*",
+            "User-Agent": "Mozilla/5.0 (compatible; LostArkHideout/1.0; +https://github.com/Seraph26/LostArkHideout)",
+          },
+          cf: { cacheTtl: 300, cacheEverything: false },
+        });
+        const body = await response.text();
+        return new Response(body, {
+          status: response.status,
+          headers: { ...corsHeaders(), "Content-Type": response.headers.get("content-type") || "application/json; charset=utf-8" },
+        });
+      } catch {
+        return json({ ok: false, error: "Unable to retrieve Bible raid statistics." }, 502);
+      }
+    }
+
     if (u.pathname !== "/character") {
-      return json({ ok: false, error: "Use /character?url=https://lostark.bible/character/REGION/NAME" }, 404);
+      return json({ ok: false, error: "Use /character?url=https://lostark.bible/character/REGION/NAME or /raid-stats?payload=..." }, 404);
     }
 
     const bibleUrl = u.searchParams.get("url");
