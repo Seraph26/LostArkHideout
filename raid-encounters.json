@@ -6,12 +6,12 @@
     {"id":"horizon-cathedral-g2","label":"Horizon Cathedral — Gate 2","boss":"Arcenos, Vanguard of Fanaticism","kind":"raid","schema":"level"},
     {"id":"serca-g1","label":"Serca — Gate 1","boss":"Witch of Agony, Serca","kind":"raid","schema":"difficulty"},
     {"id":"serca-g2","label":"Serca — Gate 2","boss":"Corvus Tul Rak","kind":"raid","schema":"difficulty"},
-    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Abyss Lord Kazeros","kind":"raid","schema":"difficulty"},
-    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Death Incarnate Kazeros","kind":"raid","schema":"difficulty"}
+    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Abyss Lord Kazeros","kind":"raid","schema":"difficulty","difficulty":"Hard","patch":"mar26","minIlvl":1730,"maxIlvl":1810},
+    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Death Incarnate Kazeros","kind":"raid","schema":"difficulty","difficulty":"Hard","patch":"mar26","minIlvl":1730,"maxIlvl":1810}
   ],
   "optional": [
-    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Brelshaza, Ember in the Ashes","kind":"optional","schema":"difficulty"},
-    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche, Sentinel of the Abyss","kind":"optional","schema":"difficulty"}
+    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Covetous Master Echidna","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810},
+    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche, Sentinel of the Abyss","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810}
   ],
   "events": [
     {"id":"extreme-aegir-g2","label":"[EXTREME] Aegir — Gate 2","boss":"Aegir, the Oppressor","kind":"event","schema":"extreme","gate":2},
