@@ -1,52 +1,18 @@
-/* Lost Ark Hideout — support hover data bridge v13 */
+/* Lost Ark Hideout — support hover data bridge v14 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
-let horizonKey='',horizonLoading=false;
-function classFor(member){
- const candidates=[member.querySelector('.class-icon')?.alt,member.dataset.class,member.querySelector('[data-class]')?.dataset.class,member.querySelector('.party-class-label')?.dataset.class].map(clean).filter(Boolean);
- return candidates.find(c=>SUPPORTS.has(c))||'';
-}
+let lastKey='',loading=false;
+function classFor(member){const c=[member.querySelector('.class-icon')?.alt,member.dataset.class,member.querySelector('[data-class]')?.dataset.class,member.querySelector('.party-class-label')?.dataset.class].map(clean).filter(Boolean);return c.find(x=>SUPPORTS.has(x))||''}
 function encounterName(){try{const n=clean(window.LostArkEncounterScoring?.profile?.()?.name);if(n)return n}catch{}try{const n=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);if(n&&n!=='Select Raid')return n}catch{}try{const n=clean(window.LostArkOptimizerMode?.encounter?.label);if(n)return n}catch{}return 'Selected encounter'}
-function pct(v){const n=Number(v);return Number.isFinite(n)?`${(n*100).toFixed(2)}%`:'Unavailable'}
-function isHorizon(enc){return /^(horizon-cathedral-g[12])$/i.test(clean(enc?.id))}
-function horizonDifficulty(enc){
- const explicit=clean(enc?.difficulty);if(/^level\s*[123]$/i.test(explicit))return explicit;
- const level=clean(enc?.level||enc?.stage);if(/^level\s*[123]$/i.test(level))return level;
- const n=Number(enc?.minIlvl);if(Number.isFinite(n)){if(n>=1750)return'Level 3';if(n>=1720)return'Level 2';if(n>=1700)return'Level 1'}
- return'Level 3';
-}
-async function ensureHorizon(){
- const api=window.LostArkSupportStats,mode=window.LostArkOptimizerMode||{},enc=mode.encounter;
- if(!api||!enc||!isHorizon(enc))return;
- const difficulty=horizonDifficulty(enc),key=JSON.stringify({id:enc.id,boss:enc.boss,difficulty});
- if(key===horizonKey&&!horizonLoading&&window.__LOSTARK_SUPPORT_STATS__?.key===key)return;
- if(horizonLoading)return;
- horizonLoading=true;horizonKey=key;
- try{
-  const result=await api.fetch({...enc,difficulty});
-  if(result?.ok){window.__LOSTARK_SUPPORT_STATS__=result;window.__LOSTARK_HORIZON_SUPPORT_DIFFICULTY__=difficulty}
- }catch(e){console.warn('Horizon Cathedral support uptime data unavailable:',e)}
- finally{horizonLoading=false}
-}
-function paintSupportData(member,summary){
- const card=member.querySelector('.character-hover-breakdown');if(!card||!summary)return;
- const detail=[...card.querySelectorAll('.chb-detail')].find(el=>/observed median support uptime/i.test(clean(el.textContent)));if(!detail)return;
- detail.innerHTML=`<div><strong>Observed median support uptime</strong></div><div>${clean(encounterName())}</div><div>AP: ${pct(summary.ap)} · Brand: ${pct(summary.brand)} · H.A. Skill: ${pct(summary.ha)} · Identity: ${pct(summary.identity)}</div>`;
-}
-function render(){
- const api=window.LostArkSupportStats;if(!api)return;
- ensureHorizon();
- document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();if(role!=='support')return;const cls=classFor(member),summary=cls?api.summary?.(cls):null;if(summary)paintSupportData(member,summary)})
-}
-function start(){
- let timer;const schedule=(delay=50)=>{clearTimeout(timer);timer=setTimeout(render,delay)};
- const attach=root=>{if(!root||root.dataset.lahHoverObserver==='1')return;try{new MutationObserver(()=>schedule(50)).observe(root,{childList:true,subtree:true,characterData:true});root.dataset.lahHoverObserver='1'}catch{}};
- const bootstrap=()=>{attach(document.body);attach(document.getElementById('suggestedParties'));schedule(0)};bootstrap();
- new MutationObserver(()=>{attach(document.body);attach(document.getElementById('suggestedParties'));schedule(50)}).observe(document.documentElement,{childList:true,subtree:true});
- document.addEventListener('mouseover',e=>{if(e.target.closest?.('#suggestedParties .party-member')){schedule(10);[50,150,300,600,1000].forEach(ms=>setTimeout(render,ms))}},true);
- [0,100,250,500,1000,2000,4000,8000].forEach(ms=>setTimeout(render,ms));setInterval(render,250);
-}
+function pct(v){const n=Number(v);return Number.isFinite(n)?`${n.toFixed(2)}%`:'Unavailable'}
+function isHorizon(enc){return /^horizon-cathedral-g[12]$/i.test(clean(enc?.id))}
+function horizonDifficulty(enc){const explicit=clean(enc?.difficulty);if(/^level\s*[123]$/i.test(explicit))return explicit;const n=Number(enc?.minIlvl);if(Number.isFinite(n)){if(n>=1750)return'Level 3';if(n>=1720)return'Level 2';if(n>=1700)return'Level 1'}return'Level 3'}
+async function ensure(){const api=window.LostArkSupportStats,mode=window.LostArkOptimizerMode||{},enc=mode.encounter;if(!api||!enc)return;if(isHorizon(enc))enc={...enc,difficulty:horizonDifficulty(enc)};const key=JSON.stringify({id:enc.id,boss:enc.boss,difficulty:enc.difficulty,label:enc.label});if(key===lastKey||loading)return;loading=true;lastKey=key;try{const result=await api.fetch(enc);if(result?.ok)window.__LOSTARK_SUPPORT_STATS__=result}catch(e){console.warn('Support uptime data unavailable:',e)}finally{loading=false}}
+function ensureDetail(card){let detail=[...card.querySelectorAll('.chb-detail')].find(el=>/observed median support uptime/i.test(clean(el.textContent)));if(!detail){detail=document.createElement('div');detail.className='chb-detail';const target=card.querySelector('.chb-stats')||card;target.appendChild(detail)}return detail}
+function paint(member,summary){const card=member.querySelector('.character-hover-breakdown');if(!card||!summary)return;const detail=ensureDetail(card);const key=JSON.stringify({name:encounterName(),ap:summary.ap,brand:summary.brand,ha:summary.ha,identity:summary.identity});if(detail.dataset.supportRenderKey===key)return;detail.innerHTML=`<div><strong>Observed median support uptime</strong></div><div>${clean(encounterName())}</div><div>AP: ${pct(summary.ap)} - Brand: ${pct(summary.brand)} - H.A. Skill: ${pct(summary.ha)} - Identity: ${pct(summary.identity)}</div>`;detail.dataset.supportRenderKey=key}
+function render(){const api=window.LostArkSupportStats;if(!api)return;ensure();document.querySelectorAll('#suggestedParties .party-member').forEach(m=>{if(clean(m.querySelector('.party-role-label')?.textContent).toLowerCase()!=='support')return;const cls=classFor(m),s=cls?api.summary?.(cls):null;if(s)paint(m,s)})}
+function start(){let timer;const schedule=()=>{clearTimeout(timer);timer=setTimeout(render,50)};new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});document.addEventListener('mouseover',e=>{if(e.target.closest?.('#suggestedParties .party-member'))schedule()},true);[0,100,250,500,1000,2000,4000].forEach(ms=>setTimeout(render,ms));setInterval(render,1000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
