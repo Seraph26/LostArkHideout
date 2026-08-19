@@ -12,11 +12,9 @@ const classNorm=s=>{const n=norm(s);if(n==='bard')return'Bard';if(n==='artist')r
 function encodePayload(o){const bytes=new TextEncoder().encode(JSON.stringify(o));let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s)}
 function payloadFor(enc){const boss=enc?.boss||'';const difficulty=enc?.difficulty||'Nightmare';const patch=enc?.patch||window.LostArkWesternDataAuthority?.patch||'jun26';const maxIlvl=Number(enc?.maxIlvl||1810),minIlvl=Number(enc?.minIlvl||1740);return encodePayload([["__skrao",1],{boss:2,difficulty:3,dpsType:4,filterBy:5,includeBus:-1,includeWeird:-1,isSupport:6,maxCombatPower:-1,maxGearScore:7,minCombatPower:-1,minGearScore:8,patch:9},boss,difficulty,'ndps','ilvl',true,maxIlvl,minIlvl,patch])}
 
-// Bible's raidStatsSearch response is a compact reference array. The previous
-// decoder only hydrated index 0, but the response is not guaranteed to place
-// the useful stats object at index 0 (for example, the response can begin with
-// metadata at index 0 while the actual stats live at index 3 or elsewhere).
-// Hydrate every top-level entry and return the complete hydrated graph.
+// Bible's raidStatsSearch response is a compact reference array. Hydrate every
+// top-level entry because the useful statistics object is not guaranteed to be
+// at index 0.
 function unflatten(data){
  const values=typeof data==='string'?JSON.parse(data):data;
  if(!Array.isArray(values))return values;
@@ -69,13 +67,15 @@ async function fetchStats(enc){
  const r=await fetch(`${WORKER}?payload=${encodeURIComponent(p)}`,{cache:'no-store'});
  if(!r.ok)throw Error(`Bible raid stats HTTP ${r.status}`);
  const raw=await r.json();
- const root=unflatten(raw?.data);
+ // raidStatsSearch currently returns the compact reference array directly;
+ // older wrappers may expose it under .data. Support both forms.
+ const root=unflatten(raw?.data??raw);
  const records=collect(root);
  const stats=merge(records);
  const value={ok:true,key,stats,rawCount:records.length,updatedAt:new Date().toISOString()};
  CACHE.set(key,value);window.__LOSTARK_SUPPORT_STATS__=value;return value;
 }
-async function ensure(){const mode=window.LostArkOptimizerMode||{};if(mode.general||!mode.encounter)return null;try{return await fetchStats(mode.encounter)}catch(e){console.warn('Support uptime data unavailable:',e);return null}}
+async function ensure(){const mode=window.LostArkOptimizerMode||{};if(mode.general||!mode.encounter)return null;try{return await fetchStats(mode.encounter)}catch(e){window.__LOSTARK_SUPPORT_STATS_ERROR__=String(e?.message||e);console.warn('Support uptime data unavailable:',e);return null}}
 function get(cls,effect){const v=window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)]?.[effect];return Number.isFinite(Number(v))?Number(v)/100:null}
 function summary(cls){const s=window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)];return s||null}
 window.LostArkSupportStats={fetch:fetchStats,ensure,get,summary};
