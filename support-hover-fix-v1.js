@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover data bridge v6 */
+/* Lost Ark Hideout — support hover data bridge v7 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -8,23 +8,22 @@ function classFor(member){
   if(SUPPORTS.has(explicit))return explicit;
   return '';
 }
-function summaryFor(member){const cls=classFor(member);if(!cls)return null;try{return window.LostArkSupportStats?.summary?.(cls)||null}catch{return null}}
 function encounterName(){
-  try{
-    const name=clean(window.LostArkEncounterScoring?.profile?.()?.name);
-    if(name)return name;
-  }catch{}
-  try{
-    const selected=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);
-    if(selected&&selected!=='Select Raid')return selected;
-  }catch{}
+  try{const name=clean(window.LostArkEncounterScoring?.profile?.()?.name);if(name)return name}catch{}
+  try{const selected=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);if(selected&&selected!=='Select Raid')return selected}catch{}
   return 'Selected encounter';
 }
-function render(){
+async function render(){
+ const api=window.LostArkSupportStats;
+ if(!api)return;
+ const encounter=window.LostArkOptimizerMode?.encounter;
+ if(!encounter)return;
+ try{await api.fetch(encounter)}catch{return}
  document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
   const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
   if(role!=='support')return;
-  const summary=summaryFor(member); if(!summary)return;
+  const cls=classFor(member); if(!cls)return;
+  const summary=api.summary?.(cls); if(!summary)return;
   const details=member.querySelectorAll('.character-hover-breakdown .chb-detail');
   if(!details.length)return;
   const rows=[
@@ -37,6 +36,6 @@ function render(){
   for(let i=1;i<details.length;i++)details[i].remove();
  });
 }
-function start(){render();const root=document.getElementById('suggestedParties')||document.body;let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(render,40)}).observe(root,{childList:true,subtree:true,characterData:true});[500,1500,3000].forEach(ms=>setTimeout(render,ms));}
+function start(){render();const root=document.getElementById('suggestedParties')||document.body;let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>render(),120)}).observe(root,{childList:true,subtree:true,characterData:true});[500,1500,3000].forEach(ms=>setTimeout(render,ms));}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
