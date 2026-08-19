@@ -2,19 +2,19 @@
   "source": "lostark.bible raid filter",
   "updatedAt": null,
   "raids": [
-    {"id":"horizon-cathedral-g1","label":"Horizon Cathedral — Gate 1","boss":"Horizon Cathedral Gate 1","kind":"raid"},
-    {"id":"horizon-cathedral-g2","label":"Horizon Cathedral — Gate 2","boss":"Horizon Cathedral Gate 2","kind":"raid"},
-    {"id":"serca-g1","label":"Serca — Gate 1","boss":"Serca Gate 1","kind":"raid"},
-    {"id":"serca-g2","label":"Serca — Gate 2","boss":"Corvus Tul Rak","kind":"raid"},
-    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Kazeros Gate 1","kind":"raid"},
-    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Kazeros Gate 2","kind":"raid"}
+    {"id":"horizon-cathedral-g1","label":"Horizon Cathedral — Gate 1","boss":"Horizon Cathedral Gate 1","kind":"raid","schema":"level"},
+    {"id":"horizon-cathedral-g2","label":"Horizon Cathedral — Gate 2","boss":"Horizon Cathedral Gate 2","kind":"raid","schema":"level"},
+    {"id":"serca-g1","label":"Serca — Gate 1","boss":"Serca Gate 1","kind":"raid","schema":"difficulty"},
+    {"id":"serca-g2","label":"Serca — Gate 2","boss":"Corvus Tul Rak","kind":"raid","schema":"difficulty"},
+    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Kazeros Gate 1","kind":"raid","schema":"difficulty"},
+    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Kazeros Gate 2","kind":"raid","schema":"difficulty"}
   ],
   "optional": [
-    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Armoche Gate 1","kind":"optional"},
-    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche Gate 2","kind":"optional"}
+    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Armoche Gate 1","kind":"optional","schema":"difficulty"},
+    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche Gate 2","kind":"optional","schema":"difficulty"}
   ],
   "events": [
-    {"id":"extreme-aegir-g2","label":"[EXTREME] Aegir — Gate 2","boss":"Extreme Aegir Gate 2","kind":"event"},
-    {"id":"extreme-brelshaza-g2","label":"[EXTREME] Brelshaza — Gate 2","boss":"Extreme Brelshaza Gate 2","kind":"event"}
+    {"id":"extreme-aegir-g2","label":"[EXTREME] Aegir — Gate 2","boss":"Extreme Aegir Gate 2","kind":"event","schema":"extreme","gate":2},
+    {"id":"extreme-brelshaza-g2","label":"[EXTREME] Brelshaza — Gate 2","boss":"Extreme Brelshaza Gate 2","kind":"event","schema":"extreme","gate":2}
   ]
 }
