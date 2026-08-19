@@ -1,6 +1,5 @@
 from html.parser import HTMLParser
 from urllib.request import Request, urlopen
-from urllib.parse import quote
 from datetime import datetime, timezone
 import json
 import re
@@ -60,9 +59,40 @@ def slug(value):
     return value or "encounter"
 
 
+def normalize_text(value):
+    return re.sub(r"\s+", " ", value or "").strip()
+
+
 def is_event(group, text):
     s = f"{group} {text}".lower()
     return any(x in s for x in ("extreme", "event", "abyssal", "special"))
+
+
+def infer_difficulty(group, text):
+    s = f"{group} {text}"
+    match = re.search(r"\b(Level\s*[123])\b", s, re.I)
+    if match:
+        return re.sub(r"\s+", " ", match.group(1)).title()
+    for difficulty in ("Normal", "Hard", "Nightmare", "Extreme"):
+        if re.search(rf"\b{difficulty}\b", s, re.I):
+            return difficulty
+    return None
+
+
+def infer_gate(text):
+    match = re.search(r"\bG(?:ate\s*)?([123])\b", text, re.I)
+    return int(match.group(1)) if match else None
+
+
+def infer_schema(group, text):
+    difficulty = infer_difficulty(group, text)
+    if difficulty == "Extreme":
+        return "extreme"
+    if difficulty and difficulty.startswith("Level"):
+        return "level"
+    if difficulty in {"Normal", "Hard", "Nightmare"}:
+        return "difficulty"
+    return "unknown"
 
 
 def main():
@@ -82,17 +112,21 @@ def main():
     raids, events = [], []
     seen = set()
     for o in enabled:
-        text = re.sub(r"\\s+", " ", o["text"]).strip()
+        text = normalize_text(o["text"])
         key = (o["group"], text)
         if key in seen:
             continue
         seen.add(key)
+        difficulty = infer_difficulty(o["group"], text)
         item = {
             "id": slug(f"{o['group']}-{text}"),
             "label": text,
             "boss": o["value"],
             "kind": "event" if is_event(o["group"], text) else "raid",
             "sourceGroup": o["group"],
+            "schema": infer_schema(o["group"], text),
+            "difficulty": difficulty,
+            "gate": infer_gate(text),
         }
         (events if item["kind"] == "event" else raids).append(item)
 
