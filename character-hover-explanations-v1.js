@@ -1,14 +1,15 @@
-/* Lost Ark Hideout — character hover explanations v5 */
+/* Lost Ark Hideout — character hover explanations v8 */
 (()=>{'use strict';
 const LABELS={crit:'Critical Rate',critDamage:'Critical Damage',attackSpeed:'Attack Speed',attackPower:'Attack Power',supportAmplification:'Support Amplification',mana:'Mana',identity:'Identity',damage:'Damage'};
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const label=k=>LABELS[k]||k;
 const numberFrom=s=>{const m=String(s??'').replace(/,/g,'').match(/[-+]?\d+(?:\.\d+)?/);return m?Number(m[0]):null};
-function humanizeEffects(text){let out=String(text??'');for(const[k,v]of Object.entries(LABELS))out=out.replace(new RegExp(`\\b${k}\\b`,'g'),v);return out.replace(/\bobserved median\b/gi,'observed median uptime')}
+function normalizeUptime(text){return String(text??'').replace(/\bobserved\s+median(?:\s+uptime)+/gi,'observed median');}
+function humanizeEffects(text){let out=normalizeUptime(text);for(const[k,v]of Object.entries(LABELS))out=out.replace(new RegExp(`\\b${k}\\b`,'g'),v);return out.replace(/\bobserved\s+median\b/gi,'observed median uptime')}
 function formatEffectRow(row){
- const raw=clean(row.textContent);if(!raw||/^No direct party effects detected\.?$/i.test(raw))return;
- const m=raw.match(/^(.+?)\s+from\s+(.+?):\s*([+-]?[\d,]+(?:\.\d+)?)(?:\s*[·-]\s*observed median(?: uptime)?\s*([\d.]+)%?)?$/i);
- if(!m){const h=humanizeEffects(raw);if(h!==raw)row.textContent=h;return}
+ const raw=clean(normalizeUptime(row.textContent));if(!raw||/^No direct party effects detected\.?$/i.test(raw))return;
+ const m=raw.match(/^(.+?)\s+from\s+(.+?):\s*([+-]?[\d,]+(?:\.\d+)?)(?:\s*[·-]\s*observed median(?:\s+uptime)?\s*([\d.]+)%?)?$/i);
+ if(!m){const h=humanizeEffects(raw);if(h!==clean(row.textContent))row.textContent=h;return}
  const effect=label(clean(m[1])),source=clean(m[2]),value=numberFrom(m[3]);if(!Number.isFinite(value))return;
  const head=row.closest('.character-hover-breakdown')?.querySelector('.chb-head span');
  const base=numberFrom(head?.textContent?.match(/CP\s+([\d,]+(?:\.\d+)?)/i)?.[1]);
