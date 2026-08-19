@@ -1,29 +1,13 @@
-/* Lost Ark Hideout — General Optimization hover authority v2 */
+/* Lost Ark Hideout — General Optimization hover authority retired */
 (()=>{
 'use strict';
-const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
-const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
-const num=v=>{const n=Number(String(v??'').replace(/,/g,''));return Number.isFinite(n)?n:0};
-const fmt=v=>Math.round(num(v)).toLocaleString();
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LABELS={damage:'Damage',mana:'Mana',crit:'Critical Rate',critDamage:'Critical Damage',attackSpeed:'Attack Speed',attackPower:'Attack Power',supportAmplification:'Support Amplification',positional:'Positional Damage'};
-function general(){return document.getElementById('generalOptimization')?.checked!==false&&window.LostArkOptimizerMode?.general!==false}
-function store(){try{return JSON.parse(localStorage.getItem('lostark-hideout-private-v3')||'null')||{characters:[]}}catch{return{characters:[]}}}
-function roster(){return(store().characters||[]).filter(c=>c&&c.id)}
-function profile(c){return c.profile||c.data||{}}
-function build(c){try{return window.LostArkBuildProfilesV3?.get(c.url)||window.LostArkBuildProfilesV2?.get(c.url)||{}}catch{return{}}}
-function text(c){const p=profile(c),b=build(c);return clean([p.rawText,p.text,p.characterText,p.arkGridText,p.arkPassiveText,p.engravingsText,p.gemsText,p.tripodsText,b.text,b.className,b.engravings?.join(' '),b.grid?.map(x=>x.name+' '+x.points).join(' '),b.arkPassive?.map(x=>x.name+' '+x.level).join(' ')].filter(Boolean).join(' ')).toLowerCase()}
-function cls(c){const p=profile(c),b=build(c),v=clean(p.class||p.className||p.characterClass||b.className);if(v&&v.toLowerCase()!=='unknown')return({'Soul Eater':'Souleater','Arcana':'Arcanist','Glavier':'Glaivier'}[v]||v);const t=text(c),m=[['Summoner',/\bsummoner\b|master summoner|ancient spear/],['Souleater',/souleater|soul eater|full moon harvester|night.?s edge/],['Arcanist',/arcanist|arcana|empress grace|emperor.?s decree/],['Glaivier',/glaivier|glavier|pinnacle|control/],['Bard',/\bbard\b|desperate salvation|true courage/],['Artist',/\bartist\b|full bloom|recurrence/],['Paladin',/\bpaladin\b|blessed aura/],['Valkyrie',/\bvalkyrie\b/]];for(const[n,r]of m)if(r.test(t))return n;return'Unknown'}
-function role(c){const p=profile(c);return p.role==='Support'||SUPPORTS.has(cls(c))?'Support':'DPS'}
-function name(c){return clean(profile(c).name||c.name)||'Unknown'}
-function partyFor(member){const party=member.closest('.party');if(!party)return[];return[...party.querySelectorAll('.party-member')].map(el=>{const n=clean(el.querySelector('.party-character-link')?.textContent);return roster().find(c=>name(c).toLowerCase()===n.toLowerCase())}).filter(Boolean)}
-function aggregate(card,label){const m=clean(card.textContent).match(new RegExp(label+'\\s*:?\\s*([+-]?[\\d,]+(?:\\.\\d+)?)','i'));return m?num(m[1]):0}
-function render(member){if(!general())return;const card=member.querySelector('.character-hover-breakdown');if(!card)return;const party=partyFor(member),target=roster().find(c=>name(c).toLowerCase()===clean(member.querySelector('.party-character-link')?.textContent).toLowerCase());if(!target||role(target)!=='DPS'||party.length!==4)return;const base=aggregate(card,'CP')||aggregate(card,'Base CP')||num(profile(target).cp??profile(target).combatPower);const total=aggregate(card,'Contribution')||base;const synergy=aggregate(card,'Party Synergy');const support=aggregate(card,'Support Impact');const rawRows=[];const authority=window.LostArkPartySynergyAuthorityV1;for(const src of party.filter(c=>c!==target&&role(c)==='DPS')){let effects=[];try{const x=authority?.provided?.(cls(src),build(src),text(src));if(Array.isArray(x))effects=x}catch{}for(const e of effects){const v=base*num(e.magnitude??e.value);if(v>0)rawRows.push({source:name(src),type:e.type,value:v,group:'synergy'})}}const sup=party.find(c=>role(c)==='Support');if(sup){let effects=[];try{effects=SUPPORTS.has(cls(sup))?([{type:'supportAmplification',value:.10}]):[]}catch{}for(const e of effects){const v=base*e.value;if(v>0)rawRows.push({source:name(sup),type:e.type,value:v,group:'support'})}}
-for(const group of ['synergy','support']){const rows=rawRows.filter(x=>x.group===group),sum=rows.reduce((a,x)=>a+x.value,0),targetValue=group==='synergy'?synergy:support;if(sum>0)rows.forEach(r=>r.value=r.value/sum*targetValue)}
-const rows=rawRows.filter(x=>x.value>0).map(r=>`<div class="chb-synergy"><div>${esc(LABELS[r.type]||r.type)} from ${esc(r.source)}: ${r.value>=0?'+':''}${fmt(r.value)} estimated contribution</div><div>${(r.value/base*100).toFixed(2)}% of base power</div></div>`).join('');
-card.className='character-hover-breakdown chb-general-canonical';card.innerHTML=`<div class="chb-head"><strong>${esc(name(target))}</strong><span>CP ${fmt(base)} - Contribution ${fmt(total)}</span></div><div class="chb-stats"><span>Party Synergy ${synergy>=0?'+':''}${base?(synergy/base*100).toFixed(2):'0.00'}%</span><span>Support Impact ${support>=0?'+':''}${base?(support/base*100).toFixed(2):'0.00'}%</span></div><div class="chb-detail">Support compatibility uses encounter data</div><div class="chb-detail">${rows||'<div>No direct party effects detected.</div>'}</div>`;card.dataset.generalHoverAuthority='2'}
-function renderAll(){if(!general())return;document.querySelectorAll('#suggestedParties .party-member').forEach(render)}
-function css(){let s=document.getElementById('general-hover-authority-style');if(!s){s=document.createElement('style');s.id='general-hover-authority-style';document.head.appendChild(s)}s.textContent='.chb-general-canonical{width:430px!important;text-align:left}.chb-general-canonical .chb-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:5px}.chb-general-canonical .chb-stats{display:flex;gap:16px;margin:3px 0 5px}.chb-general-canonical .chb-detail{margin-top:5px}.chb-general-canonical .chb-synergy{display:block;margin:5px 0}.chb-general-canonical .chb-synergy>div:last-child{opacity:.9}'}
-function start(){css();renderAll();const root=document.getElementById('suggestedParties')||document.body;let t;const schedule=()=>{clearTimeout(t);t=setTimeout(renderAll,20)};new MutationObserver(schedule).observe(root,{childList:true,subtree:true,characterData:true});[0,50,100,200,400,800,1500,3000].forEach(ms=>setTimeout(renderAll,ms));setInterval(renderAll,50);document.addEventListener('change',e=>{if(e.target?.id==='generalOptimization'||e.target?.id==='raidSpecificSelect')schedule()},true)}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+/*
+ * General Optimization hover rendering is owned exclusively by
+ * general-render-guard-v1.js.
+ *
+ * This file is intentionally a no-op. A previous version of this script
+ * rendered a second hover after the General optimizer rendered its card and
+ * could overwrite the optimizer's real Party Synergy / Support Impact values
+ * with zeros. Raid Specific rendering is not handled here.
+ */
 })();
