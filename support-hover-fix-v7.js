@@ -1,0 +1,36 @@
+/* Lost Ark Hideout — support hover data bridge v7 */
+(()=>{
+'use strict';
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
+function classFor(member){
+ const explicit=clean(member.querySelector('.class-icon')?.alt||member.dataset.class||member.querySelector('[data-class]')?.dataset.class||'');
+ return SUPPORTS.has(explicit)?explicit:'';
+}
+function summaryFor(member){const cls=classFor(member);if(!cls)return null;try{return window.LostArkSupportStats?.summary?.(cls)||null}catch{return null}}
+function encounterName(){
+ try{const selected=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);if(selected&&selected!=='Select Raid')return selected}catch{}
+ try{const name=clean(window.LostArkEncounterScoring?.profile?.()?.name);if(name)return name}catch{}
+ return 'Selected encounter';
+}
+function render(){
+ document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
+  const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
+  if(role!=='support')return;
+  const summary=summaryFor(member);if(!summary)return;
+  const details=member.querySelectorAll('.character-hover-breakdown .chb-detail');if(!details.length)return;
+  const rows=[`Attack Power: ${summary.ap!=null?(summary.ap*100).toFixed(2)+'%':'Unavailable'}`,`Brand: ${summary.brand!=null?(summary.brand*100).toFixed(2)+'%':'Unavailable'}`,`H.A. Skill: ${summary.ha!=null?(summary.ha*100).toFixed(2)+'%':'Unavailable'}`,`Identity: ${summary.identity!=null?(summary.identity*100).toFixed(2)+'%':'Unavailable'}`];
+  details[0].innerHTML=`<div>${clean(encounterName())}</div><div>${rows.join(' · ')}</div>`;
+  for(let i=1;i<details.length;i++)details[i].remove();
+ });
+}
+function start(){
+ const run=()=>render();
+ run();
+ const root=document.getElementById('suggestedParties')||document.body;let timer;
+ new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(run,60)}).observe(root,{childList:true,subtree:true,characterData:true});
+ [250,750,1500,3000,5000].forEach(ms=>setTimeout(run,ms));
+ try{window.LostArkSupportStats?.ready?.then(run).catch(()=>{})}catch{}
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
