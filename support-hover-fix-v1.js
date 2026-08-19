@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover data bridge v5 */
+/* Lost Ark Hideout — support hover data bridge v6 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -9,6 +9,17 @@ function classFor(member){
   return '';
 }
 function summaryFor(member){const cls=classFor(member);if(!cls)return null;try{return window.LostArkSupportStats?.summary?.(cls)||null}catch{return null}}
+function encounterName(){
+  try{
+    const name=clean(window.LostArkEncounterScoring?.profile?.()?.name);
+    if(name)return name;
+  }catch{}
+  try{
+    const selected=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);
+    if(selected&&selected!=='Select Raid')return selected;
+  }catch{}
+  return 'Selected encounter';
+}
 function render(){
  document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
   const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
@@ -22,7 +33,7 @@ function render(){
    `H.A. Skill: ${summary.ha!=null?(summary.ha*100).toFixed(2)+'%':'Unavailable'}`,
    `Identity: ${summary.identity!=null?(summary.identity*100).toFixed(2)+'%':'Unavailable'}`
   ];
-  details[0].innerHTML=`<div><strong>Observed median support uptime</strong></div><div>Selected encounter</div><div>${rows.join(' · ')}</div>`;
+  details[0].innerHTML=`<div>${clean(encounterName())}</div><div>${rows.join(' · ')}</div>`;
   for(let i=1;i<details.length;i++)details[i].remove();
  });
 }
