@@ -1,9 +1,17 @@
-/* Lost Ark Hideout — support hover data bridge v1 */
+/* Lost Ark Hideout — support hover data bridge v2 */
 (()=>{
 'use strict';
-function clean(s){return String(s??'').replace(/\s+/g,' ').trim()}
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
+function classFor(member){
+  const explicit=clean(member.dataset.class||member.querySelector('[data-class]')?.dataset.class||'');
+  if(SUPPORTS.has(explicit))return explicit;
+  const text=clean(member.querySelector('small')?.textContent||'');
+  for(const cls of SUPPORTS)if(new RegExp(`\\b${cls}\\b`,'i').test(text))return cls;
+  return '';
+}
 function summaryFor(member){
-  const cls=clean(member.querySelector('.party-class-label')?.textContent);
+  const cls=classFor(member);
   if(!cls)return null;
   try{return window.LostArkSupportStats?.summary?.(cls)||null}catch{return null}
 }
