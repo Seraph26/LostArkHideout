@@ -42,7 +42,7 @@ function unflatten(data){
  for(let i=0;i<values.length;i++)get(i);
  return hydrated;
 }
-function categoryFrom(value,key){const k=norm(key),v=norm(value);for(const [cat,re]of Object.entries(CAT))if(re.test(k)||re.test(v))return cat;return''}
+function categoryFrom(value,key){const k=norm(key),v=norm(value);for(const [cat,re]of Object.entries(CAT))if(re.test(k)||re.test(v))return cat;if(/supportap$/.test(v))return'ap';if(/supportha$/.test(v))return'ha';return''}
 function collect(root){
  const out=[];const seen=new WeakSet();
  function walk(v,ctx=''){
@@ -51,9 +51,10 @@ function collect(root){
   if(Array.isArray(v)){for(const x of v)walk(x,ctx);return}
   const cls=classNorm(v.class||v.className||v.supportClass||v.supportClassName||v.roleClass||v.name);
   const med=Number(v.median??v.med??v.value);
-  if(cls&&Number.isFinite(med))out.push({class:cls,median:med,category:ctx||''});
+  const ownCategory=categoryFrom(v.stat,'stat')||categoryFrom(v.spec,'spec')||ctx;
+  if(cls&&Number.isFinite(med))out.push({class:cls,median:med,category:ownCategory||''});
   for(const[k,x]of Object.entries(v)){
-   const next=categoryFrom('',k)||categoryFrom(x&&typeof x==='string'?x:'',k)||ctx;
+   const next=categoryFrom('',k)||categoryFrom(x&&typeof x==='string'?x:'',k)||ownCategory;
    walk(x,next);
   }
  }
