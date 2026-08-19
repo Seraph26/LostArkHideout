@@ -1,5 +1,20 @@
-/* Lost Ark Hideout — unified hover renderer loader */
-(()=>{'use strict';
-const load=()=>{if(window.__LOSTARK_HOVER_FIX_V20__)return;window.__LOSTARK_HOVER_FIX_V20__=true;const s=document.createElement('script');s.src='hover-fix-v20.js?v=20260819hover20';s.async=false;document.head.appendChild(s)};
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});else load();
+/* Lost Ark Hideout — support hover data bridge v18 */
+(()=>{
+'use strict';
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
+let lastKey='',loading=false;
+function isGeneralMode(){return document.getElementById('generalOptimization')?.checked!==false&&window.LostArkOptimizerMode?.general!==false}
+function classFor(member){const c=[member.querySelector('.class-icon')?.alt,member.dataset.class,member.querySelector('[data-class]')?.dataset.class,member.querySelector('.party-class-label')?.dataset.class].map(clean).filter(Boolean);return c.find(x=>SUPPORTS.has(x))||''}
+function encounterName(){try{const n=clean(window.LostArkEncounterScoring?.profile?.()?.name);if(n)return n}catch{}try{const n=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);if(n&&n!=='Select Raid')return n}catch{}try{const n=clean(window.LostArkOptimizerMode?.encounter?.label);if(n)return n}catch{}return 'Selected encounter'}
+function pct(v){let n=Number(v);if(!Number.isFinite(n))return'Unavailable';if(n>=0&&n<=1)n*=100;return`${n.toFixed(2)}%`}
+function isHorizon(enc){return /^horizon-cathedral-g[12]$/i.test(clean(enc?.id))}
+function horizonDifficulty(enc){const explicit=clean(enc?.difficulty);if(/^level\s*[123]$/i.test(explicit))return explicit;const n=Number(enc?.minIlvl);if(Number.isFinite(n)){if(n>=1750)return'Level 3';if(n>=1720)return'Level 2';if(n>=1700)return'Level 1'}return'Level 3'}
+async function ensure(){const api=window.LostArkSupportStats,mode=window.LostArkOptimizerMode||{};let enc=mode.encounter;if(!api||!enc||isGeneralMode())return;if(isHorizon(enc))enc={...enc,difficulty:horizonDifficulty(enc)};const key=JSON.stringify({id:enc.id,boss:enc.boss,difficulty:enc.difficulty,label:enc.label});if(key===lastKey&&window.__LOSTARK_SUPPORT_STATS__?.ok)return;if(loading)return;loading=true;try{const result=await api.fetch(enc);if(result?.ok){window.__LOSTARK_SUPPORT_STATS__=result;lastKey=key}else{lastKey=''}}catch(e){lastKey='';console.warn('Support uptime data unavailable:',e)}finally{loading=false}}
+function ensureDetail(card){let detail=[...card.querySelectorAll('.chb-detail')].find(el=>/observed median support uptime/i.test(clean(el.textContent)));if(!detail){detail=document.createElement('div');detail.className='chb-detail';const target=card.querySelector('.chb-stats')||card;target.appendChild(detail)}return detail}
+function paint(member,summary){const card=member.querySelector('.character-hover-breakdown');if(!card||!summary)return;const detail=ensureDetail(card);const key=JSON.stringify({name:encounterName(),ap:summary.ap,brand:summary.brand,ha:summary.ha,identity:summary.identity});if(detail.dataset.supportRenderKey===key)return;detail.innerHTML=`<div><strong>Observed median support uptime</strong></div><div>${clean(encounterName())}</div><div>AP: ${pct(summary.ap)} - Brand: ${pct(summary.brand)} - H.A. Skill: ${pct(summary.ha)} - Identity: ${pct(summary.identity)}</div>`;detail.dataset.supportRenderKey=key}
+function clearGeneralEncounterDetail(card){if(!isGeneralMode()||!card)return;card.querySelectorAll('.chb-detail').forEach(detail=>{if(/observed median support uptime|selected encounter|\bAP:\s*|\bBrand:\s*|\bH\.A\. Skill:\s*|\bIdentity:\s*/i.test(clean(detail.textContent)))detail.remove()})}
+function render(){const api=window.LostArkSupportStats;if(!api)return;const general=isGeneralMode();if(!general)ensure();document.querySelectorAll('#suggestedParties .party-member').forEach(m=>{const card=m.querySelector('.character-hover-breakdown');if(general){clearGeneralEncounterDetail(card);return}if(clean(m.querySelector('.party-role-label')?.textContent).toLowerCase()!=='support')return;const cls=classFor(m),s=cls?api.summary?.(cls):null;if(s)paint(m,s)})}
+function start(){let timer;const schedule=()=>{clearTimeout(timer);timer=setTimeout(render,50)};new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});document.addEventListener('mouseover',e=>{if(e.target.closest?.('#suggestedParties .party-member'))schedule()},true);[0,100,250,500,1000,2000,4000].forEach(ms=>setTimeout(render,ms));setInterval(render,1000)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
