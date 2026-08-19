@@ -1,0 +1,12 @@
+/* Lost Ark Hideout — support hover data bridge v8 */
+(()=>{
+'use strict';
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
+function classFor(member){const explicit=clean(member.querySelector('.class-icon')?.alt||member.dataset.class||member.querySelector('[data-class]')?.dataset.class||'');return SUPPORTS.has(explicit)?explicit:''}
+function encounterName(){try{const selected=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);if(selected&&selected!=='Select Raid')return selected}catch{};try{const name=clean(window.LostArkEncounterScoring?.profile?.()?.name);if(name)return name}catch{};return 'Selected encounter'}
+function render(){document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();if(role!=='support')return;const cls=classFor(member);if(!cls)return;const summary=(()=>{try{return window.LostArkSupportStats?.summary?.(cls)||null}catch{return null}})();if(!summary)return;const details=member.querySelectorAll('.character-hover-breakdown .chb-detail');if(!details.length)return;const rows=[`Attack Power: ${summary.ap!=null?(summary.ap*100).toFixed(2)+'%':'Unavailable'}`,`Brand: ${summary.brand!=null?(summary.brand*100).toFixed(2)+'%':'Unavailable'}`,`H.A. Skill: ${summary.ha!=null?(summary.ha*100).toFixed(2)+'%':'Unavailable'}`,`Identity: ${summary.identity!=null?(summary.identity*100).toFixed(2)+'%':'Unavailable'}`];details[0].innerHTML=`<div>${clean(encounterName())}</div><div>${rows.join(' · ')}</div>`;for(let i=1;i<details.length;i++)details[i].remove()})}
+async function refresh(){try{if(window.LostArkSupportStats?.ensure)await window.LostArkSupportStats.ensure()}catch{};render()}
+function start(){refresh();const root=document.getElementById('suggestedParties')||document.body;let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(refresh,100)}).observe(root,{childList:true,subtree:true,characterData:true});[250,750,1500,3000,5000,8000].forEach(ms=>setTimeout(refresh,ms));try{window.LostArkSupportStats?.ready?.then(refresh).catch(()=>{})}catch{};document.getElementById('optimizeBtn')?.addEventListener('click',()=>setTimeout(refresh,250));document.getElementById('raidSpecificSelect')?.addEventListener('change',()=>setTimeout(refresh,250))}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
