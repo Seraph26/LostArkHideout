@@ -20,24 +20,33 @@ const ALIASES={
  'extreme-aegir-g2':['Aegir, the Oppressor','Aegir - Gate 2','Aegir','Extreme Aegir Gate 2'],
  'extreme-brelshaza-g2':['Phantom Manifester Brelshaza','Brelshaza - Gate 2','Brelshaza','Extreme Brelshaza Gate 2']
 };
-/* The selector manifest does not currently encode difficulty. Prefer the
-   encounter's explicit difficulty when one is supplied; otherwise use the
-   known difficulty set for that encounter family instead of assuming
-   Nightmare for every raid. */
+/* Bible uses several encounter schemas. Never assume that an unspecified
+   encounter is Nightmare. Prefer an explicit difficulty/level from the
+   manifest; otherwise probe the known Bible difficulty vocabulary and only
+   accept a candidate when the response actually contains support statistics.
+   This keeps Normal/Hard/Nightmare, Level 1/2/3, and Extreme independent. */
+const DIFFICULTY_VOCABULARY=['Level 1','Level 2','Level 3','Normal','Hard','Nightmare','Extreme'];
 const DIFFICULTIES={
- 'horizon-cathedral-g1':['Hard','Normal'],
- 'horizon-cathedral-g2':['Hard','Normal'],
- 'serca-g1':['Nightmare','Hard','Normal'],
- 'serca-g2':['Nightmare','Hard','Normal'],
- 'kazeros-g1':['Hard','Normal'],
- 'kazeros-g2':['Hard','Normal'],
- 'armoche-g1':['Hard','Normal'],
- 'armoche-g2':['Hard','Normal'],
- 'extreme-aegir-g2':['Nightmare','Hard','Normal'],
- 'extreme-brelshaza-g2':['Nightmare','Hard','Normal']
+ 'horizon-cathedral-g1':['Level 3','Level 2','Level 1'],
+ 'horizon-cathedral-g2':['Level 3','Level 2','Level 1']
 };
+function difficultyCandidates(enc){
+ const explicit=String(enc?.difficulty||'').trim();
+ if(explicit)return[explicit];
+ const label=String(enc?.label||'');
+ const level=label.match(/\bLevel\s*([123])\b/i);
+ if(level)return[`Level ${level[1]}`];
+ const family=DIFFICULTIES[enc?.id];
+ if(family)return family;
+ const sourceGroup=String(enc?.sourceGroup||'');
+ const combined=`${sourceGroup} ${label}`.toLowerCase();
+ const out=[];
+ if(/extreme/.test(combined))out.push('Extreme');
+ for(const d of DIFFICULTY_VOCABULARY){if(!out.includes(d)&&new RegExp(`\\b${d.replace(' ','\\s+')}\\b`,'i').test(combined))out.push(d)}
+ for(const d of DIFFICULTY_VOCABULARY)if(!out.includes(d))out.push(d);
+ return out;
+}
 function encodePayload(o){const bytes=new TextEncoder().encode(JSON.stringify(o));let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s)}
-function difficultyCandidates(enc){const explicit=String(enc?.difficulty||'').trim();if(explicit)return[explicit];return DIFFICULTIES[enc?.id]||['Hard','Normal','Nightmare']}
 function payloadFor(enc,bossOverride,difficultyOverride){const boss=bossOverride||enc?.boss||'';const difficulty=difficultyOverride||enc?.difficulty||'Nightmare';const patch=enc?.patch||window.LostArkWesternDataAuthority?.patch||'jun26';const maxIlvl=Number(enc?.maxIlvl||1810),minIlvl=Number(enc?.minIlvl||1740);return encodePayload([["__skrao",1],{boss:2,difficulty:3,dpsType:4,filterBy:5,includeBus:-1,includeWeird:-1,isSupport:6,maxCombatPower:-1,maxGearScore:7,minCombatPower:-1,minGearScore:8,patch:9},boss,difficulty,'ndps','ilvl',true,maxIlvl,minIlvl,patch])}
 function unflatten(data){const values=typeof data==='string'?JSON.parse(data):data;if(!Array.isArray(values))return values;const hydrated=new Array(values.length),seen=new Set();function get(i){if(i===-1)return undefined;if(!Number.isInteger(i)||i<0||i>=values.length)return i;if(hydrated[i]!==undefined)return hydrated[i];if(seen.has(i))return hydrated[i];seen.add(i);const v=values[i];if(v===null||typeof v==='string'||typeof v==='boolean'||typeof v==='number')return hydrated[i]=v;if(Array.isArray(v)){const a=[];hydrated[i]=a;for(const x of v)a.push(Number.isInteger(x)&&x>=0&&x<values.length?get(x):x);return a}if(v&&typeof v==='object'){const o={};hydrated[i]=o;for(const[k,x]of Object.entries(v))o[k]=(Number.isInteger(x)&&x>=0&&x<values.length)?get(x):x;return o}return hydrated[i]=v}for(let i=0;i<values.length;i++)get(i);return hydrated}
 function categoryFrom(value,key){const k=norm(key),v=norm(value);for(const [cat,re]of Object.entries(CAT))if(re.test(k)||re.test(v))return cat;if(/supportap$/.test(v))return'ap';if(/supportha$/.test(v))return'ha';return''}
@@ -47,9 +56,9 @@ function hasSupportData(stats){return SUPPORTS.some(s=>Object.values(stats[s]||{
 function responseRoots(raw){const roots=[];const add=v=>{if(v!==undefined&&v!==null)roots.push(v)};const data=raw?.data;if(Array.isArray(data)){if(Array.isArray(data[0]))add(data[0]);if(typeof data[0]==='string')add(data[0]);add(data)}else if(data!==undefined)add(data);if(raw?.result!==undefined)add(raw.result);add(raw);return roots}
 function decodeRecords(raw){const all=[];const seenRoots=new Set();for(const candidate of responseRoots(raw)){let signature='';try{signature=JSON.stringify(candidate)}catch{}if(signature&&seenRoots.has(signature))continue;if(signature)seenRoots.add(signature);try{all.push(...collect(unflatten(candidate)))}catch{}}return all}
 async function fetchCandidate(enc,boss,difficulty){const p=payloadFor(enc,boss,difficulty);const r=await fetch(`${WORKER}?payload=${encodeURIComponent(p)}`,{cache:'no-store'});if(!r.ok)throw Error(`Bible raid stats HTTP ${r.status}`);const raw=await r.json();const records=decodeRecords(raw);const stats=merge(records);return {stats,rawCount:records.length,boss,difficulty};}
-async function fetchStats(enc){if(!enc)return null;const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});if(CACHE.has(key)){window.__LOSTARK_SUPPORT_STATS__=CACHE.get(key);return CACHE.get(key)}const candidates=[...(ALIASES[enc.id]||[]),enc.boss].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);const difficulties=difficultyCandidates(enc);let lastError=null;for(const difficulty of difficulties){for(const boss of candidates){try{const result=await fetchCandidate(enc,boss,difficulty);if(hasSupportData(result.stats)){const value={ok:true,key,stats:result.stats,rawCount:result.rawCount,resolvedBoss:boss,resolvedDifficulty:difficulty,updatedAt:new Date().toISOString()};CACHE.set(key,value);window.__LOSTARK_SUPPORT_STATS__=value;return value}}catch(e){lastError=e}}}if(lastError)throw lastError;const empty={ok:false,key,stats:merge([]),rawCount:0,resolvedBoss:null,resolvedDifficulty:null,updatedAt:new Date().toISOString()};CACHE.set(key,empty);window.__LOSTARK_SUPPORT_STATS__=empty;return empty}
+async function fetchStats(enc){if(!enc)return null;const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,label:enc?.label,sourceGroup:enc?.sourceGroup,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});if(CACHE.has(key)){window.__LOSTARK_SUPPORT_STATS__=CACHE.get(key);return CACHE.get(key)}const candidates=[...(ALIASES[enc.id]||[]),enc.boss].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);const difficulties=difficultyCandidates(enc);let lastError=null;for(const difficulty of difficulties){for(const boss of candidates){try{const result=await fetchCandidate(enc,boss,difficulty);if(hasSupportData(result.stats)){const value={ok:true,key,stats:result.stats,rawCount:result.rawCount,resolvedBoss:boss,resolvedDifficulty:difficulty,updatedAt:new Date().toISOString()};CACHE.set(key,value);window.__LOSTARK_SUPPORT_STATS__=value;return value}}catch(e){lastError=e}}}if(lastError)throw lastError;const empty={ok:false,key,stats:merge([]),rawCount:0,resolvedBoss:null,resolvedDifficulty:null,updatedAt:new Date().toISOString()};CACHE.set(key,empty);window.__LOSTARK_SUPPORT_STATS__=empty;return empty}
 let lastModeKey='';let loading=false;
-async function ensure(){const mode=window.LostArkOptimizerMode||{};if(mode.general||!mode.encounter)return null;const enc=mode.encounter;const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});if(key===lastModeKey&&window.__LOSTARK_SUPPORT_STATS__?.key===key)return window.__LOSTARK_SUPPORT_STATS__;if(loading)return null;loading=true;try{lastModeKey=key;return await fetchStats(enc)}catch(e){lastModeKey='';window.__LOSTARK_SUPPORT_STATS_ERROR__=String(e?.message||e);console.warn('Support uptime data unavailable:',e);return null}finally{loading=false}}
+async function ensure(){const mode=window.LostArkOptimizerMode||{};if(mode.general||!mode.encounter)return null;const enc=mode.encounter;const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,label:enc?.label,sourceGroup:enc?.sourceGroup,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});if(key===lastModeKey&&window.__LOSTARK_SUPPORT_STATS__?.key===key)return window.__LOSTARK_SUPPORT_STATS__;if(loading)return null;loading=true;try{lastModeKey=key;return await fetchStats(enc)}catch(e){lastModeKey='';window.__LOSTARK_SUPPORT_STATS_ERROR__=String(e?.message||e);console.warn('Support uptime data unavailable:',e);return null}finally{loading=false}}
 function get(cls,effect){const v=window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)]?.[effect];return Number.isFinite(Number(v))?Number(v):null}
 function summary(cls){const s=window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)];return s||null}
 window.LostArkSupportStats={fetch:fetchStats,ensure,get,summary};
