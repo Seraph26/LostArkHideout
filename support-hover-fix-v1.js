@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover data bridge v14 */
+/* Lost Ark Hideout — support hover data bridge v15 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -6,7 +6,7 @@ const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
 let lastKey='',loading=false;
 function classFor(member){const c=[member.querySelector('.class-icon')?.alt,member.dataset.class,member.querySelector('[data-class]')?.dataset.class,member.querySelector('.party-class-label')?.dataset.class].map(clean).filter(Boolean);return c.find(x=>SUPPORTS.has(x))||''}
 function encounterName(){try{const n=clean(window.LostArkEncounterScoring?.profile?.()?.name);if(n)return n}catch{}try{const n=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);if(n&&n!=='Select Raid')return n}catch{}try{const n=clean(window.LostArkOptimizerMode?.encounter?.label);if(n)return n}catch{}return 'Selected encounter'}
-function pct(v){const n=Number(v);return Number.isFinite(n)?`${n.toFixed(2)}%`:'Unavailable'}
+function pct(v){let n=Number(v);if(!Number.isFinite(n))return'Unavailable';if(n>=0&&n<=1)n*=100;return`${n.toFixed(2)}%`}
 function isHorizon(enc){return /^horizon-cathedral-g[12]$/i.test(clean(enc?.id))}
 function horizonDifficulty(enc){const explicit=clean(enc?.difficulty);if(/^level\s*[123]$/i.test(explicit))return explicit;const n=Number(enc?.minIlvl);if(Number.isFinite(n)){if(n>=1750)return'Level 3';if(n>=1720)return'Level 2';if(n>=1700)return'Level 1'}return'Level 3'}
 async function ensure(){const api=window.LostArkSupportStats,mode=window.LostArkOptimizerMode||{},enc=mode.encounter;if(!api||!enc)return;if(isHorizon(enc))enc={...enc,difficulty:horizonDifficulty(enc)};const key=JSON.stringify({id:enc.id,boss:enc.boss,difficulty:enc.difficulty,label:enc.label});if(key===lastKey||loading)return;loading=true;lastKey=key;try{const result=await api.fetch(enc);if(result?.ok)window.__LOSTARK_SUPPORT_STATS__=result}catch(e){console.warn('Support uptime data unavailable:',e)}finally{loading=false}}
