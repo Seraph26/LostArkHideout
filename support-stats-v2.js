@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — dynamic Bible support uptime data v2 */
+/* Lost Ark Hideout — dynamic Bible support uptime data v3 */
 (()=>{
 'use strict';
 if(window.LostArkSupportStats)return;
@@ -6,24 +6,25 @@ const WORKER='https://lostark-bible-connector.seraph0226.workers.dev/raid-stats'
 const CACHE=new Map();
 const SUPPORTS=['Bard','Artist','Paladin','Valkyrie'];
 const CAT={
-  ap:/^(ap|attack.?power|atk.?power|support.?ap)$/i,
-  brand:/^(brand|support.?brand)$/i,
-  ha:/^(ha|h\.?a\.?|haskill|h\.a\.?skill|support.?ha)$/i,
-  identity:/^(identity|support.?identity)$/i
+ ap:/^(ap|attack.?power|atk.?power|support.?ap)$/i,
+ brand:/^(brand|support.?brand)$/i,
+ ha:/^(ha|h\.?a\.?|haskill|h\.a\.?skill|support.?ha)$/i,
+ identity:/^(identity|support.?identity)$/i
 };
 const norm=s=>String(s??'').toLowerCase().replace(/[^a-z0-9]/g,'');
 const classNorm=s=>{const n=norm(s);if(n==='bard')return'Bard';if(n==='artist')return'Artist';if(n==='paladin')return'Paladin';if(n==='valkyrie')return'Valkyrie';return''};
+/* These are the actual boss names exposed by lostark.bible's Raid Statistics page. */
 const ALIASES={
- 'horizon-cathedral-g1':['Archbishop Arsenos','Archbishop Arcenos','Horizon Cathedral Gate 1'],
- 'horizon-cathedral-g2':['Vanguard of Fanaticism','Horizon Cathedral Gate 2'],
+ 'horizon-cathedral-g1':['Archbishop Arcenos','Archbishop Arsenos','Horizon Cathedral Gate 1'],
+ 'horizon-cathedral-g2':['Arcenos, Vanguard of Fanaticism','Vanguard of Fanaticism','Horizon Cathedral Gate 2'],
  'serca-g1':['Witch of Agony, Serca','Witch of Agony Serca','Serca Gate 1','Serca'],
  'serca-g2':['Corvus Tul Rak','Corvus Tul Rat','Serca Gate 2','Serca'],
- 'kazeros-g1':['Kazeros','Kazeros Gate 1'],
+ 'kazeros-g1':['Abyss Lord Kazeros','Kazeros','Kazeros Gate 1'],
  'kazeros-g2':['Death Incarnate Kazeros','Kazeros Gate 2','Kazeros'],
- 'armoche-g1':['Mistress of Desire Echidna','Covetous Master Echidna','Armoche Gate 1'],
- 'armoche-g2':['Armoche','Armoche Gate 2'],
- 'extreme-aegir-g2':['Aegir','Extreme Aegir Gate 2'],
- 'extreme-brelshaza-g2':['Brelshaza','Extreme Brelshaza Gate 2']
+ 'armoche-g1':['Brelshaza, Ember in the Ashes','Mistress of Desire Echidna','Covetous Master Echidna','Armoche Gate 1'],
+ 'armoche-g2':['Armoche, Sentinel of the Abyss','Armoche','Armoche Gate 2'],
+ 'extreme-aegir-g2':['Aegir, the Oppressor','Aegir','Extreme Aegir Gate 2'],
+ 'extreme-brelshaza-g2':['Phantom Manifester Brelshaza','Brelshaza','Extreme Brelshaza Gate 2']
 };
 function encodePayload(o){const bytes=new TextEncoder().encode(JSON.stringify(o));let s='';for(const b of bytes)s+=String.fromCharCode(b);return btoa(s)}
 function payloadFor(enc,bossOverride){const boss=bossOverride||enc?.boss||'';const difficulty=enc?.difficulty||'Nightmare';const patch=enc?.patch||window.LostArkWesternDataAuthority?.patch||'jun26';const maxIlvl=Number(enc?.maxIlvl||1810),minIlvl=Number(enc?.minIlvl||1740);return encodePayload([["__skrao",1],{boss:2,difficulty:3,dpsType:4,filterBy:5,includeBus:-1,includeWeird:-1,isSupport:6,maxCombatPower:-1,maxGearScore:7,minCombatPower:-1,minGearScore:8,patch:9},boss,difficulty,'ndps','ilvl',true,maxIlvl,minIlvl,patch])}
@@ -53,11 +54,25 @@ function merge(records){const result={};for(const s of SUPPORTS)result[s]={ap:nu
 function hasSupportData(stats){return SUPPORTS.some(s=>Object.values(stats[s]||{}).some(v=>Number.isFinite(Number(v))))}
 async function fetchCandidate(enc,boss){const p=payloadFor(enc,boss);const r=await fetch(`${WORKER}?payload=${encodeURIComponent(p)}`,{cache:'no-store'});if(!r.ok)throw Error(`Bible raid stats HTTP ${r.status}`);const raw=await r.json();const root=unflatten(raw?.data??raw);const records=collect(root);return{stats:merge(records),rawCount:records.length,boss}}
 async function fetchStats(enc){
- if(!enc)return null;const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});
+ if(!enc)return null;
+ const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});
  if(CACHE.has(key)){window.__LOSTARK_SUPPORT_STATS__=CACHE.get(key);return CACHE.get(key)}
- const candidates=[...(ALIASES[enc.id]||[]),enc.boss].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);let lastError=null;
- for(const boss of candidates){try{const result=await fetchCandidate(enc,boss);if(hasSupportData(result.stats)){const value={ok:true,key,stats:result.stats,rawCount:result.rawCount,resolvedBoss:boss,updatedAt:new Date().toISOString()};CACHE.set(key,value);window.__LOSTARK_SUPPORT_STATS__=value;return value}}catch(e){lastError=e}}
- if(lastError)throw lastError;const empty={ok:false,key,stats:merge([]),rawCount:0,resolvedBoss:null,updatedAt:new Date().toISOString()};CACHE.set(key,empty);window.__LOSTARK_SUPPORT_STATS__=empty;return empty;
+ /* Prefer the exact Bible boss name first. The old implementation tried aliases first,
+    which could accept a response for a similarly named boss before reaching the exact gate. */
+ const candidates=[enc?.boss,...(ALIASES[enc.id]||[])].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);
+ let lastError=null;
+ for(const boss of candidates){
+  try{
+   const result=await fetchCandidate(enc,boss);
+   if(hasSupportData(result.stats)){
+    const value={ok:true,key,stats:result.stats,rawCount:result.rawCount,resolvedBoss:boss,updatedAt:new Date().toISOString()};
+    CACHE.set(key,value);window.__LOSTARK_SUPPORT_STATS__=value;return value;
+   }
+  }catch(e){lastError=e}
+ }
+ if(lastError)throw lastError;
+ const empty={ok:false,key,stats:merge([]),rawCount:0,resolvedBoss:null,updatedAt:new Date().toISOString()};
+ CACHE.set(key,empty);window.__LOSTARK_SUPPORT_STATS__=empty;return empty;
 }
 let lastModeKey='',loading=false;
 async function ensure(){const mode=window.LostArkOptimizerMode||{};if(mode.general||!mode.encounter)return null;const enc=mode.encounter;const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});if(key===lastModeKey&&window.__LOSTARK_SUPPORT_STATS__?.key===key)return window.__LOSTARK_SUPPORT_STATS__;if(loading)return null;loading=true;try{lastModeKey=key;return await fetchStats(enc)}catch(e){lastModeKey='';window.__LOSTARK_SUPPORT_STATS_ERROR__=String(e?.message||e);console.warn('Support uptime data unavailable:',e);return null}finally{loading=false}}
