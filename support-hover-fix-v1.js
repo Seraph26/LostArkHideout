@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover renderer v4 */
+/* Lost Ark Hideout — support hover renderer v5 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -18,14 +18,23 @@ function format(v){
   if(v===null||v===undefined||v==='')return 'Unavailable';
   const n=Number(v);return Number.isFinite(n)?(n*100).toFixed(2)+'%':'Unavailable';
 }
+function isStale(el){
+  const text=clean(el.textContent).toLowerCase();
+  return text.includes('observed median support uptime is unavailable')||text.includes('no direct party effects detected');
+}
 function paint(member,summary){
   const card=member.querySelector('.character-hover-breakdown');if(!card)return;
   card.querySelectorAll('.chb-support-unavailable').forEach(x=>x.remove());
-  const old=card.querySelector('.chb-support-observed');if(old)old.remove();
   card.querySelectorAll('.chb-explained-metric').forEach(el=>{
     const label=clean(el.querySelector('.chb-metric-label')?.textContent).toLowerCase();
     if(label==='party synergy'||label==='support impact')el.remove();
   });
+  card.querySelectorAll('.chb-stats > span').forEach(el=>{
+    const text=clean(el.textContent).toLowerCase();
+    if(text==='support impact +0.00%'||text==='party synergy +0.00%'||text==='observed median support uptime')el.remove();
+  });
+  card.querySelectorAll('.chb-detail').forEach(el=>{if(isStale(el))el.remove()});
+  const old=card.querySelector('.chb-support-observed');if(old)old.remove();
   const details=document.createElement('div');
   details.className='chb-detail chb-support-observed';
   details.innerHTML=`<div><strong>Observed median support uptime</strong></div><div>${clean(encounterName())}</div><div>Attack Power: ${format(summary.ap)} - Brand: ${format(summary.brand)} - H.A. Skill: ${format(summary.ha)} - Identity: ${format(summary.identity)}</div>`;
