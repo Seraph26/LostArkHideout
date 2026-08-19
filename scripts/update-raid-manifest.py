@@ -8,6 +8,23 @@ from pathlib import Path
 URL = "https://lostark.bible/stats/raids?boss=Corvus%20Tul%20Rak&difficulty=Nightmare&patch=jun26&filterBy=ilvl&type=ndps&minIlvl=1740&maxIlvl=1810"
 OUT = Path("raid-encounters.json")
 
+# Bible's raid selector values are not always the boss identifier used by
+# raidStatsSearch. These are the boss identifiers already verified for the
+# LostArkHideout support-uptime queries. Keep these overrides authoritative so
+# the scheduled manifest updater cannot replace them with generic Gate labels.
+BOSS_OVERRIDES = {
+    "horizon-cathedral-g1": "Archbishop Arcenos",
+    "horizon-cathedral-g2": "Arcenos, Vanguard of Fanaticism",
+    "serca-g1": "Witch of Agony, Serca",
+    "serca-g2": "Corvus Tul Rak",
+    "kazeros-g1": "Abyss Lord Kazeros",
+    "kazeros-g2": "Death Incarnate Kazeros",
+    "armoche-g1": "Brelshaza, Ember in the Ashes",
+    "armoche-g2": "Armoche, Sentinel of the Abyss",
+    "extreme-aegir-g2": "Aegir, the Oppressor",
+    "extreme-brelshaza-g2": "Phantom Manifester Brelshaza",
+}
+
 class RaidParser(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -103,8 +120,6 @@ def main():
     parser = RaidParser()
     parser.feed(html)
 
-    # The Bible filter visually disables older/unsupported encounters. We intentionally
-    # mirror that rule: only non-disabled options are published to our selector.
     enabled = [o for o in parser.options if not o["disabled"]]
     if not enabled:
         raise RuntimeError("Bible raid selector contained no enabled options")
@@ -117,11 +132,12 @@ def main():
         if key in seen:
             continue
         seen.add(key)
+        item_id = slug(f"{o['group']}-{text}")
         difficulty = infer_difficulty(o["group"], text)
         item = {
-            "id": slug(f"{o['group']}-{text}"),
+            "id": item_id,
             "label": text,
-            "boss": o["value"],
+            "boss": BOSS_OVERRIDES.get(item_id, o["value"]),
             "kind": "event" if is_event(o["group"], text) else "raid",
             "sourceGroup": o["group"],
             "schema": infer_schema(o["group"], text),
