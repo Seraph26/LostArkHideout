@@ -1,6 +1,23 @@
-/* Lost Ark Hideout — character hover explanations v9 */
+/* Lost Ark Hideout — character hover explanations v10 */
 (()=>{'use strict';
-const LABELS={crit:'Critical Rate',critDamage:'Critical Damage',attackSpeed:'Attack Speed',attackPower:'Attack Power',supportAmplification:'Support Amplification',mana:'Mana',identity:'Identity',damage:'Damage'};
+const LABELS={
+crit:'Critical Rate',
+critDamage:'Critical Damage',
+attackSpeed:'Attack Speed',
+attackPower:'Attack Power',
+supportAmplification:'Support Amplification',
+mana:'Mana',
+identity:'Identity',
+damage:'Damage',
+defenceReduction:'Defense Reduction',
+defenseReduction:'Defense Reduction',
+moveSpeed:'Move Speed',
+movementSpeed:'Move Speed',
+positional:'Positional Damage',
+brand:'Brand',
+ha:'H.A. Skill',
+ap:'Attack Power',
+};
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const label=k=>LABELS[k]||k;
 const numberFrom=s=>{const m=String(s??'').replace(/,/g,'').match(/[-+]?\d+(?:\.\d+)?/);return m?Number(m[0]):null};
