@@ -1,11 +1,16 @@
-/* Lost Ark Hideout — support hover data bridge v7 */
+/* Lost Ark Hideout — support hover renderer */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
 function classFor(member){
-  const explicit=clean(member.querySelector('.class-icon')?.alt||member.dataset.class||member.querySelector('[data-class]')?.dataset.class||'');
-  if(SUPPORTS.has(explicit))return explicit;
+  const candidates=[
+    member.querySelector('.class-icon')?.alt,
+    member.dataset.class,
+    member.querySelector('[data-class]')?.dataset.class,
+    member.querySelector('.party-class-label')?.dataset.class
+  ].map(clean).filter(Boolean);
+  for(const c of candidates)if(SUPPORTS.has(c))return c;
   return '';
 }
 function encounterName(){
@@ -13,29 +18,40 @@ function encounterName(){
   try{const selected=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);if(selected&&selected!=='Select Raid')return selected}catch{}
   return 'Selected encounter';
 }
-async function render(){
- const api=window.LostArkSupportStats;
- if(!api)return;
- const encounter=window.LostArkOptimizerMode?.encounter;
- if(!encounter)return;
- try{await api.fetch(encounter)}catch{return}
- document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
-  const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
-  if(role!=='support')return;
-  const cls=classFor(member); if(!cls)return;
-  const summary=api.summary?.(cls); if(!summary)return;
-  const details=member.querySelectorAll('.character-hover-breakdown .chb-detail');
-  if(!details.length)return;
-  const rows=[
-   `Attack Power: ${summary.ap!=null?(summary.ap*100).toFixed(2)+'%':'Unavailable'}`,
-   `Brand: ${summary.brand!=null?(summary.brand*100).toFixed(2)+'%':'Unavailable'}`,
-   `H.A. Skill: ${summary.ha!=null?(summary.ha*100).toFixed(2)+'%':'Unavailable'}`,
-   `Identity: ${summary.identity!=null?(summary.identity*100).toFixed(2)+'%':'Unavailable'}`
-  ];
-  details[0].innerHTML=`<div>${clean(encounterName())}</div><div>${rows.join(' · ')}</div>`;
-  for(let i=1;i<details.length;i++)details[i].remove();
- });
+function format(v){return Number.isFinite(Number(v))?(Number(v)*100).toFixed(2)+'%':'Unavailable'}
+function paint(member,cls,summary){
+  let card=member.querySelector('.character-hover-breakdown');
+  if(!card)return;
+  let details=card.querySelector('.chb-support-observed');
+  if(!details){
+    details=document.createElement('div');
+    details.className='chb-detail chb-support-observed';
+    card.appendChild(details);
+  }
+  details.innerHTML=`<div>Selected encounter: ${clean(encounterName())}</div><div>Attack Power: ${format(summary.ap)} - Brand: ${format(summary.brand)} - H.A. Skill: ${format(summary.ha)} - Identity: ${format(summary.identity)}</div>`;
+  card.querySelectorAll('.chb-support-unavailable').forEach(x=>x.remove());
 }
-function start(){render();const root=document.getElementById('suggestedParties')||document.body;let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(()=>render(),120)}).observe(root,{childList:true,subtree:true,characterData:true});[500,1500,3000].forEach(ms=>setTimeout(render,ms));}
+async function render(){
+  const api=window.LostArkSupportStats;
+  if(!api)return;
+  const encounter=window.LostArkOptimizerMode?.encounter;
+  if(encounter){try{await api.fetch(encounter)}catch{}}
+  document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
+    const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
+    if(role!=='support')return;
+    const cls=classFor(member);if(!cls)return;
+    const summary=api.summary?.(cls);
+    if(!summary)return;
+    paint(member,cls,summary);
+  });
+}
+function start(){
+  const root=document.getElementById('suggestedParties')||document.body;
+  let timer;
+  const schedule=()=>{clearTimeout(timer);timer=setTimeout(render,80)};
+  new MutationObserver(schedule).observe(root,{childList:true,subtree:true,characterData:true,attributes:true});
+  render();
+  [250,750,1500,3000,5000].forEach(ms=>setTimeout(render,ms));
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
