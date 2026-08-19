@@ -1,22 +1,17 @@
-/* Lost Ark Hideout — character hover explanations v3 */
+/* Lost Ark Hideout — character hover explanations v4 */
 (()=>{'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
-const LABELS={
-  crit:'Critical Rate',
-  critDamage:'Critical Damage',
-  attackSpeed:'Attack Speed',
-  attackPower:'Attack Power',
-  supportAmplification:'Support Amplification',
-  mana:'Mana',
-  identity:'Identity',
-  damage:'Damage'
-};
+const LABELS={crit:'Critical Rate',critDamage:'Critical Damage',attackSpeed:'Attack Speed',attackPower:'Attack Power',supportAmplification:'Support Amplification',mana:'Mana',identity:'Identity',damage:'Damage'};
 function humanizeEffects(text){
   let out=String(text??'');
-  for(const [key,label] of Object.entries(LABELS)){
-    out=out.replace(new RegExp(`\\b${key}\\b`,'g'),label);
-  }
+  for(const [key,label] of Object.entries(LABELS))out=out.replace(new RegExp(`\\b${key}\\b`,'g'),label);
   return out.replace(/\bobserved median\b/gi,'Observed median uptime');
+}
+function formatEffectText(text){
+  return humanizeEffects(text)
+    .replace(/\s*-\s*observed median uptime/gi,' — observed median uptime')
+    .replace(/\s+/g,' ')
+    .trim();
 }
 function enhance(){
   document.querySelectorAll('.character-hover-breakdown').forEach(card=>{
@@ -43,31 +38,29 @@ function enhance(){
         }
       });
     }
-    /* Normalize the actual rendered effect rows. Different optimizer versions
-       have used .chb-synergy, .chb-detail, and plain spans for these rows. */
-    card.querySelectorAll('.chb-synergy,.chb-detail').forEach(row=>{
+    /* Effect rows are deliberately handled only at their own row level. We do
+       not rewrite .chb-detail textContent because that destroys the optimizer's
+       existing row boundaries and spacing. */
+    card.querySelectorAll('.chb-synergy').forEach(row=>{
       const raw=clean(row.textContent);
       if(!raw)return;
-      const normalized=humanizeEffects(raw)
-        .replace(/\bfrom\b/gi,'from')
-        .replace(/\s+-\s+observed median uptime/gi,' — observed median uptime');
+      const normalized=formatEffectText(raw);
       if(normalized!==raw)row.textContent=normalized;
       const txt=clean(row.textContent);
-      if(/observed median uptime/i.test(txt)){
-        row.title='Estimated contribution is the optimizer model value assigned to this effect for this character. Observed median uptime is the typical percentage of the relevant encounter for which the support effect is active, based on Bible encounter data. These are different measurements.';
-        row.style.cursor='help';
-      }else if(/\bfrom\b/i.test(txt)&&/\d[\d,]*/.test(txt)){
-        row.title='Estimated contribution from a party synergy. The numeric value is a model contribution value, not a percentage and not a direct in-game damage increase.';
-        row.style.cursor='help';
-      }
+      row.title=/observed median uptime/i.test(txt)
+        ? 'Estimated contribution is the optimizer model value assigned to this effect for this character. Observed median uptime is the typical percentage of the relevant encounter for which the support effect is active, based on Bible encounter data. These are different measurements.'
+        : 'Estimated contribution from a party synergy. The numeric value is a model contribution value, not a percentage and not a direct in-game damage increase.';
+      row.style.cursor='help';
     });
-    /* The compact summary can be rendered as a plain text detail rather than
-       a .chb-synergy row, so normalize its effect-key list as well. */
+    /* Normalize only the compact Synergies summary. Replacing this single
+       summary element is safe; it is not a collection of individual rows. */
     card.querySelectorAll('div,span').forEach(el=>{
+      if(el.dataset.chbSynergySummaryDone==='1')return;
       const raw=clean(el.textContent);
       if(!/^Synergies\s*:/i.test(raw))return;
-      const normalized=humanizeEffects(raw).replace(/\s*·\s*/g,' · ');
-      if(normalized!==raw)el.textContent=normalized;
+      const normalized=formatEffectText(raw).replace(/\s*·\s*/g,' · ');
+      el.textContent=normalized;
+      el.dataset.chbSynergySummaryDone='1';
       el.title='Synergies available from this party/encounter model. Support effects may also include observed median uptime data.';
       el.style.cursor='help';
     });
@@ -76,7 +69,7 @@ function enhance(){
 function css(){
   let s=document.getElementById('character-hover-explanations-style');
   if(!s){s=document.createElement('style');s.id='character-hover-explanations-style';document.head.appendChild(s)}
-  s.textContent='.chb-explained-metric{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45)}.chb-explained-metric:hover{border-bottom-color:currentColor}.chb-metric-label{font-weight:600}.chb-synergy[title],.chb-detail[title]{cursor:help}';
+  s.textContent='.chb-explained-metric{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45)}.chb-explained-metric:hover{border-bottom-color:currentColor}.chb-metric-label{font-weight:600}.chb-synergy{display:block;margin:2px 0}.chb-synergy[title]{cursor:help}.chb-detail[title]{cursor:help}';
 }
 function start(){
   css();enhance();
