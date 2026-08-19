@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — encounter scoring engine v4 */
+/* Lost Ark Hideout — encounter scoring engine v5 */
 (()=>{
 'use strict';
 const CLASS_RANGED=new Set(['Sorceress','Sharpshooter','Artillerist','Machinist','Scouter','Summoner','Aeromancer','Gunslinger','Deadeye','Arcana','Arcanist']);
@@ -74,7 +74,19 @@ function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=pars
 function mobilityFactor(level,mechanics){const m=mechanics?.movement||'low';if(level==='high')return 1;if(level==='low'){if(m==='very-high')return .975;if(m==='high')return .98;if(m==='moderate-high')return .985;if(m==='moderate')return .992}return 1}
 function burstFactor(level,mechanics){const w=mechanics?.burstWindows||'low';if(level==='high'){if(w==='very-high')return 1.012;if(w==='high')return 1.008;if(w==='moderate')return 1.003}return 1}
 function pushFactor(level,mechanics){if(level==='high'&&mechanics?.forcedPositioning==='very-high')return 1.005;return 1}
-function supportFactor(t,p){if(!t.support)return 1;if(t.behavior.supportPlacement==='placement-sensitive'&&p.mechanics?.forcedPositioning==='very-high')return p.support*.995;if(t.behavior.supportPlacement==='flexible')return Math.min(1,p.support*1.002);return p.support}
+function supportStatsFor(cls){try{const stats=window.LostArkSupportStats?.summary?.(cls);return stats&&typeof stats==='object'?stats:null}catch{return null}}
+function supportUptimeFactor(cls){
+ const stats=supportStatsFor(cls);if(!stats)return{factor:1,weighted:null,metrics:[],source:'encounter-model'};
+ const weights={ap:.30,brand:.25,ha:.15,identity:.30};let weighted=0,totalWeight=0;
+ for(const key of Object.keys(weights)){const value=Number(stats[key]);if(Number.isFinite(value)){const uptime=value>1?value/100:value;weighted+=Math.max(0,Math.min(1,uptime))*weights[key];totalWeight+=weights[key]}}
+ if(!totalWeight)return{factor:1,weighted:null,metrics:[],source:'encounter-model'};
+ weighted/=totalWeight;
+ // Bible uptime is an empirical support-performance signal, not a direct DPS multiplier.
+ // Keep the encounter model dominant while allowing real raid data to distinguish supports.
+ const factor=.80+.20*weighted;
+ return{factor,weighted,metrics:Object.keys(weights).filter(k=>Number.isFinite(Number(stats[k]))),source:'bible'};
+}
+function supportFactor(t,p){if(!t.support)return 1;const base=t.behavior.supportPlacement==='placement-sensitive'&&p.mechanics?.forcedPositioning==='very-high'?p.support*.995:t.behavior.supportPlacement==='flexible'?Math.min(1,p.support*1.002):p.support;const live=supportUptimeFactor(t.cls);return base*live.factor}
 function characterScore(c){const p=profile();if(!p)return{score:1,components:{},reasons:[]};const t=traits(c);let score=p.baseUptime||1;const components={baseUptime:p.baseUptime||1};const reasons=[];
  const posKey=t.position==='backattack'?'back':t.position==='frontattack'?'front':t.position==='hitmaster'?'hitmaster':null;if(posKey){score*=p[posKey];components.position=p[posKey];reasons.push(`${t.positionLabel} uptime × ${p[posKey].toFixed(3)}`)}else components.position=1;
  if(t.ranged){score*=p.ranged;components.range=p.ranged;reasons.push(`Ranged uptime × ${p.ranged.toFixed(3)}`)}else if(t.cls){score*=p.melee;components.range=p.melee;reasons.push(`Melee uptime × ${p.melee.toFixed(3)}`)}else components.range=1;
@@ -82,7 +94,7 @@ function characterScore(c){const p=profile();if(!p)return{score:1,components:{},
  const mf=mobilityFactor(t.behavior.mobility,p.mechanics);score*=mf;components.mobility=mf;if(mf!==1)reasons.push(`${t.behavior.mobility} mobility vs ${p.mechanics?.movement||'unknown'} movement × ${mf.toFixed(3)}`);
  const bf=burstFactor(t.behavior.burstDependency,p.mechanics);score*=bf;components.buildBurst=bf;if(bf!==1)reasons.push(`Build burst dependence vs encounter windows × ${bf.toFixed(3)}`);
  const pf=pushFactor(t.behavior.pushResilience,p.mechanics);score*=pf;components.pushResilience=pf;if(pf!==1)reasons.push(`Push resilience × ${pf.toFixed(3)}`);
- const sf=supportFactor(t,p);if(t.support){score*=sf;components.support=sf;reasons.push(`Support encounter fit × ${sf.toFixed(3)}`)}else components.support=1;
+ const sf=supportFactor(t,p);if(t.support){score*=sf;components.support=sf;const live=supportUptimeFactor(t.cls);if(live.source==='bible'){components.bibleSupportUptime=live.factor;if(live.weighted!==null)components.bibleWeightedUptime=live.weighted;reasons.push(`Bible support uptime × ${live.factor.toFixed(3)} (${(live.weighted*100).toFixed(1)}% weighted uptime)`)}else reasons.push(`Support encounter fit × ${sf.toFixed(3)}`)}else components.support=1;
  score=Math.max(.75,Math.min(1.15,score));return{score,components,reasons,profile:p.name,confidence:p.confidence,traits:t};}
 function partyScore(chars){const results=(chars||[]).map(characterScore);if(!results.length)return{score:0,characters:[],partyFactors:{}};const avg=results.reduce((s,r)=>s+r.score,0)/results.length;const supports=results.filter((r,i)=>traits(chars[i]).support).length;return{score:avg,characters:results,partyFactors:{averageEncounterFit:avg,supportCount:supports}}}
 function explain(chars){const r=partyScore(chars);return{...r,encounter:profile()?.name||null,mechanics:profile()?.mechanics||{}}}
