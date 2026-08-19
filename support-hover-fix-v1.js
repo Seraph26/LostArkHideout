@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover renderer v2 */
+/* Lost Ark Hideout — support hover renderer v3 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -14,13 +14,18 @@ function encounterName(){
   try{const e=window.LostArkOptimizerMode?.encounter;if(e?.label)return clean(e.label)}catch{}
   return 'Selected encounter';
 }
-function format(v){return Number.isFinite(Number(v))?(Number(v)*100).toFixed(2)+'%':'Unavailable'}
+function format(v){
+  if(v===null||v===undefined||v==='')return 'Unavailable';
+  const n=Number(v);return Number.isFinite(n)?(n*100).toFixed(2)+'%':'Unavailable';
+}
 function paint(member,summary){
   const card=member.querySelector('.character-hover-breakdown');if(!card)return;
-  let details=card.querySelector('.chb-support-observed');
-  if(!details){details=document.createElement('div');details.className='chb-detail chb-support-observed';card.appendChild(details)}
-  details.innerHTML=`<div><strong>Observed median support uptime</strong></div><div>${clean(encounterName())}</div><div>Attack Power: ${format(summary.ap)} - Brand: ${format(summary.brand)} - H.A. Skill: ${format(summary.ha)} - Identity: ${format(summary.identity)}</div>`;
   card.querySelectorAll('.chb-support-unavailable').forEach(x=>x.remove());
+  const old=card.querySelector('.chb-support-observed');if(old)old.remove();
+  const details=document.createElement('div');
+  details.className='chb-detail chb-support-observed';
+  details.innerHTML=`<div><strong>Observed median support uptime</strong></div><div>${clean(encounterName())}</div><div>Attack Power: ${format(summary.ap)} - Brand: ${format(summary.brand)} - H.A. Skill: ${format(summary.ha)} - Identity: ${format(summary.identity)}</div>`;
+  card.appendChild(details);
 }
 function render(){
   const api=window.LostArkSupportStats;if(!api)return;
