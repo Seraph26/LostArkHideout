@@ -77,7 +77,7 @@ async function fetchStats(enc){
  CACHE.set(key,value);window.__LOSTARK_SUPPORT_STATS__=value;return value;
 }
 async function ensure(){const mode=window.LostArkOptimizerMode||{};if(mode.general||!mode.encounter)return null;try{return await fetchStats(mode.encounter)}catch(e){window.__LOSTARK_SUPPORT_STATS_ERROR__=String(e?.message||e);console.warn('Support uptime data unavailable:',e);return null}}
-function get(cls,effect){const v=window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)]?.[effect];return Number.isFinite(Number(v))?Number(v)/100:null}
+function get(cls,effect){const v=window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)]?.[effect];return Number.isFinite(Number(v))?Number(v):null}
 function summary(cls){const s=window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)];return s||null}
 window.LostArkSupportStats={fetch:fetchStats,ensure,get,summary};
 window.LostArkSupportStats.ready=ensure();
