@@ -10,7 +10,7 @@
     {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Death Incarnate Kazeros","kind":"raid","schema":"difficulty","difficulty":"Hard","patch":"mar26","minIlvl":1730,"maxIlvl":1810}
   ],
   "optional": [
-    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Covetous Master Echidna","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810},
+    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Brelshaza, Ember in the Ashes","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810},
     {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche, Sentinel of the Abyss","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810}
   ],
   "events": [
