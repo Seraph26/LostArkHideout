@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization hover spacing + synergy explanation v3 */
+/* Lost Ark Hideout — General Optimization hover spacing + synergy explanation v4 */
 (()=>{
 'use strict';
 
@@ -21,7 +21,13 @@ function formatSynergySummary(){
    const text=node.nodeValue||'';const match=/Support uptime/i.exec(text);if(!match)continue;
    const before=text.slice(0,match.index),after=text.slice(match.index+match[0].length),frag=document.createDocumentFragment();
    if(before)frag.appendChild(document.createTextNode(before));
-   const span=document.createElement('span');span.className='support-uptime-label';span.textContent='Support Uptime';span.title=synergyTitle;span.setAttribute('aria-label',synergyTitle);frag.appendChild(span);
+   const span=document.createElement('span');
+   span.className='support-uptime-label';
+   span.textContent='Support Uptime';
+   span.setAttribute('data-tooltip',synergyTitle);
+   span.setAttribute('aria-label',synergyTitle);
+   span.setAttribute('role','note');
+   frag.appendChild(span);
    if(after)frag.appendChild(document.createTextNode(after));
    node.parentNode.replaceChild(frag,node);el.dataset.supportUptimeWrapped='1';break;
   }
@@ -47,7 +53,10 @@ function css(){
  #suggestedParties .character-hover-breakdown .chb-percent-line,#suggestedParties .character-hover-breakdown .chb-uptime-line{display:block!important;white-space:nowrap!important;margin-top:2px!important}
  #suggestedParties .character-hover-breakdown .chb-detail{margin-top:6px!important}
  #suggestedParties .party-synergies{line-height:1.5!important}
- #suggestedParties .party-synergies .support-uptime-label{text-decoration-line:underline;text-decoration-style:dotted;text-decoration-thickness:1px;text-underline-offset:3px;cursor:help}
+ #suggestedParties .party-synergies .support-uptime-label{position:relative;display:inline-block;text-decoration-line:underline;text-decoration-style:dotted;text-decoration-thickness:1px;text-underline-offset:3px;cursor:help}
+ #suggestedParties .party-synergies .support-uptime-label::after{content:attr(data-tooltip);position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);width:360px;max-width:min(360px,calc(100vw - 32px));padding:10px 12px;border-radius:6px;background:#1f1f1f;color:#fff;font-size:12px;font-weight:400;line-height:1.45;white-space:normal;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,.35);opacity:0;visibility:hidden;pointer-events:none;z-index:10000;transition:opacity .12s ease,visibility .12s ease}
+ #suggestedParties .party-synergies .support-uptime-label::before{content:'';position:absolute;left:50%;bottom:calc(100% + 3px);transform:translateX(-50%);border:5px solid transparent;border-top-color:#1f1f1f;opacity:0;visibility:hidden;pointer-events:none;z-index:10001}
+ #suggestedParties .party-synergies .support-uptime-label:hover::after,#suggestedParties .party-synergies .support-uptime-label:hover::before{opacity:1;visibility:visible}
  `;
 }
 function start(){css();const run=()=>{formatSynergySummary();formatCards()};run();const root=document.getElementById('suggestedParties')||document.body;let timer;const schedule=()=>{clearTimeout(timer);timer=setTimeout(run,30)};new MutationObserver(schedule).observe(root,{childList:true,subtree:true,characterData:true});document.addEventListener('mouseover',e=>{if(e.target.closest?.('#suggestedParties .party-member')||e.target.closest?.('#suggestedParties .party-synergies'))schedule()},true);[0,50,150,300,600,1000,2000,4000,8000].forEach(ms=>setTimeout(run,ms));setInterval(run,1000)}
