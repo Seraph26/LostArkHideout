@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid-specific support hover data bridge v11 */
+/* Lost Ark Hideout — raid-specific support hover data bridge v12 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -37,21 +37,21 @@ function supportLines(member){
   const row=rows.find(r=>re.test(clean(r.textContent)));
   if(!row)continue;
   const text=clean(row.textContent).replace(re,`Support Amplification to ${targetName}:`);
-  out.push({text,title:row.title||'Estimated contribution from the party support. This is a model contribution, not a direct in-game damage percentage.'});
+  out.push({text,title:row.title||'Estimated contribution is the optimizer model value assigned to this effect. Observed median uptime is the typical percentage of the relevant encounter for which the support effect is active, based on Bible encounter data.'});
  }
  return out;
 }
 function renderCard(member){
  const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
- if(role!=='support')return;
+ if(role!=='support')return false;
  const card=member.querySelector('.character-hover-breakdown');
- if(!card)return;
+ if(!card)return false;
  const supportName=clean(card.querySelector('.chb-head strong')?.textContent);
- if(!supportName)return;
+ if(!supportName)return false;
  const lines=supportLines(member);
  const stats=card.querySelector('.chb-stats');
  const head=card.querySelector('.chb-head');
- if(!stats||!head||!lines.length)return;
+ if(!stats||!head||!lines.length)return false;
  card.classList.add('chb-general-detailed','chb-raid-support-detailed');
  card.dataset.raidSupportAuthority='1';
  card.dataset.raidSupportContributionView='1';
@@ -69,32 +69,36 @@ function renderCard(member){
   detail.appendChild(row);
  });
  card.appendChild(detail);
+ return true;
 }
 function css(){
- let s=document.getElementById('raid-support-hover-v11-style');
- if(!s){s=document.createElement('style');s.id='raid-support-hover-v11-style';document.head.appendChild(s)}
+ let s=document.getElementById('raid-support-hover-v12-style');
+ if(!s){s=document.createElement('style');s.id='raid-support-hover-v12-style';document.head.appendChild(s)}
  s.textContent='.chb-raid-support-contributions .chb-synergy{display:block!important;margin:2px 0}.chb-raid-support-contributions .chb-synergy[title]{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}';
 }
-function render(){document.querySelectorAll('#suggestedParties .party-member').forEach(renderCard)}
+function wireMember(member){
+ if(member.dataset.raidSupportHoverV12)return;
+ member.dataset.raidSupportHoverV12='1';
+ const refresh=()=>{renderCard(member)};
+ member.addEventListener('mouseenter',refresh,{passive:true});
+ member.addEventListener('focusin',refresh,{passive:true});
+}
+function wire(){
+ document.querySelectorAll('#suggestedParties .party-member').forEach(wireMember);
+}
 function start(){
  css();
- render();
- const root=document.getElementById('suggestedParties')||document.body;let timer=0,frame=0;
+ wire();
+ const root=document.getElementById('suggestedParties')||document.body;
+ let timer=0,frame=0;
  const schedule=()=>{
   clearTimeout(timer);
   timer=setTimeout(()=>{
    if(frame)return;
-   frame=requestAnimationFrame(()=>{frame=0;render()});
+   frame=requestAnimationFrame(()=>{frame=0;wire()});
   },20);
  };
- new MutationObserver(mutations=>{
-  const relevant=mutations.some(m=>{
-   const target=m.target?.nodeType===1?m.target:m.target?.parentElement;
-   return !(target?.closest?.('.character-hover-breakdown'));
-  });
-  if(relevant)schedule();
- }).observe(root,{childList:true,subtree:true});
- [0,25,75,150,300,600,1000,2000].forEach(ms=>setTimeout(render,ms));
+ new MutationObserver(schedule).observe(root,{childList:true,subtree:true});
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
