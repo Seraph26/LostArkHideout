@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid-specific support hover data bridge v8 */
+/* Lost Ark Hideout — raid-specific support hover data bridge v9 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -7,51 +7,84 @@ function classFor(member){
  const explicit=clean(member.querySelector('.class-icon')?.alt||member.dataset.class||member.querySelector('[data-class]')?.dataset.class||'');
  return SUPPORTS.has(explicit)?explicit:'';
 }
-function summaryFor(member){const cls=classFor(member);if(!cls)return null;try{return window.LostArkSupportStats?.summary?.(cls)||null}catch{return null}}
-function encounterName(){
- try{const selected=clean(document.getElementById('raidSpecificSelect')?.selectedOptions?.[0]?.textContent);if(selected&&selected!=='Select Raid')return selected}catch{}
- try{const name=clean(window.LostArkEncounterScoring?.profile?.()?.name);if(name)return name}catch{}
- return 'Selected encounter';
+function partyMembersFor(member){
+ let node=member.parentElement;
+ let best=null;
+ while(node&&node!==document.body){
+  const members=[...node.children].filter(x=>x.classList?.contains('party-member'));
+  if(members.includes(member)&&members.length>=2&&members.length<=4)best=members;
+  node=node.parentElement;
+ }
+ if(best)return best;
+ return [...document.querySelectorAll('#suggestedParties .party-member')].filter(x=>x.closest('[data-party]')===member.closest('[data-party]'));
 }
-function pct(v){return v!=null&&Number.isFinite(Number(v))?(Number(v)*100).toFixed(2)+'%':'Unavailable'}
-function render(){
- document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
-  const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
-  if(role!=='support')return;
-  const summary=summaryFor(member);if(!summary)return;
-  const details=member.querySelectorAll('.character-hover-breakdown .chb-detail');if(!details.length)return;
-  const encounter=clean(encounterName()),supportClass=classFor(member);
-  const effects=[
-   ['Attack Power',summary.ap],
-   ['Brand',summary.brand],
-   ['H.A. Skill',summary.ha],
-   ['Identity',summary.identity]
-  ];
-  details[0].innerHTML=`<div><strong>${encounter}</strong></div><div>Support compatibility uses encounter data.</div><div>Observed median support uptime by effect:</div>`;
-  effects.forEach(([name,value],i)=>{
-   const row=details[i+1]||document.createElement('div');
-   row.className='chb-detail chb-raid-support-effect';
-   row.innerHTML=`<div><strong>${name}</strong></div><div>Observed median uptime: ${pct(value)}</div>`;
-   row.title=`Observed median ${name} uptime for ${supportClass} in ${encounter}. This is encounter evidence from Bible data, not a modeled contribution percentage.`;
-   if(!row.parentNode)details[0].parentNode.appendChild(row);
+function supportLines(member){
+ const supportName=clean(member.querySelector('.chb-head strong')?.textContent);
+ if(!supportName)return[];
+ const party=partyMembersFor(member),out=[];
+ for(const target of party){
+  if(target===member)continue;
+  const role=clean(target.querySelector('.party-role-label')?.textContent).toLowerCase();
+  if(role!=='dps')continue;
+  const targetName=clean(target.querySelector('.chb-head strong')?.textContent);
+  if(!targetName)continue;
+  const rows=[...target.querySelectorAll('.chb-synergy')];
+  const row=rows.find(r=>new RegExp(`^Support Amplification\\s+from\\s+${supportName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*:`,'i').test(clean(r.textContent)));
+  if(!row)continue;
+  const text=clean(row.textContent).replace(new RegExp(`^Support Amplification\\s+from\\s+${supportName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}\\s*:`,'i'),`Support Amplification to ${targetName}:`);
+  out.push({text,title:row.title||'Estimated contribution from the party support. This is a model contribution, not a direct in-game damage percentage.'});
+ }
+ return out;
+}
+function renderCard(member){
+ const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
+ if(role!=='support')return;
+ const card=member.querySelector('.character-hover-breakdown');
+ if(!card)return;
+ const supportName=clean(card.querySelector('.chb-head strong')?.textContent);
+ if(!supportName)return;
+ const lines=supportLines(member);
+ const stats=card.querySelector('.chb-stats');
+ const head=card.querySelector('.chb-head');
+ if(!stats||!head)return;
+ card.classList.add('chb-general-detailed','chb-raid-support-detailed');
+ card.dataset.raidSupportAuthority='1';
+ card.dataset.raidSupportContributionView='1';
+ [...stats.querySelectorAll('.chb-raid-support-encounter,.chb-raid-support-effect')].forEach(x=>x.remove());
+ const oldDetails=[...card.querySelectorAll('.chb-detail')];
+ oldDetails.forEach(x=>x.remove());
+ const detail=document.createElement('div');
+ detail.className='chb-detail chb-raid-support-contributions';
+ if(lines.length){
+  lines.forEach(({text,title})=>{
+   const row=document.createElement('div');
+   row.className='chb-synergy';
+   row.textContent=text;
+   row.title=title;
+   row.style.display='block';
+   row.style.margin='2px 0';
+   detail.appendChild(row);
   });
-  const all=member.querySelectorAll('.character-hover-breakdown .chb-detail');
-  for(const row of all){if(!row.classList.contains('chb-raid-support-effect')&&row!==details[0])row.remove()}
- });
+ }else{
+  const row=document.createElement('div');
+  row.textContent='No direct party effects detected.';
+  detail.appendChild(row);
+ }
+ card.appendChild(detail);
 }
 function css(){
- let s=document.getElementById('raid-support-hover-v8-style');
- if(!s){s=document.createElement('style');s.id='raid-support-hover-v8-style';document.head.appendChild(s)}
- s.textContent='.chb-raid-support-effect{display:block!important;margin:4px 0;line-height:1.4}.chb-raid-support-effect strong{font-weight:600}.chb-raid-support-effect[title]{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}';
+ let s=document.getElementById('raid-support-hover-v9-style');
+ if(!s){s=document.createElement('style');s.id='raid-support-hover-v9-style';document.head.appendChild(s)}
+ s.textContent='.chb-raid-support-contributions .chb-synergy{display:block!important;margin:2px 0}.chb-raid-support-contributions .chb-synergy[title]{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}';
 }
+function render(){document.querySelectorAll('#suggestedParties .party-member').forEach(renderCard)}
 function start(){
  css();
- const run=()=>render();
- run();
+ render();
  const root=document.getElementById('suggestedParties')||document.body;let timer;
- new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(run,60)}).observe(root,{childList:true,subtree:true,characterData:true});
- [250,750,1500,3000,5000].forEach(ms=>setTimeout(run,ms));
- try{window.LostArkSupportStats?.ready?.then(run).catch(()=>{})}catch{}
+ const schedule=()=>{clearTimeout(timer);timer=setTimeout(render,40)};
+ new MutationObserver(schedule).observe(root,{childList:true,subtree:true,characterData:true});
+ [0,100,300,600,1200,2500,5000].forEach(ms=>setTimeout(render,ms));
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
