@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid-specific support hover data bridge v10 */
+/* Lost Ark Hideout — raid-specific support hover data bridge v11 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -71,8 +71,8 @@ function renderCard(member){
  card.appendChild(detail);
 }
 function css(){
- let s=document.getElementById('raid-support-hover-v10-style');
- if(!s){s=document.createElement('style');s.id='raid-support-hover-v10-style';document.head.appendChild(s)}
+ let s=document.getElementById('raid-support-hover-v11-style');
+ if(!s){s=document.createElement('style');s.id='raid-support-hover-v11-style';document.head.appendChild(s)}
  s.textContent='.chb-raid-support-contributions .chb-synergy{display:block!important;margin:2px 0}.chb-raid-support-contributions .chb-synergy[title]{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}';
 }
 function render(){document.querySelectorAll('#suggestedParties .party-member').forEach(renderCard)}
@@ -87,7 +87,13 @@ function start(){
    frame=requestAnimationFrame(()=>{frame=0;render()});
   },20);
  };
- new MutationObserver(schedule).observe(root,{childList:true,subtree:true,characterData:true});
+ new MutationObserver(mutations=>{
+  const relevant=mutations.some(m=>{
+   const target=m.target?.nodeType===1?m.target:m.target?.parentElement;
+   return !(target?.closest?.('.character-hover-breakdown'));
+  });
+  if(relevant)schedule();
+ }).observe(root,{childList:true,subtree:true});
  [0,25,75,150,300,600,1000,2000].forEach(ms=>setTimeout(render,ms));
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
