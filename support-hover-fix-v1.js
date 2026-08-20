@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid-specific support hover data bridge v26 */
+/* Lost Ark Hideout — raid-specific support hover data bridge v27 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -43,8 +43,14 @@ function renderSupport(member){
  card.appendChild(detail);
 }
 function render(){if(isGeneralMode())return;document.querySelectorAll('#suggestedParties .party-member').forEach(renderSupport)}
-async function refresh(){if(isGeneralMode())return;await ensure();render()}
-function css(){let s=document.getElementById('raid-support-hover-v26-style');if(!s){s=document.createElement('style');s.id='raid-support-hover-v26-style';document.head.appendChild(s)}s.textContent='.chb-raid-support-contributions .chb-synergy{display:block!important;margin:2px 0}.chb-raid-support-contributions .chb-synergy[title]{cursor:help}.chb-raid-support-detailed .chb-raid-support-summary{line-height:1.5;margin-bottom:4px}'}
+function refresh(){
+ if(isGeneralMode())return;
+ // Render immediately from the optimizer's already-calculated DPS contribution rows.
+ // Do not block the hover update on the separate Bible support-data request.
+ render();
+ ensure().then(()=>render()).catch(()=>{});
+}
+function css(){let s=document.getElementById('raid-support-hover-v27-style');if(!s){s=document.createElement('style');s.id='raid-support-hover-v27-style';document.head.appendChild(s)}s.textContent='.chb-raid-support-contributions .chb-synergy{display:block!important;margin:2px 0}.chb-raid-support-contributions .chb-synergy[title]{cursor:help}.chb-raid-support-detailed .chb-raid-support-summary{line-height:1.5;margin-bottom:4px}'}
 function start(){css();let timer;const schedule=()=>{clearTimeout(timer);timer=setTimeout(refresh,40)};new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});document.addEventListener('mouseover',e=>{if(e.target.closest?.('#suggestedParties .party-member'))schedule()},true);document.getElementById('raidSpecificSelect')?.addEventListener('change',schedule);[0,100,250,500,1000,2000,4000,8000].forEach(ms=>setTimeout(refresh,ms))}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
