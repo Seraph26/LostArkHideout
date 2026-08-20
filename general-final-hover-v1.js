@@ -1,9 +1,14 @@
-/* Lost Ark Hideout — General hover detail loader v4 */
+/* Lost Ark Hideout — General Optimization final hover renderer v3 */
 (()=>{
 'use strict';
-if(document.querySelector('script[data-general-hover-detail-loader="1"]'))return;
-const s=document.createElement('script');
-s.src='general-hover-detail-v2.js?v=20260819generaldetail2';
-s.dataset.generalHoverDetailLoader='1';
-(document.head||document.documentElement).appendChild(s);
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim(),num=s=>{const n=Number(String(s??'').replace(/,/g,''));return Number.isFinite(n)?n:0},esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function active(){return document.getElementById('generalOptimization')?.checked!==false&&window.LostArkOptimizerMode?.general!==false}
+function supportMember(el){const role=clean(el.querySelector('.party-role-label')?.textContent).toLowerCase();return role==='support'||/support/.test(role)}
+function dpsMember(el){return !supportMember(el)}
+function parseSupportContribution(card){const t=clean(card?.textContent||'');let total=0;const re=/Support Amplification (?:from|to)\s+[^:]+:\s*\+([\d,]+(?:\.\d+)?)\s+estimated contribution/gi;let m;while((m=re.exec(t)))total+=num(m[1]);return total}
+function parseBase(card){const t=clean(card?.textContent||'');const m=t.match(/(?:Base CP|CP)\s*:?\s*([\d,]+(?:\.\d+)?)/i);return m?num(m[1]):0}
+function renderSupport(el,party){if(!supportMember(el))return;const card=el.querySelector('.character-hover-breakdown');if(!card)return;const base=parseBase(card),dps=party.filter(dpsMember),rows=[];let total=0;for(const d of dps){const dc=d.querySelector('.character-hover-breakdown');const v=parseSupportContribution(dc);if(v>0){total+=v;const name=clean(d.querySelector('.party-character-link')?.textContent||'Unknown');const pct=base?((v/base)*100):0;rows.push(`<div class="gf-final-support-row"><div>Support Amplification to ${esc(name)}: +${Math.round(v).toLocaleString()} estimated contribution</div><div>${pct.toFixed(2)}% of base power</div></div>`)}}const contribution=base+total;const name=clean(el.querySelector('.party-character-link')?.textContent||'Unknown');card.innerHTML=`<div class="chb-head"><strong>${esc(name)}</strong><span>CP ${base.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} - Contribution ${Math.round(contribution).toLocaleString()}</span></div><div class="chb-stats"><span>Party Synergy +0.00%</span><span>Support Impact +${base?(total/base*100).toFixed(2):'0.00'}%</span></div><div class="chb-detail">Support compatibility uses encounter data</div><div class="chb-detail"><div>Build Effect: +0 estimated contribution</div><div>Party Synergy: +0 estimated contribution</div>${rows.join('')||'<div>No direct support effects detected.</div>'}</div>`;card.dataset.gfFinal='3'}
+function render(){if(!active())return;document.querySelectorAll('#suggestedParties .party-dropzone').forEach(p=>{const members=[...p.querySelectorAll(':scope > .party-member')];const support=members.find(supportMember);if(support)renderSupport(support,members)})}
+function start(){const run=()=>{if(active())render()};[0,100,250,500,1000,2000,4000].forEach(ms=>setTimeout(run,ms));setInterval(run,1000);const root=document.getElementById('suggestedParties')||document.body;new MutationObserver(()=>setTimeout(run,0)).observe(root,{childList:true,subtree:true});const style=document.createElement('style');style.textContent='.gf-final-support-row{margin:5px 0}.gf-final-support-row>div+div{opacity:.82}.gf-final-support-row{line-height:1.45}';document.head.appendChild(style)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
