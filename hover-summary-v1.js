@@ -1,0 +1,88 @@
+/* Lost Ark Hideout — compact hover summary authority
+ * Keeps the existing optimizer calculations intact and only changes hover presentation.
+ * DPS: aggregate all effects by source character.
+ * Support: aggregate all effects by target character.
+ */
+(()=>{
+'use strict';
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+const num=s=>{const m=String(s??'').replace(/,/g,'').match(/[-+]?\d+(?:\.\d+)?/);return m?Number(m[0]):0};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
+function memberRole(member){
+ const r=clean(member?.querySelector('.party-role-label')?.textContent).toLowerCase();
+ if(r==='support'||r==='dps')return r;
+ const c=clean(member?.querySelector('.class-icon')?.alt||member?.dataset.class||member?.querySelector('[data-class]')?.dataset.class||'');
+ return SUPPORTS.has(c)?'support':'dps';
+}
+function members(){return [...document.querySelectorAll('#suggestedParties .party-member')];}
+function card(member){return member?.querySelector('.character-hover-breakdown');}
+function name(member){return clean(card(member)?.querySelector('.chb-head strong')?.textContent);}
+function cp(member){return num(card(member)?.querySelector('.chb-head span')?.textContent.match(/CP\s+([\d,.]+)/i)?.[1]);}
+function encounterFromCard(c){
+ const e=c?.querySelector('.raid-support-encounter,.raid-encounter,.chb-raid-support-encounter');
+ return e?clean(e.textContent).split(/Support compatibility/i)[0].trim():'';
+}
+function parseDpsRows(member){
+ const out=[];const c=card(member);if(!c)return out;
+ for(const row of c.querySelectorAll('.chb-synergy')){
+  const t=clean(row.textContent);
+  let m=t.match(/^(.+?)\s+from\s+(.+?):\s*([+-]?[\d,]+(?:\.\d+)?)(?:\s*[·-]\s*([\d.]+)%\s+of\s+base\s+power)/i);
+  if(!m)continue;
+  out.push({source:clean(m[2]),effect:clean(m[1]),value:num(m[3]),pct:num(m[4])});
+ }
+ return out;
+}
+function parseSupportRows(member){
+ const out=[];const c=card(member);if(!c)return out;
+ for(const row of c.querySelectorAll('.raid-support-row,.chb-synergy')){
+  const t=clean(row.textContent);
+  let m=t.match(/^(.+?)\s+to\s+(.+?):\s*([+-]?[\d,]+(?:\.\d+)?)(?:\s*[·-]\s*([\d.]+)%\s+of\s+.+?['’]s\s+base\s+power)/i);
+  if(!m)continue;
+  out.push({target:clean(m[2]),effect:clean(m[1]),value:num(m[3]),pct:num(m[4])});
+ }
+ return out;
+}
+function isAlreadyCompact(c){return !!c?.dataset.hoverSummaryCompact;}
+function statsHeader(c){return c?.querySelector('.chb-stats');}
+function makeDetail(rows,kind){
+ const groups=new Map();
+ for(const r of rows){const key=kind==='support'?r.target:r.source;if(!groups.has(key))groups.set(key,{name:key,value:0,pct:0});const g=groups.get(key);g.value+=r.value;g.pct+=r.pct;}
+ return [...groups.values()].sort((a,b)=>b.value-a.value);
+}
+function renderDps(member){
+ const c=card(member);if(!c||memberRole(member)!=='dps')return false;
+ const rows=parseDpsRows(member);if(!rows.length)return false;
+ const groups=makeDetail(rows,'dps');
+ const html=groups.map(g=>`<div class="chb-summary-row"><span>+${g.value.toLocaleString(undefined,{maximumFractionDigits:2})} estimated ${rows.filter(r=>r.source===g.name&&/^Support Amplification|^Mana|^Attack Power|^Attack Speed|^Identity|^Brand|^H\.A\. Skill/i.test(r.effect)).length?'support':'synergy'} contribution from ${esc(g.name)} - ${g.pct.toFixed(2)}% of base power</span></div>`).join('');
+ const key=groups.map(g=>`${g.name}|${g.value}|${g.pct}`).join('\n');
+ if(c.dataset.hoverSummaryCompactKey===key)return false;
+ const detail=c.querySelector('.chb-detail');if(!detail)return false;
+ detail.innerHTML=html;c.dataset.hoverSummaryCompact='1';c.dataset.hoverSummaryCompactKey=key;return true;
+}
+function renderSupport(member){
+ const c=card(member);if(!c||memberRole(member)!=='support')return false;
+ const party=member.closest('.party')||member.parentElement?.closest('.party')||document.getElementById('suggestedParties');
+ const all=[...party.querySelectorAll?.('.party-member')||members()].filter(m=>m!==member&&memberRole(m)==='dps');
+ const rows=[];for(const dps of all){const dc=card(dps);if(!dc)continue;for(const r of parseDpsRows(dps)){if(r.source===name(member))rows.push({target:name(dps),effect:r.effect,value:r.value,pct:r.pct});}}
+ if(!rows.length)return false;
+ const groups=makeDetail(rows,'support');
+ const detail=c.querySelector('.chb-detail.raid-support-contributions')||c.querySelector('.chb-detail');if(!detail)return false;
+ const html=groups.map(g=>`<div class="chb-summary-row"><span>+${g.value.toLocaleString(undefined,{maximumFractionDigits:2})} estimated support contribution to ${esc(g.name)} - ${g.pct.toFixed(2)}% of ${esc(g.name)}'s base power</span></div>`).join('');
+ const key=groups.map(g=>`${g.name}|${g.value}|${g.pct}`).join('\n');
+ if(c.dataset.hoverSummaryCompactKey===key)return false;
+ detail.innerHTML=html;c.dataset.hoverSummaryCompact='1';c.dataset.hoverSummaryCompactKey=key;return true;
+}
+function apply(){
+ for(const m of members()){
+  if(memberRole(m)==='support')renderSupport(m);else renderDps(m);
+ }
+}
+function css(){
+ let s=document.getElementById('hover-summary-v1-style');if(!s){s=document.createElement('style');s.id='hover-summary-v1-style';document.head.appendChild(s)}
+ s.textContent='.chb-summary-row{display:block!important;margin:5px 0!important;line-height:1.45}.chb-summary-row span{display:inline}.chb-summary-row+.chb-summary-row{margin-top:7px!important}';
+}
+function start(){css();apply();const root=document.getElementById('suggestedParties')||document.body;let timer=0;const schedule=()=>{clearTimeout(timer);timer=setTimeout(apply,40)};new MutationObserver(schedule).observe(root,{childList:true,subtree:true,characterData:true});[50,150,300,600,1000,2000,4000].forEach(ms=>setTimeout(apply,ms));}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+window.LostArkHoverSummaryV1={active:true};
+})();
