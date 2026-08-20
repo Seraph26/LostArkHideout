@@ -1,8 +1,43 @@
 /* Lost Ark Hideout — General Optimization hover finalizer
-   Disabled: General Optimization now renders its authoritative hover directly
-   from general-party-optimizer-v2.js. This file remains as a compatibility
-   no-op so it cannot overwrite the optimizer's detailed DPS/support hover. */
+   UI-only authority for General Optimization DPS hover metrics.
+   Support uptime calculations remain in general-party-optimizer-v2.js untouched.
+*/
 (()=>{
 'use strict';
-window.LostArkGeneralFinalHoverV1={version:'disabled',active:false};
+const SYNERGY_TITLE='Estimated increase to this character’s modeled potential from offensive synergies supplied by the other DPS characters in the party. This is a model contribution, not a direct in-game damage percentage.';
+const SUPPORT_TITLE='Estimated increase to this character’s modeled potential from the party support. This is a model contribution, not a direct in-game damage percentage.';
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+function apply(){
+ document.querySelectorAll('.general-dps-hover').forEach(card=>{
+   [...card.children].forEach(row=>{
+     const t=clean(row.textContent);
+     if(/^Party Synergy\s+[+−-]/i.test(t)){
+       row.classList.add('chb-explained-metric','chb-general-party-synergy');
+       row.title=SYNERGY_TITLE;
+       row.style.cursor='help';
+     }else if(/^Support Impact\s+[+−-]/i.test(t)){
+       row.classList.add('chb-explained-metric','chb-general-support-impact');
+       row.title=SUPPORT_TITLE;
+       row.style.cursor='help';
+     }
+   });
+ });
+}
+function css(){
+ let s=document.getElementById('general-final-hover-style');
+ if(!s){s=document.createElement('style');s.id='general-final-hover-style';document.head.appendChild(s)}
+ s.textContent='.general-dps-hover .chb-general-party-synergy,.general-dps-hover .chb-general-support-impact{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}.general-dps-hover .chb-general-party-synergy:hover,.general-dps-hover .chb-general-support-impact:hover{border-bottom-color:currentColor}';
+}
+function start(){
+ css();
+ apply();
+ const root=document.getElementById('suggestedParties')||document.body;
+ let timer;
+ const schedule=()=>{clearTimeout(timer);timer=setTimeout(apply,25)};
+ new MutationObserver(schedule).observe(root,{childList:true,subtree:true,characterData:true});
+ [0,50,150,300,600,1000,2000,4000,8000].forEach(ms=>setTimeout(apply,ms));
+ setInterval(apply,1000);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+window.LostArkGeneralFinalHoverV1={version:'ui-authority-1',active:true};
 })();
