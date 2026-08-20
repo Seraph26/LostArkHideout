@@ -1,118 +1,115 @@
-/* Lost Ark Hideout — raid-specific support hover data bridge v13 */
+/* Lost Ark Hideout — raid-specific support hover renderer
+ * Raid support cards intentionally mirror the General Optimization support format.
+ * The contribution values come from the already-rendered DPS cards; no Bible lookup
+ * is required to construct this hover.
+ */
 (()=>{
 'use strict';
-const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+
 const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
-function classFor(member){
- const explicit=clean(member.querySelector('.class-icon')?.alt||member.dataset.class||member.querySelector('[data-class]')?.dataset.class||'');
- return SUPPORTS.has(explicit)?explicit:'';
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+const num=s=>{const m=String(s??'').replace(/,/g,'').match(/[-+]?\d+(?:\.\d+)?/);return m?Number(m[0]):0};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function role(member){
+ const r=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
+ if(r==='support'||r==='dps')return r;
+ const cls=clean(member.querySelector('.class-icon')?.alt||member.dataset.class||member.querySelector('[data-class]')?.dataset.class||'');
+ return SUPPORTS.has(cls)?'support':'dps';
 }
-function partyMembersFor(member){
- let node=member.parentElement;
- let best=null;
+
+function partyFor(member){
+ let node=member.parentElement,best=null;
  while(node&&node!==document.body){
-  const members=[...node.children].filter(x=>x.classList?.contains('party-member'));
-  if(members.includes(member)&&members.length>=2&&members.length<=4)best=members;
+  const ms=[...node.children].filter(x=>x.classList?.contains('party-member'));
+  if(ms.includes(member)&&ms.length>=2&&ms.length<=4)best=ms;
   node=node.parentElement;
  }
- if(best)return best;
- return [...document.querySelectorAll('#suggestedParties .party-member')].filter(x=>x.closest('[data-party]')===member.closest('[data-party]'));
+ return best||[...document.querySelectorAll('#suggestedParties .party-member')].filter(x=>x.closest('[data-party]')===member.closest('[data-party]'));
 }
-function supportLines(member){
+
+function currentEncounter(){
+ try{
+  const p=window.LostArkEncounterModel?.getProfile?.();
+  if(p?.name)return clean(p.name).replace(/\s+—\s+/g,' - ');
+ }catch{}
+ return '';
+}
+
+function supportName(card){return clean(card?.querySelector('.chb-head strong')?.textContent)}
+
+function cpFromCard(card){
+ const h=clean(card?.querySelector('.chb-head span')?.textContent);
+ return num(h.match(/CP\s+([\d,]+(?:\.\d+)?)/i)?.[1]);
+}
+
+function supportRows(member){
  const card=member.querySelector('.character-hover-breakdown');
- const existing=[...(card?.querySelectorAll('.chb-synergy')||[])].map(r=>({text:clean(r.textContent),title:r.title||''})).filter(x=>/^Support Amplification\s+to\s+/i.test(x.text));
- if(existing.length)return existing;
- const supportName=clean(card?.querySelector('.chb-head strong')?.textContent);
- if(!supportName)return[];
- const party=partyMembersFor(member),out=[];
- const escaped=supportName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
- const re=new RegExp(`^Support Amplification\\s+from\\s+${escaped}\\s*:`, 'i');
- for(const target of party){
-  if(target===member)continue;
-  const role=clean(target.querySelector('.party-role-label')?.textContent).toLowerCase();
-  if(role!=='dps')continue;
-  const targetName=clean(target.querySelector('.chb-head strong')?.textContent);
+ const name=supportName(card);
+ if(!name)return [];
+ const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ const re=new RegExp(`^(.+?)\\s+from\\s+${escaped}\\s*:\\s*([+-]?[\\d,]+(?:\\.\\d+)?)(?:\\s*[·-]\\s*([\\d.]+)%\\s+of\\s+base\\s+power)?(?:\\s*[·-]\\s*observed\\s+median\\s+uptime\\s+[\\d.]+%)?$`,'i');
+ const out=[];
+ for(const target of partyFor(member)){
+  if(target===member||role(target)!=='dps')continue;
+  const targetCard=target.querySelector('.character-hover-breakdown');
+  if(!targetCard)continue;
+  const targetName=clean(targetCard.querySelector('.chb-head strong')?.textContent);
   if(!targetName)continue;
-  const rows=[...target.querySelectorAll('.chb-synergy')];
-  const row=rows.find(r=>re.test(clean(r.textContent)));
-  if(!row)continue;
-  const text=clean(row.textContent).replace(re,`Support Amplification to ${targetName}:`);
-  out.push({text,title:row.title||'Estimated contribution is the optimizer model value assigned to this effect. Observed median uptime is the typical percentage of the relevant encounter for which the support effect is active, based on Bible encounter data.'});
+  for(const row of targetCard.querySelectorAll('.chb-synergy')){
+   const raw=clean(row.textContent),m=raw.match(re);
+   if(!m)continue;
+   const effect=clean(m[1]),value=num(m[2]);
+   const targetCp=cpFromCard(targetCard);
+   const pct=targetCp>0?value/targetCp*100:num(m[3]);
+   out.push({target:targetName,effect,value,pct,title:row.title||'Estimated contribution is the optimizer model value assigned to this effect. The numeric value is a model contribution, not a percentage.'});
+  }
  }
  return out;
 }
-function renderCard(member){
- const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
- if(role!=='support')return false;
+
+function render(member){
+ if(role(member)!=='support')return false;
  const card=member.querySelector('.character-hover-breakdown');
  if(!card)return false;
- const supportName=clean(card.querySelector('.chb-head strong')?.textContent);
- if(!supportName)return false;
- const lines=supportLines(member);
- const stats=card.querySelector('.chb-stats');
- const head=card.querySelector('.chb-head');
- if(!stats||!head||!lines.length)return false;
- const signature=lines.map(x=>x.text).join('\n');
- if(card.dataset.raidSupportContributionSignature===signature)return true;
+ const name=supportName(card);
+ if(!name)return false;
+ const rows=supportRows(member);
+ if(!rows.length)return false;
+ const cp=cpFromCard(card);
+ const total=rows.reduce((a,r)=>a+r.value,0);
+ const supportImpact=cp>0?total/cp*100:0;
+ const encounter=currentEncounter();
+ const signature=[encounter,cp,total,supportImpact,...rows.map(r=>`${r.target}|${r.effect}|${r.value}|${r.pct.toFixed(4)}`)].join('\n');
+ if(card.dataset.raidSupportCanonicalSignature===signature)return true;
+ const synergy=`+0.00%`;
  card.classList.add('chb-general-detailed','chb-raid-support-detailed');
  card.dataset.raidSupportAuthority='1';
- card.dataset.raidSupportContributionView='1';
- card.dataset.raidSupportContributionSignature=signature;
- [...stats.querySelectorAll('.chb-raid-support-encounter,.chb-raid-support-effect')].forEach(x=>x.remove());
- [...card.querySelectorAll('.chb-detail')].forEach(x=>x.remove());
- const detail=document.createElement('div');
- detail.className='chb-detail chb-raid-support-contributions';
- lines.forEach(({text,title})=>{
-  const row=document.createElement('div');
-  row.className='chb-synergy';
-  row.textContent=text;
-  row.title=title;
-  row.style.display='block';
-  row.style.margin='2px 0';
-  detail.appendChild(row);
- });
- card.appendChild(detail);
+ card.dataset.raidSupportCanonical='1';
+ card.dataset.raidSupportCanonicalSignature=signature;
+ const details=rows.map(r=>`<div class="chb-synergy raid-support-row" title="${esc(r.title)}"><span class="raid-support-line"><span>${esc(r.effect)} to ${esc(r.target)}: ${r.value>=0?'+':''}${r.value.toLocaleString(undefined,{maximumFractionDigits:2})} estimated contribution</span><br><span>${r.pct.toFixed(2)}% of ${esc(r.target)}'s base power</span></span></div>`).join('');
+ card.innerHTML=`<div class="chb-head"><strong>${esc(name)}</strong><span title="Estimated overall contribution for this character in the current party. It is an optimizer model value, not an observed Bible DPS parse and not Combat Power." style="cursor:help">CP ${cp.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} - Contribution ${Math.round(total).toLocaleString()}</span></div><div class="chb-stats"><span class="chb-explained-metric" title="Estimated increase to this character's modeled potential from offensive synergies supplied by the other DPS characters in the party. This is a model contribution, not a direct in-game damage percentage.">Party Synergy ${synergy}</span><span class="chb-explained-metric" title="Estimated increase to this character's modeled potential from the party support. This is a model contribution, not a direct in-game damage percentage.">Support Impact +${supportImpact.toFixed(2)}%</span>${encounter?`<span class="raid-support-encounter">${esc(encounter)}</span>`:''}<span>Support compatibility uses encounter data</span></div><div class="chb-detail raid-support-contributions">${details}</div>`;
  return true;
 }
+
 function css(){
- let s=document.getElementById('raid-support-hover-v13-style');
- if(!s){s=document.createElement('style');s.id='raid-support-hover-v13-style';document.head.appendChild(s)}
- s.textContent='.chb-raid-support-contributions .chb-synergy{display:block!important;margin:2px 0}.chb-raid-support-contributions .chb-synergy[title]{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}';
+ let s=document.getElementById('raid-support-canonical-style');
+ if(!s){s=document.createElement('style');s.id='raid-support-canonical-style';document.head.appendChild(s)}
+ s.textContent='.raid-support-contributions{line-height:1.45}.raid-support-row{display:block!important;margin:6px 0!important}.raid-support-row[title]{cursor:help}.raid-support-line{display:inline-block;border-bottom:1px dotted rgba(255,255,255,.45)}.raid-support-encounter{display:block;margin:2px 0}.chb-raid-support-detailed .chb-explained-metric{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45)}';
 }
+
 function wireMember(member){
- if(member.dataset.raidSupportHoverV13)return;
- member.dataset.raidSupportHoverV13='1';
- let timer=0;
- let rendering=false;
- const refresh=()=>{
-  if(rendering)return;
-  clearTimeout(timer);
-  timer=setTimeout(()=>{renderCard(member)},0);
- };
- const observer=new MutationObserver(()=>{
-  if(rendering)return;
-  refresh();
- });
- observer.observe(member,{childList:true,subtree:true,characterData:true});
- member.addEventListener('mouseenter',refresh,{passive:true});
- member.addEventListener('focusin',refresh,{passive:true});
+ if(member.dataset.raidSupportCanonicalWired)return;
+ member.dataset.raidSupportCanonicalWired='1';
+ const run=()=>{render(member)};
+ member.addEventListener('mouseenter',run,{passive:true});
+ member.addEventListener('focusin',run,{passive:true});
+ new MutationObserver(()=>{if(member.dataset.raidSupportCanonical==='1')return;run()}).observe(member,{childList:true,subtree:true,characterData:true});
 }
-function wire(){
- document.querySelectorAll('#suggestedParties .party-member').forEach(wireMember);
-}
-function start(){
- css();
- wire();
- const root=document.getElementById('suggestedParties')||document.body;
- let timer=0,frame=0;
- const schedule=()=>{
-  clearTimeout(timer);
-  timer=setTimeout(()=>{
-   if(frame)return;
-   frame=requestAnimationFrame(()=>{frame=0;wire()});
-  },20);
- };
- new MutationObserver(schedule).observe(root,{childList:true,subtree:true});
-}
+
+function wire(){document.querySelectorAll('#suggestedParties .party-member').forEach(wireMember)}
+
+function start(){css();wire();const root=document.getElementById('suggestedParties')||document.body;new MutationObserver(wire).observe(root,{childList:true,subtree:true});}
+
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
