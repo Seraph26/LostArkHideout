@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — dynamic Bible support uptime data v13 */
+/* Lost Ark Hideout — dynamic Bible support uptime data v14 */
 (()=>{
 'use strict';
 if(window.LostArkSupportStats)return;
@@ -19,7 +19,30 @@ function merge(records){const result={};for(const s of SUPPORTS)result[s]={ap:nu
 function hasSupportData(stats){return SUPPORTS.some(s=>Object.values(stats[s]||{}).some(v=>Number.isFinite(Number(v))))}
 async function fetchCandidate(enc,boss,difficulty){const p=payloadFor(enc,boss,difficulty);const r=await fetch(`${WORKER}?payload=${encodeURIComponent(p)}`,{cache:'no-store'});if(!r.ok)throw Error(`Bible raid stats HTTP ${r.status}`);const raw=await r.json();const root=unflatten(raw?.data??raw);const records=collect(root);return{stats:merge(records),rawCount:records.length,boss,difficulty}}
 function filtersFor(enc){if(enc?.id==='armoche-g1')return['Hard'];if(String(enc?.schema||'').toLowerCase()==='level')return['Level 3','Level 2','Level 1'];if(String(enc?.schema||'').toLowerCase()==='extreme')return[enc?.difficulty||'Extreme Nightmare','Extreme Hard','Extreme Normal'];return[...new Set([enc?.difficulty,'Nightmare','Hard','Normal'].filter(Boolean))]}
-async function fetchStats(enc){if(!enc)return null;const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,schema:enc?.schema,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});if(CACHE.has(key)){window.__LOSTARK_SUPPORT_STATS__=CACHE.get(key);return CACHE.get(key)}const candidates=enc?.id==='armoche-g1'?['Brelshaza, Ember in the Ashes']:[enc?.boss,...(ALIASES[enc.id]||[])].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);let lastError=null;for(const boss of candidates){for(const difficulty of filtersFor(enc)){try{const result=await fetchCandidate(enc,boss,difficulty);if(hasSupportData(result.stats)){const value={ok:true,key,stats:result.stats,rawCount:result.rawCount,resolvedBoss:boss,resolvedFilter:difficulty,updatedAt:new Date().toISOString()};CACHE.set(key,value);window.__LOSTARK_SUPPORT_STATS__=value;return value}}catch(e){lastError=e}}}if(lastError)throw lastError;const empty={ok:false,key,stats:merge([]),rawCount:0,resolvedBoss:null,resolvedFilter:null,updatedAt:new Date().toISOString()};CACHE.set(key,empty);window.__LOSTARK_SUPPORT_STATS__=empty;return empty}
+async function fetchStats(enc){
+ if(!enc)return null;
+ const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,schema:enc?.schema,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});
+ if(CACHE.has(key)){window.__LOSTARK_SUPPORT_STATS__=CACHE.get(key);return CACHE.get(key)}
+ const candidates=enc?.id==='armoche-g1'?['Brelshaza, Ember in the Ashes']:[enc?.boss,...(ALIASES[enc.id]||[])].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i);
+ let lastError=null;
+ // Preserve the existing boss/difficulty priority, but try all difficulty filters for
+ // the current boss concurrently. This removes long serial waits when an early filter
+ // is empty or slow while still selecting the first successful result in the original order.
+ for(const boss of candidates){
+  const results=await Promise.all(filtersFor(enc).map(async difficulty=>{
+   try{return await fetchCandidate(enc,boss,difficulty)}catch(e){lastError=e;return null}
+  }));
+  for(const result of results){
+   if(result&&hasSupportData(result.stats)){
+    const value={ok:true,key,stats:result.stats,rawCount:result.rawCount,resolvedBoss:boss,resolvedFilter:result.difficulty,updatedAt:new Date().toISOString()};
+    CACHE.set(key,value);window.__LOSTARK_SUPPORT_STATS__=value;return value;
+   }
+  }
+ }
+ if(lastError)throw lastError;
+ const empty={ok:false,key,stats:merge([]),rawCount:0,resolvedBoss:null,resolvedFilter:null,updatedAt:new Date().toISOString()};
+ CACHE.set(key,empty);window.__LOSTARK_SUPPORT_STATS__=empty;return empty
+}
 let lastModeKey='',loading=false;async function ensure(){const mode=window.LostArkOptimizerMode||{};if(mode.general||!mode.encounter)return null;const enc=mode.encounter;const key=JSON.stringify({id:enc?.id,boss:enc?.boss,difficulty:enc?.difficulty,schema:enc?.schema,patch:enc?.patch,minIlvl:enc?.minIlvl,maxIlvl:enc?.maxIlvl});if(key===lastModeKey&&window.__LOSTARK_SUPPORT_STATS__?.key===key)return window.__LOSTARK_SUPPORT_STATS__;if(loading)return null;loading=true;try{lastModeKey=key;return await fetchStats(enc)}catch(e){lastModeKey='';window.__LOSTARK_SUPPORT_STATS_ERROR__=String(e?.message||e);console.warn('Support uptime data unavailable:',e);return null}finally{loading=false}}
 function get(cls,effect){const v=window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)]?.[effect];return Number.isFinite(Number(v))?Number(v):null}function summary(cls){return window.__LOSTARK_SUPPORT_STATS__?.stats?.[classNorm(cls)]||null}
 window.LostArkSupportStats={fetch:fetchStats,ensure,get,summary};window.LostArkSupportStats.ready=ensure();const tick=()=>{try{ensure()}catch{}};setTimeout(tick,250);setTimeout(tick,750);setTimeout(tick,1500);setTimeout(tick,3000);setInterval(tick,2000);
