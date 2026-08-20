@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover data bridge v18 */
+/* Lost Ark Hideout — raid-specific support hover data bridge v19 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -11,10 +11,29 @@ function pct(v){let n=Number(v);if(!Number.isFinite(n))return'Unavailable';if(n>
 function isHorizon(enc){return /^horizon-cathedral-g[12]$/i.test(clean(enc?.id))}
 function horizonDifficulty(enc){const explicit=clean(enc?.difficulty);if(/^level\s*[123]$/i.test(explicit))return explicit;const n=Number(enc?.minIlvl);if(Number.isFinite(n)){if(n>=1750)return'Level 3';if(n>=1720)return'Level 2';if(n>=1700)return'Level 1'}return'Level 3'}
 async function ensure(){const api=window.LostArkSupportStats,mode=window.LostArkOptimizerMode||{};let enc=mode.encounter;if(!api||!enc||isGeneralMode())return;if(isHorizon(enc))enc={...enc,difficulty:horizonDifficulty(enc)};const key=JSON.stringify({id:enc.id,boss:enc.boss,difficulty:enc.difficulty,label:enc.label});if(key===lastKey&&window.__LOSTARK_SUPPORT_STATS__?.ok)return;if(loading)return;loading=true;try{const result=await api.fetch(enc);if(result?.ok){window.__LOSTARK_SUPPORT_STATS__=result;lastKey=key}else{lastKey=''}}catch(e){lastKey='';console.warn('Support uptime data unavailable:',e)}finally{loading=false}}
-function ensureDetail(card){let detail=[...card.querySelectorAll('.chb-detail')].find(el=>/observed median support uptime/i.test(clean(el.textContent)));if(!detail){detail=document.createElement('div');detail.className='chb-detail';const target=card.querySelector('.chb-stats')||card;target.appendChild(detail)}return detail}
-function paint(member,summary){const card=member.querySelector('.character-hover-breakdown');if(!card||!summary)return;const detail=ensureDetail(card);const key=JSON.stringify({name:encounterName(),ap:summary.ap,brand:summary.brand,ha:summary.ha,identity:summary.identity});if(detail.dataset.supportRenderKey===key)return;detail.innerHTML=`<div><strong>Observed median support uptime</strong></div><div>${clean(encounterName())}</div><div>AP: ${pct(summary.ap)} - Brand: ${pct(summary.brand)} - H.A. Skill: ${pct(summary.ha)} - Identity: ${pct(summary.identity)}</div>`;detail.dataset.supportRenderKey=key}
+function renderSupportDetail(member,summary){
+ const card=member.querySelector('.character-hover-breakdown');if(!card||!summary)return;
+ const encounter=clean(encounterName());
+ const supportClass=classFor(member);
+ const effects=[['Attack Power',summary.ap],['Brand',summary.brand],['H.A. Skill',summary.ha],['Identity',summary.identity]];
+ card.classList.add('chb-raid-support-detailed');
+ card.dataset.raidSupportDetailed='1';
+ let head=card.querySelector('.chb-head');
+ if(!head){head=document.createElement('div');head.className='chb-head';card.prepend(head)}
+ const name=clean(head.querySelector('strong')?.textContent||member.querySelector('.character-name')?.textContent||'Support');
+ const cpLine=head.querySelector('span');
+ if(!cpLine){const cp=clean([...card.querySelectorAll('div,span')].map(x=>clean(x.textContent)).find(t=>/^CP\s+/i.test(t))||'');if(cp){const s=document.createElement('span');s.textContent=cp;s.dataset.raidSupportCp='1';head.appendChild(s)}}
+ const oldStats=card.querySelector('.chb-stats');if(oldStats)oldStats.remove();
+ let stats=document.createElement('div');stats.className='chb-stats';
+ stats.innerHTML=`<div class="chb-raid-support-summary"><span class="chb-metric-label">Party Synergy</span> ${clean(card.dataset.partySynergy||'')||'+0.00%'} <span class="chb-metric-label">Support Impact</span> ${clean(card.dataset.supportImpact||'')||'+0.00%'}</div>`;
+ const detail=document.createElement('div');detail.className='chb-detail chb-raid-support-encounter';detail.innerHTML=`<strong>${encounter}</strong><br>Support compatibility uses encounter data.<br><span>Observed median support uptime by effect:</span>`;stats.appendChild(detail);
+ effects.forEach(([label,value])=>{const row=document.createElement('div');row.className='chb-detail chb-raid-support-effect';row.innerHTML=`<strong>${label}</strong><br>Observed median uptime: ${pct(value)}`;row.title=`Observed median ${label} uptime for ${supportClass} in ${encounter}. This is encounter evidence from Bible data, not a modeled contribution percentage.`;stats.appendChild(row)});
+ card.querySelectorAll('.chb-detail:not(.chb-raid-support-encounter):not(.chb-raid-support-effect)').forEach(x=>x.remove());
+ card.appendChild(stats);
+}
 function clearGeneralEncounterDetail(card){if(!isGeneralMode()||!card)return;card.querySelectorAll('.chb-detail').forEach(detail=>{if(/observed median support uptime|selected encounter|\bAP:\s*|\bBrand:\s*|\bH\.A\. Skill:\s*|\bIdentity:\s*/i.test(clean(detail.textContent)))detail.remove()})}
-function render(){const api=window.LostArkSupportStats;if(!api)return;const general=isGeneralMode();if(!general)ensure();document.querySelectorAll('#suggestedParties .party-member').forEach(m=>{const card=m.querySelector('.character-hover-breakdown');if(general){clearGeneralEncounterDetail(card);return}if(clean(m.querySelector('.party-role-label')?.textContent).toLowerCase()!=='support')return;const cls=classFor(m),s=cls?api.summary?.(cls):null;if(s)paint(m,s)})}
-function start(){let timer;const schedule=()=>{clearTimeout(timer);timer=setTimeout(render,50)};new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});document.addEventListener('mouseover',e=>{if(e.target.closest?.('#suggestedParties .party-member'))schedule()},true);[0,100,250,500,1000,2000,4000].forEach(ms=>setTimeout(render,ms));setInterval(render,1000)}
+function render(){const api=window.LostArkSupportStats;if(!api)return;const general=isGeneralMode();if(general)return;document.querySelectorAll('#suggestedParties .party-member').forEach(m=>{if(clean(m.querySelector('.party-role-label')?.textContent).toLowerCase()!=='support')return;const cls=classFor(m),s=cls?api.summary?.(cls):null;if(s)renderSupportDetail(m,s)})}
+function css(){let s=document.getElementById('raid-support-hover-v19-style');if(!s){s=document.createElement('style');s.id='raid-support-hover-v19-style';document.head.appendChild(s)}s.textContent='.chb-raid-support-detailed .chb-raid-support-summary{line-height:1.5;margin-bottom:6px}.chb-raid-support-detailed .chb-raid-support-effect{display:block!important;margin:5px 0;line-height:1.45;cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}.chb-raid-support-detailed .chb-raid-support-effect strong{font-weight:600}.chb-raid-support-detailed .chb-raid-support-encounter{line-height:1.45;margin-top:4px}'}
+function start(){css();let timer;const schedule=()=>{clearTimeout(timer);timer=setTimeout(render,50)};new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});document.addEventListener('mouseover',e=>{if(e.target.closest?.('#suggestedParties .party-member'))schedule()},true);[0,100,250,500,1000,2000,4000,8000].forEach(ms=>setTimeout(render,ms));setInterval(render,1000)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
