@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid-specific support hover data bridge v12 */
+/* Lost Ark Hideout — raid-specific support hover data bridge v13 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -52,9 +52,12 @@ function renderCard(member){
  const stats=card.querySelector('.chb-stats');
  const head=card.querySelector('.chb-head');
  if(!stats||!head||!lines.length)return false;
+ const signature=lines.map(x=>x.text).join('\n');
+ if(card.dataset.raidSupportContributionSignature===signature)return true;
  card.classList.add('chb-general-detailed','chb-raid-support-detailed');
  card.dataset.raidSupportAuthority='1';
  card.dataset.raidSupportContributionView='1';
+ card.dataset.raidSupportContributionSignature=signature;
  [...stats.querySelectorAll('.chb-raid-support-encounter,.chb-raid-support-effect')].forEach(x=>x.remove());
  [...card.querySelectorAll('.chb-detail')].forEach(x=>x.remove());
  const detail=document.createElement('div');
@@ -72,14 +75,25 @@ function renderCard(member){
  return true;
 }
 function css(){
- let s=document.getElementById('raid-support-hover-v12-style');
- if(!s){s=document.createElement('style');s.id='raid-support-hover-v12-style';document.head.appendChild(s)}
+ let s=document.getElementById('raid-support-hover-v13-style');
+ if(!s){s=document.createElement('style');s.id='raid-support-hover-v13-style';document.head.appendChild(s)}
  s.textContent='.chb-raid-support-contributions .chb-synergy{display:block!important;margin:2px 0}.chb-raid-support-contributions .chb-synergy[title]{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}';
 }
 function wireMember(member){
- if(member.dataset.raidSupportHoverV12)return;
- member.dataset.raidSupportHoverV12='1';
- const refresh=()=>{renderCard(member)};
+ if(member.dataset.raidSupportHoverV13)return;
+ member.dataset.raidSupportHoverV13='1';
+ let timer=0;
+ let rendering=false;
+ const refresh=()=>{
+  if(rendering)return;
+  clearTimeout(timer);
+  timer=setTimeout(()=>{renderCard(member)},0);
+ };
+ const observer=new MutationObserver(()=>{
+  if(rendering)return;
+  refresh();
+ });
+ observer.observe(member,{childList:true,subtree:true,characterData:true});
  member.addEventListener('mouseenter',refresh,{passive:true});
  member.addEventListener('focusin',refresh,{passive:true});
 }
