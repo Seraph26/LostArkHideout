@@ -77,18 +77,18 @@ function render(member){
  const rows=supportRows(member);
  if(!rows.length)return false;
  const cp=cpFromCard(card);
- const total=rows.reduce((a,r)=>a+r.value,0);
- const supportImpact=cp>0?total/cp*100:0;
+ const outgoing=rows.reduce((a,r)=>a+r.value,0);
+ const contribution=cp+outgoing;
+ const supportImpact=cp>0?outgoing/cp*100:0;
  const encounter=currentEncounter();
- const signature=[encounter,cp,total,supportImpact,...rows.map(r=>`${r.target}|${r.effect}|${r.value}|${r.pct.toFixed(4)}`)].join('\n');
+ const signature=[encounter,cp,contribution,supportImpact,...rows.map(r=>`${r.target}|${r.effect}|${r.value}|${r.pct.toFixed(4)}`)].join('\n');
  if(card.dataset.raidSupportCanonicalSignature===signature)return true;
- const synergy=`+0.00%`;
  card.classList.add('chb-general-detailed','chb-raid-support-detailed');
  card.dataset.raidSupportAuthority='1';
  card.dataset.raidSupportCanonical='1';
  card.dataset.raidSupportCanonicalSignature=signature;
  const details=rows.map(r=>`<div class="chb-synergy raid-support-row" title="${esc(r.title)}"><span class="raid-support-line"><span>${esc(r.effect)} to ${esc(r.target)}: ${r.value>=0?'+':''}${r.value.toLocaleString(undefined,{maximumFractionDigits:2})} estimated contribution</span><br><span>${r.pct.toFixed(2)}% of ${esc(r.target)}'s base power</span></span></div>`).join('');
- card.innerHTML=`<div class="chb-head"><strong>${esc(name)}</strong><span title="Estimated overall contribution for this character in the current party. It is an optimizer model value, not an observed Bible DPS parse and not Combat Power." style="cursor:help">CP ${cp.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} - Contribution ${Math.round(total).toLocaleString()}</span></div><div class="chb-stats"><span class="chb-explained-metric" title="Estimated increase to this character's modeled potential from offensive synergies supplied by the other DPS characters in the party. This is a model contribution, not a direct in-game damage percentage.">Party Synergy ${synergy}</span><span class="chb-explained-metric" title="Estimated increase to this character's modeled potential from the party support. This is a model contribution, not a direct in-game damage percentage.">Support Impact +${supportImpact.toFixed(2)}%</span>${encounter?`<span class="raid-support-encounter">${esc(encounter)}</span>`:''}<span>Support compatibility uses encounter data</span></div><div class="chb-detail raid-support-contributions">${details}</div>`;
+ card.innerHTML=`<div class="chb-head"><strong>${esc(name)}</strong><span title="Estimated overall contribution for this character in the current party. It is an optimizer model value, not an observed Bible DPS parse and not Combat Power." style="cursor:help">CP ${cp.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} - Contribution ${Math.round(contribution).toLocaleString()}</span></div><div class="chb-stats"><span class="chb-explained-metric" title="Estimated increase to this character's modeled potential from offensive synergies supplied by the other DPS characters in the party. This is a model contribution, not a direct in-game damage percentage.">Party Synergy +0.00%</span><span class="chb-explained-metric" title="Estimated increase to this character's modeled potential from the party support. This is a model contribution, not a direct in-game damage percentage.">Support Impact +${supportImpact.toFixed(2)}%</span>${encounter?`<span class="raid-support-encounter">${esc(encounter)}</span>`:''}<span>Support compatibility uses encounter data</span></div><div class="chb-detail raid-support-contributions">${details}</div>`;
  return true;
 }
 
