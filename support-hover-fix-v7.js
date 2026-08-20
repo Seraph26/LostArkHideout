@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover data bridge v7 */
+/* Lost Ark Hideout — raid-specific support hover data bridge v8 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
@@ -13,18 +13,39 @@ function encounterName(){
  try{const name=clean(window.LostArkEncounterScoring?.profile?.()?.name);if(name)return name}catch{}
  return 'Selected encounter';
 }
+function pct(v){return v!=null&&Number.isFinite(Number(v))?(Number(v)*100).toFixed(2)+'%':'Unavailable'}
 function render(){
  document.querySelectorAll('#suggestedParties .party-member').forEach(member=>{
   const role=clean(member.querySelector('.party-role-label')?.textContent).toLowerCase();
   if(role!=='support')return;
   const summary=summaryFor(member);if(!summary)return;
   const details=member.querySelectorAll('.character-hover-breakdown .chb-detail');if(!details.length)return;
-  const rows=[`Attack Power: ${summary.ap!=null?(summary.ap*100).toFixed(2)+'%':'Unavailable'}`,`Brand: ${summary.brand!=null?(summary.brand*100).toFixed(2)+'%':'Unavailable'}`,`H.A. Skill: ${summary.ha!=null?(summary.ha*100).toFixed(2)+'%':'Unavailable'}`,`Identity: ${summary.identity!=null?(summary.identity*100).toFixed(2)+'%':'Unavailable'}`];
-  details[0].innerHTML=`<div>${clean(encounterName())}</div><div>${rows.join(' · ')}</div>`;
-  for(let i=1;i<details.length;i++)details[i].remove();
+  const encounter=clean(encounterName()),supportClass=classFor(member);
+  const effects=[
+   ['Attack Power',summary.ap],
+   ['Brand',summary.brand],
+   ['H.A. Skill',summary.ha],
+   ['Identity',summary.identity]
+  ];
+  details[0].innerHTML=`<div><strong>${encounter}</strong></div><div>Support compatibility uses encounter data.</div><div>Observed median support uptime by effect:</div>`;
+  effects.forEach(([name,value],i)=>{
+   const row=details[i+1]||document.createElement('div');
+   row.className='chb-detail chb-raid-support-effect';
+   row.innerHTML=`<div><strong>${name}</strong></div><div>Observed median uptime: ${pct(value)}</div>`;
+   row.title=`Observed median ${name} uptime for ${supportClass} in ${encounter}. This is encounter evidence from Bible data, not a modeled contribution percentage.`;
+   if(!row.parentNode)details[0].parentNode.appendChild(row);
+  });
+  const all=member.querySelectorAll('.character-hover-breakdown .chb-detail');
+  for(const row of all){if(!row.classList.contains('chb-raid-support-effect')&&row!==details[0])row.remove()}
  });
 }
+function css(){
+ let s=document.getElementById('raid-support-hover-v8-style');
+ if(!s){s=document.createElement('style');s.id='raid-support-hover-v8-style';document.head.appendChild(s)}
+ s.textContent='.chb-raid-support-effect{display:block!important;margin:4px 0;line-height:1.4}.chb-raid-support-effect strong{font-weight:600}.chb-raid-support-effect[title]{cursor:help;border-bottom:1px dotted rgba(255,255,255,.45);width:max-content;max-width:100%}';
+}
 function start(){
+ css();
  const run=()=>render();
  run();
  const root=document.getElementById('suggestedParties')||document.body;let timer;
