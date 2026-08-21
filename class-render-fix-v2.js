@@ -11,7 +11,12 @@
   const data = () => window.LostArkHideoutClassData;
   const norm = v => String(v ?? '').normalize('NFKC').trim().toLowerCase();
   const canonical = cls => { try { return data()?.canonical?.(cls) || cls; } catch { return cls; } };
-  const iconFor = cls => { try { return data()?.iconUrl?.(cls) || ''; } catch { return ''; } };
+  const iconFor = cls => {
+    try {
+      return data()?.iconUrl?.(cls) ||
+        (norm(cls)==='guardianknight' ? data()?.iconUrl?.('Guardian Knight') : '') || '';
+    } catch { return ''; }
+  };
 
   /* Static spec -> class mapping supplied for the roster. */
   const SPEC_TO_CLASS = {
@@ -82,10 +87,6 @@
       p.buildSpec,p.buildName,p.build?.spec,p.build?.specName
     ].find(v=>String(v||'').trim() && norm(v)!=='-');
     if(explicit)return String(explicit).trim();
-
-    /* V3's parser deliberately stores the detected class engraving names in
-       `engravings`; check that array first so the New Addition roster gets the
-       same authority as the rest of the app. */
     const engravingValues=[];
     for(const source of [b.engravings,b.engravingNames,b.engravingData,p.engravings,p.engravingNames]){
       if(Array.isArray(source))for(const x of source){
@@ -97,7 +98,6 @@
       const found=ENGRAVINGS.find(e=>norm(e)===norm(value));
       if(found)return found;
     }
-
     const text=corpus(b,b.engravings,b.engraving,b.engravingData,b.build,b.text,
       b.raidText,b.raidLines,b.sections,b.rawText,p,p.engravings,p.engraving,
       p.engravingData,p.loadout,p.loadoutText,p.buildText,p.rawText);
@@ -111,29 +111,22 @@
       const mapped=ENGRAVINGS.find(e=>norm(e)===norm(spec));
       if(mapped) return canonical(SPEC_TO_CLASS[mapped]);
     }
-
     const buildClass=b.className||b.class||b.characterClass;
-    if(buildClass && norm(buildClass)!=='unknown' && norm(buildClass)!=='-')
-      return canonical(buildClass);
-
+    if(buildClass && norm(buildClass)!=='unknown' && norm(buildClass)!=='-') return canonical(buildClass);
     const text=corpus(b,b.engravings,b.engraving,b.engravingData,b.build,b.text,
       b.raidText,b.raidLines,b.sections,b.rawText,p,p.engravings,p.engraving,
       p.engravingData,p.loadout,p.loadoutText,p.buildText,p.rawText);
     for(const e of ENGRAVINGS) if(text.includes(norm(e))) return canonical(SPEC_TO_CLASS[e]);
-
     if(p.className && norm(p.className)!=='unknown' && norm(p.className)!=='-') return canonical(p.className);
     if(p.class && norm(p.class)!=='unknown' && norm(p.class)!=='-') return canonical(p.class);
     return 'Unknown';
   }
 
-  function readState(key) {
-    try { return JSON.parse(localStorage.getItem(key)||'null'); } catch { return null; }
-  }
+  function readState(key) { try { return JSON.parse(localStorage.getItem(key)||'null'); } catch { return null; } }
 
   function applyStored() {
     for(const key of KEYS){
-      const state=readState(key);
-      if(!state)continue;
+      const state=readState(key); if(!state)continue;
       const list=Array.isArray(state?.characters) ? state.characters : (Array.isArray(state) ? state : null);
       if(!list)continue;
       for(const c of list){
@@ -164,8 +157,7 @@
   }
 
   function run(){ applyStored(); updateVisibleDom(); }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,250),{once:true});
-  else setTimeout(run,250);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,250),{once:true}); else setTimeout(run,250);
   window.addEventListener('lostark-build-profiles-v3-ready',()=>setTimeout(run,100));
   const observer=new MutationObserver(()=>setTimeout(updateVisibleDom,50));
   observer.observe(document.documentElement,{subtree:true,childList:true});
