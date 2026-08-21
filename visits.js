@@ -44,6 +44,6 @@ document.head.appendChild(candidateRosterScript);
 
 // Final data-driven repair for class/spec fields after candidate rendering.
 const newAdditionsFinalAuthorityScript = document.createElement('script');
-newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v1.js?v=20260821final2';
+newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v1.js?v=20260821final3';
 newAdditionsFinalAuthorityScript.async = false;
 document.head.appendChild(newAdditionsFinalAuthorityScript);
