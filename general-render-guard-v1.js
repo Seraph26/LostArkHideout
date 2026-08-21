@@ -1,8 +1,26 @@
-/* Lost Ark Hideout — General Optimization hover guard v26
-   Intentionally inert. The dedicated general-final-hover-v1.js renderer is the
-   sole General Optimization hover finalizer. Keeping this file as a no-op
-   prevents a second renderer from replacing a working DPS/support hover. */
+/* Lost Ark Hideout — General Optimization top-potential swap indicators */
 (()=>{
 'use strict';
-window.LostArkGeneralRenderGuardV1={version:'26',active:false};
+const PARTY='lostark-hideout-party-assignments-v2';
+let baseline=null,optimizing=false,timer=null,lastSig='';
+const root=()=>document.getElementById('suggestedParties');
+const general=()=>!!document.getElementById('generalOptimization')?.checked&&!(document.getElementById('raidSpecificSelect')?.value||'');
+const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
+const num=s=>{const n=Number(String(s??'').replace(/[^0-9.+-]/g,''));return Number.isFinite(n)?n:null};
+const names=()=>{try{const x=JSON.parse(localStorage.getItem('lostark-hideout-private-v3')||localStorage.getItem('lostark-hideout-private-v2')||'null');return new Map((x?.characters||[]).map(c=>[String(c.id),clean(c.profile?.name||c.name||c.id)]))}catch{return new Map()}};
+function sig(){const r=root();if(!r)return'';return [...r.querySelectorAll('.authoritative-member[data-character-id]')].map(x=>x.dataset.characterId).join('|')}
+function state(){const r=root();if(!r)return{p1:[],p2:[]};const z=[...r.querySelectorAll('.authoritative-dropzone')].slice(0,2);return{p1:[...z[0]?.querySelectorAll('.authoritative-member[data-character-id]')||[]].map(x=>x.dataset.characterId),p2:[...z[1]?.querySelectorAll('.authoritative-member[data-character-id]')||[]].map(x=>x.dataset.characterId)}}
+function swapText(a,b){const n=names(),out=[];for(const p of ['p1','p2']){const x=new Set(a[p]||[]),y=new Set(b[p]||[]);for(const id of x)if(!y.has(id))out.push(id)}return out.length===2?`${n.get(String(out[0]))||out[0]} swapped with ${n.get(String(out[1]))||out[1]}`:'Manual party swap'}
+function candidates(){const r=root();if(!r)return[];return[...r.querySelectorAll('*')].filter(e=>{const t=clean(e.childElementCount?e.firstChild?.textContent:e.textContent);return /(?:^|\s)Estimated potential:\s*[\d,.]+/.test(t)&&!/^Combined estimated potential:/i.test(t)}).sort((a,b)=>a.textContent.length-b.textContent.length)}
+function combined(){const r=root();if(!r)return null;const els=[...r.querySelectorAll('*')].filter(e=>{const t=clean(e.childElementCount?e.firstChild?.textContent:e.textContent);return /^Combined estimated potential:\s*[\d,.]+/i.test(t)}).sort((a,b)=>a.textContent.length-b.textContent.length);const e=els[0];if(!e)return null;const m=clean(e.textContent).match(/^Combined estimated potential:\s*([\d,.]+)/i);return m?{e,v:num(m[1])}:null}
+function parties(){const out=[];for(const e of candidates()){const m=clean(e.textContent).match(/(?:^|\s)Estimated potential:\s*([\d,.]+)/i);if(m&&!out.some(x=>x.e===e))out.push({e,v:num(m[1])});if(out.length===2)break}return out}
+function arrow(delta,title){if(Math.abs(delta)<.005)return'';const up=delta>0;const val=Math.abs(delta);const text=val>=1?Math.abs(Math.round(delta)).toLocaleString():val.toFixed(2)+'%';return `<span class="general-top-swap-arrow ${up?'general-swap-up':'general-swap-down'}" data-swap-title="${title}">${up?'▲':'▼'} ${text}</span>`}
+function clearArrows(){root()?.querySelectorAll('.general-top-swap-arrow').forEach(e=>e.remove())}
+function render(){if(!general()||optimizing||!baseline)return;const changed=sig()!==baseline.sig;if(!changed){clearArrows();return}const title=swapText(baseline.state,state()),p=parties(),c=combined();p.forEach((x,i)=>{const b=baseline.potentials.p?.[i];if(b==null)return;const old=x.e.querySelector('.general-top-swap-arrow');if(old)old.remove();const d=x.v-b;x.e.insertAdjacentHTML('beforeend',arrow(d,title))});if(c&&baseline.potentials.c!=null){c.e.querySelector('.general-top-swap-arrow')?.remove();c.e.insertAdjacentHTML('beforeend',arrow(c.v-baseline.potentials.c,title))}}
+function capture(){if(!general())return;optimizing=false;clearArrows();const p=parties(),c=combined();if(p.length<2||!c)return;baseline={sig:sig(),state:state(),potentials:{p:p.map(x=>x.v),c:c.v}};lastSig=baseline.sig;render()}
+function optimize(){if(!general())return;optimizing=true;baseline=null;clearArrows();if(timer)clearTimeout(timer);timer=setTimeout(capture,4600)}
+function start(){if(!root())return;const b=document.getElementById('optimizeBtn');b?.addEventListener('click',optimize,true);const mo=new MutationObserver(()=>{if(!general())return;if(optimizing)return;const s=sig();if(baseline&&s!==baseline.sig){lastSig=s;setTimeout(render,100)}else if(baseline)render()});mo.observe(root(),{childList:true,subtree:true});setInterval(()=>{if(!general()){baseline=null;optimizing=false;return}if(optimizing)return;if(baseline&&sig()!==baseline.sig)render()},250);setTimeout(()=>{if(general()&&!baseline&&!optimizing)capture()},1200)}
+const style=()=>{if(document.getElementById('general-top-swap-style'))return;const s=document.createElement('style');s.id='general-top-swap-style';s.textContent='.general-top-swap-arrow{font-weight:800!important;margin-left:5px;white-space:nowrap;cursor:help!important;position:relative}.general-top-swap-arrow.general-swap-up{color:#65c878!important}.general-top-swap-arrow.general-swap-down{color:#ef6b6b!important}.general-top-swap-arrow:hover::after{content:attr(data-swap-title);position:absolute;left:0;bottom:calc(100% + 7px);z-index:99999;background:#17191d;color:#eee;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:7px 9px;font-size:11px;font-weight:400;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.4)}';document.head.appendChild(s)};
+function boot(){style();start()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(boot,50),{once:true});else setTimeout(boot,50);
 })();
