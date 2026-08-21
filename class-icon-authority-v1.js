@@ -10,7 +10,7 @@
   const asset = name => new URL(name, document.baseURI).href;
   const VALKYRIE_ICON = asset('valkyrie-icon.svg');
   const WILDSOUL_ICON = 'https://static.wikia.nocookie.net/lostark_gamepedia/images/3/3b/ClassIcon-Specialist.png/revision/latest/scale-to-width-down/120?cb=20230901205506';
-  const SPECIAL = { valkyrie: VALKYRIE_ICON, wildsoul: WILDSOUL_ICON };
+  const SPECIAL = { valkyrie: VALKYRIE_ICON, wildsoul: WILDSOUL_ICON, guardianknight: '' };
 
   function iconFor(name) {
     return SPECIAL[String(name || '').trim().toLowerCase()] || '';
@@ -45,14 +45,24 @@
     }
   }
 
-  function patchDom() {
-    document.querySelectorAll('img.class-icon').forEach(img => {
+  function patchDom(root = document) {
+    root.querySelectorAll?.('img.class-icon').forEach(img => {
       const cls = String(img.alt || '').trim().toLowerCase();
       const icon = iconFor(cls);
       if (!icon) return;
-      if (img.src !== icon) img.src = icon;
+      if (img.getAttribute('src') !== icon) img.src = icon;
       img.removeAttribute('srcset');
       img.alt = cls === 'valkyrie' ? 'Valkyrie' : 'Wildsoul';
+    });
+  }
+
+  let scheduled = false;
+  function scheduleDomPatch() {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      patchDom();
     });
   }
 
@@ -65,5 +75,20 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
   else run();
   window.addEventListener('load', run, { once: true });
-  new MutationObserver(run).observe(document.documentElement, { subtree: true, childList: true });
+  window.addEventListener('lostark-build-profiles-v3-ready', scheduleDomPatch);
+
+  /* Only react when new DOM nodes containing class icons are actually added.
+   * The previous document-wide observer ran on every UI mutation and could
+   * cause repeated icon work while the comparison/party sections rendered. */
+  const observer = new MutationObserver(mutations => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes || []) {
+        if (node.nodeType === 1 && (node.matches?.('img.class-icon') || node.querySelector?.('img.class-icon'))) {
+          scheduleDomPatch();
+          return;
+        }
+      }
+    }
+  });
+  observer.observe(document.documentElement, { subtree: true, childList: true });
 })();
