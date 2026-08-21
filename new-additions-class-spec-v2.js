@@ -1,0 +1,32 @@
+/* New Additions spec authority. Local/cache only; never fetches Bible on page load. */
+(()=>{
+  'use strict';
+  const KEY='lostark-hideout-new-additions-v1', CACHE='lostark-hideout-build-profiles-v3';
+  const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??d}catch{return d}};
+  const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+  const norm=v=>String(v??'').normalize('NFKC').toLowerCase().replace(/[’']/g,"'").replace(/\s+/g,' ').trim();
+  const text=v=>{try{return norm(typeof v==='string'?v:JSON.stringify(v||{}))}catch{return ''}};
+  const cls=c=>String(c?.profile?.class||c?.profile?.className||'').trim();
+  const urlKey=u=>{try{return new URL(u,location.href).href.replace(/\/$/,'')}catch{return String(u||'').replace(/\/$/,'')}};
+  const cacheFor=c=>{const u=c?.url||'';const cache=read(CACHE,{});if(cache[u])return cache[u];const k=urlKey(u);for(const [x,v] of Object.entries(cache))if(urlKey(x)===k)return v;return {}};
+  const RULES={
+    Sorceress:[['igniter','Igniter'],['reflux','Reflux']], Reaper:[['hunger','Hunger'],['lunar voice','Lunar Voice']], Deadeye:[['enhanced weapon','Enhanced Weapon'],['pistoleer','Pistoleer']],
+    Glaivier:[['pinnacle','Pinnacle'],['control','Control']], Glavier:[['pinnacle','Pinnacle'],['control','Control']],
+    Guardianknight:[['hellfire successor','Hellfire Successor'],['dreadful roar','Dreadful Roar']], Wildsoul:[['phantom beast awakening','Phantom Beast Awakening'],['ferality','Ferality']],
+    Artist:[['recurrence','Recurrence'],['full bloom','Full Bloom']], Valkyrie:[['shining knight','Shining Knight'],['liberator','Liberator']],
+    Arcanist:[["grace of the empress",'Grace of the Empress'],['empress grace','Grace of the Empress'],['order of the emperor',"Order of the Emperor"],["emperor's decree","Order of the Emperor"],["emperor decree","Order of the Emperor"]],
+    Summoner:[['master summoner','Master Summoner'],['communication overflow','Communication Overflow']], Bard:[['desperate salvation','Desperate Salvation'],['true courage','True Courage']],
+    Paladin:[['blessed aura','Blessed Aura'],['judgment','Judgment']], Gunslinger:[['peacemaker','Peacemaker'],['time to hunt','Time to Hunt']], Sharpshooter:[['loyal companion','Loyal Companion'],['death strike','Death Strike']],
+    Artillerist:[['barrage enhancement','Barrage Enhancement'],['firepower enhancement','Firepower Enhancement']], Machinist:[['evolutionary legacy','Evolutionary Legacy'],['arthetinean skill','Arthetinean Skill']],
+    Striker:[['deathblow','Deathblow'],['esoteric flurry','Esoteric Flurry']], Wardancer:[['esoteric skill enhancement','Esoteric Skill Enhancement'],['first intention','First Intention']],
+    Scrapper:[['shock training','Shock Training'],['taijutsu','Ultimate Skill: Taijutsu']], Soulfist:[['robust spirit','Robust Spirit'],['energy overflow','Energy Overflow']],
+    Deathblade:[['remaining energy','Remaining Energy'],['surge','Surge']], Shadowhunter:[['demonic impulse','Demonic Impulse'],['perfect suppression','Perfect Suppression']],
+    Souleater:[['full moon harvester','Full Moon Harvester'],["night's edge","Night's Edge"]], Aeromancer:[['wind fury','Wind Fury'],['drizzle','Drizzle']],
+    Breaker:[["asura's path","Asura's Path"],['brawl king storm','Brawl King Storm']], Slayer:[['predator','Predator'],['punisher','Punisher']],
+    Berserker:[["berserker's technique","Berserker's Technique"],['mayhem','Mayhem']], Destroyer:[['gravity training','Gravity Training'],['rage hammer','Rage Hammer']],
+    Gunlancer:[['lone knight','Lone Knight'],['combat readiness','Combat Readiness']]
+  };
+  function spec(c){const p=c?.profile||{},b=cacheFor(c),direct=p.spec||p.specialization||p.specName||p.buildSpec||b.spec||b.specialization||b.specName||b.buildSpec;if(direct&&norm(direct)!=='-')return String(direct).trim();const t=text({...p,build:b});for(const [needle,name] of RULES[cls(c)]||[])if(t.includes(needle))return name;return ''}
+  function apply(){const list=read(KEY,[]);if(!Array.isArray(list))return;let changed=false;for(const c of list){if(!c?.profile)continue;const s=spec(c);if(s&&c.profile.spec!==s){c.profile.spec=s;changed=true}}if(changed)write(KEY,list);for(const c of list){const s=c?.profile?.spec;if(!s)continue;const card=document.querySelector(`.new-addition-card[data-candidate-id="${CSS.escape(String(c.id))}"]`);const el=card?.querySelector('.class');if(el&&el.textContent!==s)el.textContent=s}}
+  const schedule=()=>setTimeout(apply,40); if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});else schedule(); new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true}); window.addEventListener('lostark-build-profiles-v3-ready',schedule);
+})();
