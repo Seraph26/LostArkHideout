@@ -48,6 +48,13 @@ newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v1.js?v=20
 newAdditionsFinalAuthorityScript.async = false;
 document.head.appendChild(newAdditionsFinalAuthorityScript);
 
+// Apply the supplied class/spec authority to the isolated New Additions roster.
+// This is intentionally limited to identity/spec/icon rendering.
+const classRenderFixScript = document.createElement('script');
+classRenderFixScript.src = 'class-render-fix-v2.js?v=20260821newadditions1';
+classRenderFixScript.async = false;
+document.head.appendChild(classRenderFixScript);
+
 // Must run after every generic class-icon renderer so Wildsoul cannot fall back to Fandom.
 const wildsoulIconGuardScript = document.createElement('script');
 wildsoulIconGuardScript.src = 'wildsoul-icon-guard-v1.js?v=20260821wildsoul2';
