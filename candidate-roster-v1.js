@@ -7,7 +7,10 @@ const newChars=()=>read(NEW_KEY,[]).filter(c=>c&&c.id),hidden=()=>new Set(read(H
 const setHidden=s=>write(HIDDEN_KEY,[...s]);
 function canonicalClass(c){const raw=String(c?.profile?.class||c?.profile?.className||'').trim();try{return window.LostArkHideoutClassData?.canonical?.(raw)||raw||'Unknown'}catch{return raw||'Unknown'}}
 function classIcon(cls,p){
-  if(String(cls).toLowerCase()==='valkyrie') return 'https://lostark.fandom.com/wiki/Special:Redirect/file/ClassIcon-Warrior-Valkyrie.png';
+  // The Bible roster supplies the Valkyrie emblem through the Poyoanon asset.
+  // Route it through an image proxy because the raw CMS asset does not reliably
+  // render as an external image from the dashboard's origin.
+  if(String(cls).toLowerCase()==='valkyrie') return 'https://images.weserv.nl/?url=cms.poyoanon.fyi%2Fassets%2Fd3a00d6c-f439-4a8e-9a42-38f7367cc7f2.png%3Fheight%3D636%26width%3D816';
   try{const x=window.LostArkHideoutClassData?.iconUrl?.(cls);if(x)return x}catch{}
   const files={Artist:'ClassIcon-Specialist-Artist.png'};
   return files[cls]?`https://lostark.fandom.com/wiki/Special:Redirect/file/${encodeURIComponent(files[cls])}`:(p?.classIcon||'')
