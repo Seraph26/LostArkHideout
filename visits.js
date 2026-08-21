@@ -14,7 +14,7 @@ async function loadVisitCounter() {
 loadVisitCounter();
 
 const newAdditionsAuthorityScript = document.createElement('script');
-newAdditionsAuthorityScript.src = 'new-additions-class-spec-v1.js?v=20260821authority5';
+newAdditionsAuthorityScript.src = 'new-additions-class-spec-v2.js?v=20260821authority6';
 newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
@@ -24,7 +24,7 @@ candidateRosterScript.async = false;
 document.head.appendChild(candidateRosterScript);
 
 const newAdditionsFinalAuthorityScript = document.createElement('script');
-newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v1.js?v=20260821final3';
+newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v2.js?v=20260821final4';
 newAdditionsFinalAuthorityScript.async = false;
 document.head.appendChild(newAdditionsFinalAuthorityScript);
 
@@ -40,8 +40,13 @@ wildsoulIconGuardScript.async = false;
 document.head.appendChild(wildsoulIconGuardScript);
 
 // Final hard authority for the supplied Valkyrie SVG and verified Wildsoul asset.
-// Must run after generic and legacy class-icon renderers.
 const classIconAuthorityScript = document.createElement('script');
 classIconAuthorityScript.src = 'class-icon-authority-v1.js?v=20260821icons1';
 classIconAuthorityScript.async = false;
 document.head.appendChild(classIconAuthorityScript);
+
+// Guardianknight was supplied as an exact Bible SVG, not a Fandom asset.
+const guardianknightInlineAuthorityScript = document.createElement('script');
+guardianknightInlineAuthorityScript.src = 'guardianknight-inline-authority-v1.js?v=20260821gk1';
+guardianknightInlineAuthorityScript.async = false;
+document.head.appendChild(guardianknightInlineAuthorityScript);
