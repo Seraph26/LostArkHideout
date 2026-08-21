@@ -19,9 +19,16 @@ newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
 const candidateRosterScript = document.createElement('script');
-candidateRosterScript.src = 'candidate-roster-v1.js?v=20260821candidate9';
+candidateRosterScript.src = 'candidate-roster-v1.js?v=20260821candidate10';
 candidateRosterScript.async = false;
 document.head.appendChild(candidateRosterScript);
+
+// Isolate the candidate build refresh from the main optimizer state before any
+// New Addition can request a build-profile refresh.
+const candidateBuildRefreshIsolationScript = document.createElement('script');
+candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v1.js?v=20260821isolate1';
+candidateBuildRefreshIsolationScript.async = false;
+document.head.appendChild(candidateBuildRefreshIsolationScript);
 
 const newAdditionsFinalAuthorityScript = document.createElement('script');
 newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v2.js?v=20260821final4';
