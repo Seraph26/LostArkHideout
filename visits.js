@@ -41,3 +41,9 @@ const candidateRosterScript = document.createElement('script');
 candidateRosterScript.src = 'candidate-roster-v1.js?v=20260821candidate6';
 candidateRosterScript.async = false;
 document.head.appendChild(candidateRosterScript);
+
+// Final data-driven repair for class/spec fields after candidate rendering.
+const newAdditionsFinalAuthorityScript = document.createElement('script');
+newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v1.js?v=20260821final1';
+newAdditionsFinalAuthorityScript.async = false;
+document.head.appendChild(newAdditionsFinalAuthorityScript);
