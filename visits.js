@@ -19,16 +19,23 @@ newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
 const candidateRosterScript = document.createElement('script');
-candidateRosterScript.src = 'candidate-roster-v1.js?v=20260821candidate9';
+candidateRosterScript.src = 'candidate-roster-v1.js?v=20260821candidate10';
 candidateRosterScript.async = false;
 document.head.appendChild(candidateRosterScript);
+
+// Isolate the candidate build refresh from the main optimizer state before any
+// New Addition can request a build-profile refresh.
+const candidateBuildRefreshIsolationScript = document.createElement('script');
+candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v1.js?v=20260821isolate1';
+candidateBuildRefreshIsolationScript.async = false;
+document.head.appendChild(candidateBuildRefreshIsolationScript);
 
 const newAdditionsFinalAuthorityScript = document.createElement('script');
 newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v2.js?v=20260821final4';
 newAdditionsFinalAuthorityScript.async = false;
 document.head.appendChild(newAdditionsFinalAuthorityScript);
 
-// Identity/spec/icon display only. No optimizer, hover, arrow, scoring, or swap logic.
+// Identity/spec/icon display only. No optimizer, hover, arrow, scoring, or swap behavior.
 const classRenderFixScript = document.createElement('script');
 classRenderFixScript.src = 'class-render-fix-v2.js?v=20260821newadditions2';
 classRenderFixScript.async = false;
@@ -56,3 +63,9 @@ const guardianknightInlineAuthorityScript = document.createElement('script');
 guardianknightInlineAuthorityScript.src = 'guardianknight-inline-authority-v1.js?v=20260821gk1';
 guardianknightInlineAuthorityScript.async = false;
 document.head.appendChild(guardianknightInlineAuthorityScript);
+
+// Final display-only specialization authority for the Optimized Party Setup.
+const optimizerSpecDisplayGuardScript = document.createElement('script');
+optimizerSpecDisplayGuardScript.src = 'optimizer-spec-display-guard-v1.js?v=20260821optspec1';
+optimizerSpecDisplayGuardScript.async = false;
+document.head.appendChild(optimizerSpecDisplayGuardScript);
