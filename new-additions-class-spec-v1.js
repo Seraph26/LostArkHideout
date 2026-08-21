@@ -4,165 +4,45 @@
 
   const CONNECTOR='https://lostark-bible-connector.seraph0226.workers.dev/character';
   const NEW_KEY='lostark-hideout-new-additions-v1';
-  // Bible's Valkyrie roster asset. Keep this as the class-wide fallback for every Valkyrie.
   const VALK_ICON='https://cms.poyoanon.fyi/assets/d3a00d6c-f439-4a8e-9a42-38f7367cc7f2.png?height=636&width=816';
-  // Fandom's standard class-icon asset for the Specialist Wildsoul class.
-  const WILDSOUL_ICON='https://lostark.fandom.com/wiki/Special:Redirect/file/ClassIcon-Specialist-Wildsoul.png';
+  // Canonical Wildsoul SVG supplied from the Bible roster. Never use the Fandom Wildsoul asset.
+  const WILDSOUL_ICON='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="300 90 600 400" fill="white"><path d="M699.34,213.81s-15.74-11.92-7.87-34.34c11.36-32.36,38.37-29.54,52.57-58.98,6.81-14.11-4.84-46.05-9.65-51.19,55.93,41.49,61.76,104.44,55.56,136.48-3.38,17.48-15.5,37.36-37.68,38.79-22.18,1.43-37.2-10.02-37.91-25.04-.72-15.02,6.92-43.88,35.77-38.63-11.45,5.72-36.45,30.23-7.4,38.37,7.17,2.01,20.04-10,22.43-27.88,2.05-15.39-.73-26.76-10.49-29.57-18.84-5.43-35.19,4.44-41.63,15.17-6.44,10.73-10.71,20-13.69,36.81Z"/><path d="M590.13,0c32.9,37.83,10.04,67.38,1.92,82.18-5.79,10.57-13.83,37.2-4.31,48.01,10.02-17.17,17.48-32.27,32.91-32.27,10.73,0,20.51,13.67,20.51,32.27s-8.85,38.36-28.14,40.69c-15.74,1.91-13.12-27.9,9.78-33.62-22.65-21.22-67.25,35.05-18.8,58.03,36.07,17.1,67.9-19.44,70.3-58.03,2.62-42.21-30.76-123.76-84.17-137.27Z"/><path d="M503.32,170.18c13.94,22.48,47.97,9.78,47.93-20.75-.03-24.29-22.89-40.06-37.2-48.65-14.31-8.58-21.46-12.88-22.18-51.51-16.69,11.45-35.02,60.81-38.6,78.69s-10.04,47.69,12.13,69.39c17.35,16.98,56.99,18.84,66.53-4.05-17.41,1.19-30.52-4.05-41.97-13.35s-24.65-48.59-4.53-56.99c15.42-6.44,29.43,14.32,33.62,22.65,5.72,11.39-2.86,23.85-15.74,24.56Z"/><path d="M468.27,255.3c-10.02-11.45-31.44-23.2-43.64-19.32-15.74,5.01-10.21,32.51,3.03,38.39,12.88,5.72,34.41,3.82,33.7-7.63,9.51,30.41-11.79,38.41-38.63,31.76-33.2-8.21-51.03-42.26-33.86-81.84,6.3-14.53,15.11-43.68,18.6-65.1,15.26,15.98,11.95,45.49,27.16,54.21,28.16,16.14,42.47,29.97,33.65,49.52Z"/><path d="M565.8,363.09c-15.18,2.14-18.6-15.74-9.54-24.8,11.81-11.81,21.96-16.43,39.11-15.74,25.28,1.02,31,13.77,37.44,20.12-49.84-6.76-52.7,18.4-67.01,20.42Z"/><path d="M522.93,464.95c-40.06-22.89-65.87-14.59-113.32-58.7-18.16-16.89-31.48-49.36-38.63-67.96-26.95,59.14,12.16,118.04,108.02,141.64-64.38,3.34-103.97-12.4-130.91-30.76,19.32,63.67,122.78,68.44,140.21,55.8-12.64,22.18-42.8,29.33-78.69,32.19,12.16,12.16,60.81,27.9,101.58-10.73-14.31,28.61-21.85,40.06-41.69,50.79,33.82,8.58,63.86-9.3,63.86-48.65,4.29,13.59,1.43,28.61,0,39.35,22.42-18.84,26.47-34.34,25.04-55.08-1.43-20.75-24.5-41.62-35.47-47.89Z"/><path d="M835.73,310.15c-13.59-1.43-39.44,3.99-54.37,14.78-31,22.41-52.46,75.83-122.81,84.89-25.7,3.31-54.56,30.52-55.01,52.46-3.89.48-11.5.95-18.67.48-5.72,4.29-10.05,59.14,11.45,82.03,21.5,22.89,39.58,28.85,67.96,28.85,36.48,0,70.11-23.61,67.25-26.47-13.59-2.15-20.75-1.43-20.75-1.43,0,0,20.92-19.08,16.69-40.06,12.71-2.86,31.48-5.72,31.48-5.72,0,0-5.52,16.77-13.2,23.2,15.22,0,24.74-6.03,42.1-23.2,17.36-17.17,30.77-54.12,31.19-80.6.48-30.28-8.82-44.35-2.86-69.63,2-8.47,26.23-39.11,51.27-11.45,3.93-11.45-18.12-26.71-31.71-28.14ZM772.3,421.99c11.92-2.62,13.37-11.4,19.32-15.02.3,57.23-45.43,95.1-73.21,71.54-35.39-30.02-88.71-5.25-82.03,30.52,4.03,21.57,33.38,24.32,43.4,12.4-30.52.48-21.22-27.18-10.49-31.48,10.73-4.29,28.61-5.01,40.78,17.17,12.16,22.18-14.73,44-28.61,49.36-24.08,9.3-55.28-1.18-66.53-19.32-31.95-51.51,11.45-106.35,62.2-108.76,87.83-4.17,74.2-52.43,114.77-73.89-17.2,27.18-21.02,55.8-19.59,67.48Z"/><path d="M710.78,267.7c-27.15-15.15-27.66-23.01-31.48-41.57-1.31-6.39-23.37,0-40.06,2.7-37.06,6-49.36-9.08-62.24-19.56-12.88-10.48-21.46,5.03-29.33,15.16s-20.29,20.62-30.05,16.56c-17.22-7.15-14.78-3.82-13.35,14.78,1.32,17.13-8.82,30.55-15.98,41.51-7.15,10.95-21.19,23.61-29.81,25.19s-8.69,33.45-5.12,54.91c3.58,21.46,23.24,53.42,40.41,62.01,17.17,8.58,25.28,0,38.87,14.78,7.56,8.22,23.18-6.45,38.63-37.2-39.82,0-100.42-40.54-86.56-89.42,19.32,4.29,45.07,4.7,61.52-6.59,18.94-13,34.81-25.12,72.25-17.73-7.48-22.11-4.32-41.56,10.25-51.75,13.7-9.57,40.04-14.07,45.65-16.22-3.69,15.02,0,31-2.97,51.51-1.43,9.86-14.78,27.43-21.93,31.72,10.02,14.31,19.07,24.08,16.92,39.1-2.15,15.02-10.02,34.34-17.17,40.06,21.46,0,46.5-9.3,66.53-27.18,20.03-17.88,24.06-86.56-5.01-102.78ZM546.25,287.74c-20.51-31.48,27.66-64.38,27.66-64.38,2.86,24.8,23.37,48.17,23.37,65.81-9.54.95-43.79,9.68-51.03-1.43Z"/></svg>`);
 
-  const SPECS=[
-    ['full moon harvester','Full Moon Harvester'],
-    ['night\'s edge',"Night's Edge"],['nights edge',"Night's Edge"],
-    ['empress\'s grace',"Grace of the Empress"],['empress grace',"Grace of the Empress"],
-    ['grace of the empress',"Grace of the Empress"],
-    ['emperor\'s decree',"Order of the Emperor"],['emperor decree',"Order of the Emperor"],
-    ['order of the emperor',"Order of the Emperor"],
-    ['master summoner','Master Summoner'],['communication overflow','Communication Overflow'],
-    ['lone knight','Lone Knight'],['combat readiness','Combat Readiness'],
-    ['rage hammer','Rage Hammer'],['gravity training','Gravity Training'],
-    ['mayhem','Mayhem'],['berserker\'s technique',"Berserker's Technique"],['berserkers technique',"Berserker's Technique"],
-    ['predator','Predator'],['punisher','Punisher'],['igniter','Igniter'],['reflux','Reflux'],
-    ['surge','Surge'],['remaining energy','Remaining Energy'],['peacemaker','Peacemaker'],['time to hunt','Time to Hunt'],
-    ['death strike','Death Strike'],['loyal companion','Loyal Companion'],
-    ['barrage enhancement','Barrage Enhancement'],['firepower enhancement','Firepower Enhancement'],
-    ['enhanced weapon','Enhanced Weapon'],['pistoleer','Pistoleer'],
-    ['demonic impulse','Demonic Impulse'],['perfect suppression','Perfect Suppression'],
-    ['hunger','Hunger'],['pinnacle','Pinnacle'],['control','Control'],
-    ['shock training','Shock Training'],['taijutsu','Taijutsu'],
-    ['esoteric flurry','Esoteric Flurry'],['first intention','First Intention'],
-    ['esoteric skill enhancement','Esoteric Skill Enhancement'],
-    ['asura\'s path',"Asura's Path"],['asuras path',"Asura's Path"],['brawl king storm','Brawl King Storm'],
-    ['deathblow','Deathblow'],['full bloom','Full Bloom'],['recurrence','Recurrence'],
-    ['desperate salvation','Desperate Salvation'],['true courage','True Courage'],
-    ['blessed aura','Blessed Aura'],['judgment','Judgment'],['liberator','Liberator'],['shining knight','Shining Knight'],
-    ['ferality','Ferality'],['phantom beast awakening','Phantom Beast Awakening']
-  ];
+  const SPECS=[['full moon harvester','Full Moon Harvester'],['night\'s edge',"Night's Edge"],['nights edge',"Night's Edge"],['empress\'s grace',"Grace of the Empress"],['empress grace',"Grace of the Empress"],['grace of the empress',"Grace of the Empress"],['emperor\'s decree',"Order of the Emperor"],['emperor decree',"Order of the Emperor"],['order of the emperor',"Order of the Emperor"],['ferality','Ferality'],['phantom beast awakening','Phantom Beast Awakening'],['full bloom','Full Bloom'],['liberator','Liberator']];
+  const normalized=v=>String(v??'').toLowerCase().replace(/[’']/g,"'").replace(/\s+/g,' ').trim();
+  const findSpec=t=>{const s=normalized(t);for(const [n,v] of [...SPECS].sort((a,b)=>b[0].length-a[0].length))if(s.includes(n))return v;return ''};
+  const textOf=v=>{try{return normalized(JSON.stringify(v))}catch{return normalized(v)}};
+  const className=p=>String(p?.class||p?.className||'').trim();
 
-  function decodeEntities(v){
-    const s=String(v??'');
-    try{return new DOMParser().parseFromString(s,'text/html').documentElement.textContent||s}catch{return s}
+  function authoritativeClass(html, current){
+    const s=String(html||'');
+    const marker=s.match(/data-bible-authoritative-class=["']([^"']+)["']/i);
+    if(marker&&/wildsoul/i.test(marker[1]))return 'Wildsoul';
+    const visible=s.match(/<[^>]*class=["'][^"']*\bclass\b[^"']*["'][^>]*>\s*([^<]+?)\s*<\//i);
+    if(visible&&/wildsoul/i.test(visible[1]))return 'Wildsoul';
+    return current;
   }
-  function normalized(v){return decodeEntities(v).toLowerCase().replace(/[’']/g,"'").replace(/\\s+/g,' ')}
-  function textOf(v){try{return normalized(JSON.stringify(v))}catch{return normalized(v)}}
-  function className(p){return String(p?.class||p?.className||'').trim()}
-
-  function findSpec(text){
-    const s=normalized(text);
-    const ordered=[...SPECS].sort((a,b)=>b[0].length-a[0].length);
-    for(const [needle,name] of ordered)if(s.includes(needle))return name;
+  function specFromProfile(profile,c,html){
+    const direct=profile?.spec||profile?.specialization||profile?.specName||profile?.buildSpec;if(direct)return String(direct);
+    const found=findSpec(`${textOf(profile)} ${html}`);if(found)return found;
     return '';
   }
-
-  function buildProfileFor(c){
-    try{
-      return window.LostArkBuildProfilesAuthorityV1?.get?.(c.url)
-        ||window.LostArkBuildProfilesV3?.get?.(c.url)
-        ||window.LostArkBuildProfilesV2?.get?.(c.url)
-        ||null;
-    }catch{return null}
-  }
-
-  function specFromProfile(profile,c){
-    const direct=profile?.spec||profile?.specialization||profile?.specName||profile?.buildSpec;
-    if(direct)return String(direct);
-    const b=c?buildProfileFor(c):null;
-    const buildDirect=b?.spec||b?.specialization||b?.specName||b?.buildSpec;
-    if(buildDirect)return String(buildDirect);
-    const buildText=[b?.engravings,b?.arkPassive,b?.sections,b?.text,b?.raidText].map(textOf).join(' ');
-    const profileText=textOf(profile);
-    return findSpec(`${buildText} ${profileText}`);
-  }
-
-  function specFromHtml(html,profile){
-    const spec=findSpec(html);
-    if(spec)return spec;
-    const cls=className(profile);
-    const s=normalized(html);
-    if(cls==='Artist')return /\brecurrence\b/i.test(s)?'Recurrence':'Full Bloom';
-    if(cls==='Valkyrie')return /\bshining knight\b/i.test(s)?'Shining Knight':'Liberator';
-    return '';
-  }
-
-  function iconFromHtml(html,profile){
-    const cls=className(profile);
-    if(cls!=='Valkyrie'&&cls!=='Wildsoul')return '';
-    try{
-      const d=new DOMParser().parseFromString(String(html||''),'text/html');
-      const candidates=[...d.querySelectorAll('img[src],img[data-src],svg')];
-      for(const el of candidates){
-        const meta=[el.getAttribute?.('alt'),el.getAttribute?.('title'),el.getAttribute?.('aria-label'),el.getAttribute?.('data-class'),el.getAttribute?.('data-character-class')].filter(Boolean).join(' ');
-        if(new RegExp(cls,'i').test(meta)){
-          const src=el.getAttribute?.('src')||el.getAttribute?.('data-src');
-          if(src)return src;
-          if(el.tagName?.toLowerCase()==='svg')return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(el.outerHTML)}`;
-        }
-      }
-    }catch{}
-    return '';
-  }
-
-  function fallbackIcon(profile){
-    const cls=className(profile);
-    if(cls==='Valkyrie')return VALK_ICON;
-    if(cls==='Wildsoul')return WILDSOUL_ICON;
-    return '';
-  }
-
-  async function fetchPayload(url){
-    try{
-      const r=await fetch(`${CONNECTOR}?url=${encodeURIComponent(url)}`,{cache:'no-store',headers:{Accept:'application/json'}});
-      if(!r.ok)return null;
-      return await r.json();
-    }catch{return null}
-  }
+  async function fetchPayload(url){try{const r=await fetch(`${CONNECTOR}?url=${encodeURIComponent(url)}`,{cache:'no-store',headers:{Accept:'application/json'}});if(!r.ok)return null;return await r.json()}catch{return null}}
 
   async function enrichExisting(){
     try{
-      const list=JSON.parse(localStorage.getItem(NEW_KEY)||'[]');
-      if(!Array.isArray(list)||!list.length)return;
+      const list=JSON.parse(localStorage.getItem(NEW_KEY)||'[]');if(!Array.isArray(list)||!list.length)return;
       let changed=false;
-      for(const c of list){
-        if(!c?.profile)continue;
-        const data=await fetchPayload(c.url);
-        const html=data?.html||data?.characterHtml||data?.content||data?.page||'';
-        const spec=specFromProfile(c.profile,c)||specFromHtml(html,c.profile);
-        const icon=iconFromHtml(html,c.profile)||fallbackIcon(c.profile);
+      for(const c of list){if(!c?.profile)continue;const data=await fetchPayload(c.url);const html=data?.html||data?.characterHtml||data?.content||data?.page||'';
+        const cls=authoritativeClass(html,className(c.profile));
+        if(cls&&c.profile.class!==cls){c.profile.class=cls;changed=true}
+        const spec=specFromProfile(c.profile,c,html);
         if(spec&&c.profile.spec!==spec){c.profile.spec=spec;changed=true}
-        if(icon&&c.profile.classIcon!==icon){c.profile.classIcon=icon;changed=true}
+        if(cls==='Wildsoul'&&c.profile.classIcon!==WILDSOUL_ICON){c.profile.classIcon=WILDSOUL_ICON;changed=true}
       }
       if(changed)localStorage.setItem(NEW_KEY,JSON.stringify(list));
-      document.querySelectorAll('.new-addition-card[data-candidate-id]').forEach(card=>{
-        const c=list.find(x=>x?.id===card.dataset.candidateId);
-        if(!c?.profile)return;
-        const spec=specFromProfile(c.profile,c)||specFromHtml('',c.profile);
-        const label=card.querySelector('.class');
-        if(label&&spec)label.textContent=spec;
-        const cls=className(c.profile);
-        if(cls==='Valkyrie'||cls==='Wildsoul'){
-          const img=card.querySelector('img.class-icon');
-          if(img){img.src=c.profile.classIcon||fallbackIcon(c.profile);img.alt=cls}
-        }
-      });
+      window.NewAdditionsClassSpecAuthority={WILDSOUL_ICON,enrichExisting};
     }catch{}
   }
-
-  window.NewAdditionsClassSpecAuthority={specFromProfile,specFromHtml,enrichExisting,VALK_ICON,WILDSOUL_ICON};
-
-  const originalFetchCharacter=window.fetchCharacter;
-  if(typeof originalFetchCharacter==='function'&&!window.__NewAdditionsSpecWrapped){
-    window.__NewAdditionsSpecWrapped=true;
-    window.fetchCharacter=async function(candidate){
-      const profile=await originalFetchCharacter(candidate);
-      if(!profile)return profile;
-      const data=await fetchPayload(candidate.url);
-      const html=data?.html||data?.characterHtml||data?.content||data?.page||'';
-      const spec=specFromProfile(profile,candidate)||specFromHtml(html,profile);
-      if(spec)profile.spec=spec;
-      const icon=iconFromHtml(html,profile)||fallbackIcon(profile);
-      if(icon)profile.classIcon=icon;
-      return profile;
-    };
-  }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(enrichExisting,0),{once:true});
-  else setTimeout(enrichExisting,0);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(enrichExisting,0),{once:true});else setTimeout(enrichExisting,0);
 })();
