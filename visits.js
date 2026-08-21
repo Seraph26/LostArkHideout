@@ -35,13 +35,6 @@ newAdditionsAuthorityScript.src = 'new-additions-class-spec-v1.js?v=20260821auth
 newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
-// Canonical white Wildsoul class icon. This runs before candidate creation so
-// future Wildsoul additions receive the icon automatically.
-const wildsoulIconScript = document.createElement('script');
-wildsoulIconScript.src = 'wildsoul-icon-v1.js?v=20260821wildsoul1';
-wildsoulIconScript.async = false;
-document.head.appendChild(wildsoulIconScript);
-
 // Load the isolated candidate-roster layer without changing any optimizer,
 // hover, arrow, or formatting implementation.
 const candidateRosterScript = document.createElement('script');
@@ -54,3 +47,9 @@ const newAdditionsFinalAuthorityScript = document.createElement('script');
 newAdditionsFinalAuthorityScript.src = 'new-additions-final-authority-v1.js?v=20260821final3';
 newAdditionsFinalAuthorityScript.async = false;
 document.head.appendChild(newAdditionsFinalAuthorityScript);
+
+// Must run after every generic class-icon renderer so Wildsoul cannot fall back to Fandom.
+const wildsoulIconGuardScript = document.createElement('script');
+wildsoulIconGuardScript.src = 'wildsoul-icon-guard-v1.js?v=20260821wildsoul2';
+wildsoulIconGuardScript.async = false;
+document.head.appendChild(wildsoulIconGuardScript);
