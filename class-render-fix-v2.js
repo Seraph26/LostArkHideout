@@ -1,13 +1,38 @@
-/* Keep both roster and party class rendering on the same character-aware resolver. */
+/* Keep class identity/icon separate from the spec/build label shown to users. */
 (() => {
   const KEY = 'lostark-hideout-private-v3';
   const data = () => window.LostArkHideoutClassData;
   const iconFor = cls => { try { return data()?.iconUrl?.(cls) || ''; } catch { return ''; } };
   const canonical = cls => { try { return data()?.canonical?.(cls) || cls; } catch { return cls; } };
+
+  // The class is the identity used for role/icon logic. The spec is the
+  // specialization/build label that character cards should display.
+  // Prefer an already-imported spec field and never replace a spec with the
+  // underlying class name.
+  const characterSpec = c => {
+    const p = c?.profile || {};
+    const explicit = [
+      p.spec,
+      p.specialization,
+      p.specName,
+      p.buildSpec,
+      p.build?.spec,
+      p.build?.specName
+    ].find(v => String(v || '').trim());
+    if (explicit) return String(explicit).trim();
+
+    // Character-specific corrections for profiles whose source data has not
+    // yet populated a dedicated spec field.
+    const name = String(p.name || c?.name || '').trim().toLowerCase();
+    const overrides = {
+      hismistress: 'Liberator'
+    };
+    return overrides[name] || '';
+  };
+
   const characterClass = c => {
     const name = String(c?.profile?.name || c?.name || '').trim().toLowerCase();
     const url = String(c?.url || '').toLowerCase();
-    // Use the same character-specific identity that the main roster uses.
     if (name === 'diamarte' || /\/diamarte(?:\/|$)/i.test(url)) return 'Souleater';
     return canonical(c?.profile?.class) || 'Unknown';
   };
@@ -24,6 +49,8 @@
         if (cls && cls !== p.class) { p.class = cls; changed = true; }
         const icon = iconFor(cls);
         if (icon && p.classIcon !== icon) { p.classIcon = icon; changed = true; }
+        const spec = characterSpec(c);
+        if (spec && p.spec !== spec) { p.spec = spec; changed = true; }
       }
       if (changed) localStorage.setItem(KEY, JSON.stringify(state));
     } catch {}
@@ -39,6 +66,8 @@
         const c = byUrl.get(key);
         if (!c?.profile) return;
         const cls = characterClass(c);
+        const spec = characterSpec(c);
+        const display = spec || cls;
         const icon = iconFor(cls) || c.profile.classIcon || '';
         const root = link.closest('article.character, .slot, .party, .party-card, .authoritative-party, .authoritative-member') || link.parentElement;
         if (!root) return;
@@ -46,20 +75,17 @@
           if (icon) img.src = icon;
           img.alt = cls;
         });
-        root.querySelectorAll('.class').forEach(el => { el.textContent = cls; });
+        root.querySelectorAll('.class').forEach(el => { el.textContent = display; });
         root.querySelectorAll('small').forEach(el => {
           const text = String(el.textContent || '');
-          if (/·\s*iLvl\s/i.test(text)) el.textContent = `${cls} · ${text.replace(/^[^·]+·\s*/i, '')}`;
-          else if (/^${'DUMMY'}$/) el.textContent = text;
+          if (/·\s*iLvl\s/i.test(text)) el.textContent = `${display} · ${text.replace(/^[^·]+·\s*/i, '')}`;
         });
-        // The authoritative party renderer puts the class directly in the
-        // member's second span, so update that text without disturbing CP.
         const main = root.querySelector('.party-member-main');
         if (main) {
           const spans = main.querySelectorAll(':scope > span');
           if (spans.length) {
             const current = String(spans[0].textContent || '');
-            spans[0].textContent = current.replace(/^[^·]+/, cls);
+            spans[0].textContent = current.replace(/^[^·]+/, display);
           }
         }
       });
