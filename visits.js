@@ -35,6 +35,13 @@ newAdditionsAuthorityScript.src = 'new-additions-class-spec-v1.js?v=20260821auth
 newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
+// Canonical white Wildsoul class icon. This runs before candidate creation so
+// future Wildsoul additions receive the icon automatically.
+const wildsoulIconScript = document.createElement('script');
+wildsoulIconScript.src = 'wildsoul-icon-v1.js?v=20260821wildsoul1';
+wildsoulIconScript.async = false;
+document.head.appendChild(wildsoulIconScript);
+
 // Load the isolated candidate-roster layer without changing any optimizer,
 // hover, arrow, or formatting implementation.
 const candidateRosterScript = document.createElement('script');
