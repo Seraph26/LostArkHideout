@@ -19,9 +19,10 @@ newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
 // Install candidate build-refresh isolation before candidate-roster-v1 runs.
-// v2 also handles the case where BuildProfilesV3 has not been initialized yet.
+// v3 also recovers a Main Group that was already replaced by a previous
+// candidate refresh, using the preserved main snapshot or legacy roster.
 const candidateBuildRefreshIsolationScript = document.createElement('script');
-candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v2.js?v=20260821isolate4';
+candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v2.js?v=20260821isolate5';
 candidateBuildRefreshIsolationScript.async = false;
 document.head.appendChild(candidateBuildRefreshIsolationScript);
 
