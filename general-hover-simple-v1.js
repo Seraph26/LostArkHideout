@@ -10,8 +10,18 @@
  * - preserve General Optimization's own calculated values
  * - use the same canonical layout as Raid Specific
  * - omit the raid/gate encounter line in General mode
+ *
+ * Optimized General parties use the authoritative-member DOM. The canonical
+ * renderer historically keyed off party-member, so mirror the harmless class
+ * onto General authoritative members as they are rendered. This lets the
+ * canonical renderer continue to be the sole hover formatter.
  */
 (()=>{
 'use strict';
-window.LostArkGeneralHoverBridgeV2={active:true,version:2,delegatedTo:'LostArkHoverSummaryV1'};
+window.LostArkGeneralHoverBridgeV2={active:true,version:3,delegatedTo:'LostArkHoverSummaryV1'};
+const isGeneral=()=>!!document.getElementById('generalOptimization')?.checked&&!(document.getElementById('raidSpecificSelect')?.value||'');
+const root=()=>document.getElementById('suggestedParties');
+function normalize(){if(!isGeneral())return;root()?.querySelectorAll('.authoritative-member').forEach(m=>m.classList.add('party-member'));}
+function start(){normalize();const r=root()||document.body;new MutationObserver(()=>{if(isGeneral())normalize()}).observe(r,{childList:true,subtree:true});document.getElementById('generalOptimization')?.addEventListener('change',normalize,true);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
