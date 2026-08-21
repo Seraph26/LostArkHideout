@@ -31,7 +31,7 @@ loadVisitCounter();
 
 // Load New Additions authority before the isolated candidate-roster layer.
 const newAdditionsAuthorityScript = document.createElement('script');
-newAdditionsAuthorityScript.src = 'new-additions-class-spec-v1.js?v=20260821authority2';
+newAdditionsAuthorityScript.src = 'new-additions-class-spec-v1.js?v=20260821authority3';
 newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
