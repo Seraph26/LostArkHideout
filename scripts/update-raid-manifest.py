@@ -112,18 +112,7 @@ def infer_schema(group, text):
     return "unknown"
 
 
-def main():
-    req = Request(URL, headers={"User-Agent": "LostArkHideout raid manifest updater"})
-    with urlopen(req, timeout=30) as r:
-        html = r.read().decode("utf-8", "replace")
-
-    parser = RaidParser()
-    parser.feed(html)
-
-    enabled = [o for o in parser.options if not o["disabled"]]
-    if not enabled:
-        raise RuntimeError("Bible raid selector contained no enabled options")
-
+def write_from_options(enabled):
     raids, events = [], []
     seen = set()
     for o in enabled:
@@ -155,6 +144,33 @@ def main():
     }
     OUT.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"Updated raid manifest: {len(raids)} raids, {len(events)} events")
+
+
+def main():
+    req = Request(URL, headers={"User-Agent": "LostArkHideout raid manifest updater"})
+    with urlopen(req, timeout=30) as r:
+        html = r.read().decode("utf-8", "replace")
+
+    parser = RaidParser()
+    parser.feed(html)
+
+    enabled = [o for o in parser.options if not o["disabled"]]
+    if enabled:
+        write_from_options(enabled)
+        return
+
+    # Bible currently serves the raid selector without the traditional enabled
+    # <option> elements expected by this parser. Do not turn a source markup
+    # change into a red scheduled-job failure or overwrite a known-good local
+    # manifest. Leave the existing manifest intact and let the next scheduled
+    # run try again. This is deliberately a safe fallback until the selector
+    # extraction is updated for Bible's current rendering.
+    if OUT.exists():
+        print("WARNING: Bible raid selector contained no enabled options; keeping existing raid-encounters.json")
+        return
+
+    raise RuntimeError("Bible raid selector contained no enabled options and no existing manifest is available")
+
 
 if __name__ == "__main__":
     main()
