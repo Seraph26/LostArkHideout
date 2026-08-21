@@ -4,7 +4,8 @@
   const CORRECTIONS = new Map([
     ['ryohaku', 'Glavier'],
     ['bailsxo', 'Artist'],
-    ['diamarte', 'Souleater']
+    ['diamarte', 'Souleater'],
+    ['kittyjam', 'Guardianknight']
   ]);
 
   function correctedName(character) {

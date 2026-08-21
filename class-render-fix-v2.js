@@ -2,17 +2,21 @@
  * This file only repairs roster/party identity display. Do not touch hover,
  * arrow, optimization, scoring, or swap behavior here.
  *
- * IMPORTANT: the live app stores its main character roster under v2 and the
- * isolated New Additions roster under its own v1 key. Both must use the same
- * supplied class/spec authority.
+ * IMPORTANT: the live app stores the main roster under v3. Keep the legacy
+ * keys as compatibility fallbacks, but v3 is the current authoritative roster.
  */
 (() => {
   'use strict';
-  const KEYS = ['lostark-hideout-private-v2', 'lostark-hideout-new-additions-v1'];
+  const KEYS = ['lostark-hideout-private-v3', 'lostark-hideout-private-v2', 'lostark-hideout-new-additions-v1'];
   const data = () => window.LostArkHideoutClassData;
   const norm = v => String(v ?? '').normalize('NFKC').trim().toLowerCase();
   const canonical = cls => { try { return data()?.canonical?.(cls) || cls; } catch { return cls; } };
-  const iconFor = cls => { try { return data()?.iconUrl?.(cls) || ''; } catch { return ''; } };
+  const iconFor = cls => {
+    try {
+      return data()?.iconUrl?.(cls) ||
+        (norm(cls)==='guardianknight' ? data()?.iconUrl?.('Guardian Knight') : '') || '';
+    } catch { return ''; }
+  };
 
   /* Static spec -> class mapping supplied for the roster. */
   const SPEC_TO_CLASS = {
@@ -39,7 +43,8 @@
     'Demonic Impulse':'Shadowhunter', 'Perfect Suppression':'Shadowhunter',
     Hunger:'Reaper', 'Lunar Voice':'Reaper',
     'Full Moon Harvester':'Souleater', "Night's Edge":'Souleater',
-    'Grace of the Empress':'Arcanist', 'Order of the Emperor':'Arcanist',
+    'Grace of the Empress':'Arcanist', 'Empress Grace':'Arcanist',
+    'Order of the Emperor':'Arcanist', "Emperor's Decree":'Arcanist',
     Recurrence:'Arcanist',
     'Wind Fury':'Aeromancer', Drizzle:'Aeromancer',
     Ferality:'Wildsoul', 'Phantom Beast Awakening':'Wildsoul',
@@ -50,16 +55,21 @@
   function authority(c) {
     try {
       const url = c?.url || c?.profile?.url;
-      return window.LostArkBuildProfilesAuthorityV1?.get?.(url) ||
-             window.LostArkBuildProfilesV3?.get?.(url) ||
-             window.LostArkBuildProfilesV2?.get?.(url) || {};
+      const direct = window.LostArkBuildProfilesAuthorityV1?.get?.(url) ||
+                     window.LostArkBuildProfilesV3?.get?.(url) ||
+                     window.LostArkBuildProfilesV2?.get?.(url);
+      if (direct) return direct;
+      try {
+        const cache = JSON.parse(localStorage.getItem('lostark-hideout-build-profiles-v3') || '{}');
+        return cache[url] || {};
+      } catch { return {}; }
     } catch { return {}; }
   }
 
   function corpus(...values) {
     const out=[];
     const walk=(v,d=0)=>{
-      if(v==null||d>10)return;
+      if(v==null||d>12)return;
       if(typeof v==='string'){out.push(v);return;}
       if(Array.isArray(v)){v.forEach(x=>walk(x,d+1));return;}
       if(typeof v==='object')Object.entries(v).forEach(([k,x])=>{out.push(k);walk(x,d+1);});
@@ -72,56 +82,62 @@
     const p=c?.profile||{}, b=authority(c);
     const explicit=[
       b.spec,b.specName,b.specialization,b.specializationName,
+      b.buildSpec,b.buildName,b.build?.spec,b.build?.specName,b.build?.name,
       p.spec,p.specName,p.specialization,p.specializationName,
-      b.buildSpec,b.build?.spec,b.build?.specName,
-      p.buildSpec,p.build?.spec,p.build?.specName
+      p.buildSpec,p.buildName,p.build?.spec,p.build?.specName
     ].find(v=>String(v||'').trim() && norm(v)!=='-');
     if(explicit)return String(explicit).trim();
-
+    const engravingValues=[];
+    for(const source of [b.engravings,b.engravingNames,b.engravingData,p.engravings,p.engravingNames]){
+      if(Array.isArray(source))for(const x of source){
+        const value=typeof x==='string'?x:(x?.name||x?.title||x?.label||x?.engraving||'');
+        if(value)engravingValues.push(value);
+      }
+    }
+    for(const value of engravingValues){
+      const found=ENGRAVINGS.find(e=>norm(e)===norm(value));
+      if(found)return found;
+    }
     const text=corpus(b,b.engravings,b.engraving,b.engravingData,b.build,b.text,
-      b.raidText,p,p.engravings,p.engraving,p.engravingData,p.loadout,p.loadoutText,p.buildText);
+      b.raidText,b.raidLines,b.sections,b.rawText,p,p.engravings,p.engraving,
+      p.engravingData,p.loadout,p.loadoutText,p.buildText,p.rawText);
     for(const e of ENGRAVINGS) if(text.includes(norm(e))) return e;
     return '';
   }
 
   function authoritativeClass(c, spec) {
     const p=c?.profile||{}, b=authority(c);
-    if(spec && SPEC_TO_CLASS[spec]) return canonical(SPEC_TO_CLASS[spec]);
-
+    if(spec) {
+      const mapped=ENGRAVINGS.find(e=>norm(e)===norm(spec));
+      if(mapped) return canonical(SPEC_TO_CLASS[mapped]);
+    }
     const buildClass=b.className||b.class||b.characterClass;
-    if(buildClass && norm(buildClass)!=='unknown' && norm(buildClass)!=='-')
-      return canonical(buildClass);
-
+    if(buildClass && norm(buildClass)!=='unknown' && norm(buildClass)!=='-') return canonical(buildClass);
     const text=corpus(b,b.engravings,b.engraving,b.engravingData,b.build,b.text,
-      b.raidText,p,p.engravings,p.engraving,p.engravingData,p.loadout,p.loadoutText,p.buildText);
+      b.raidText,b.raidLines,b.sections,b.rawText,p,p.engravings,p.engraving,
+      p.engravingData,p.loadout,p.loadoutText,p.buildText,p.rawText);
     for(const e of ENGRAVINGS) if(text.includes(norm(e))) return canonical(SPEC_TO_CLASS[e]);
-
     if(p.className && norm(p.className)!=='unknown' && norm(p.className)!=='-') return canonical(p.className);
     if(p.class && norm(p.class)!=='unknown' && norm(p.class)!=='-') return canonical(p.class);
     return 'Unknown';
   }
 
-  function readState(key) {
-    try { return JSON.parse(localStorage.getItem(key)||'null'); } catch { return null; }
-  }
+  function readState(key) { try { return JSON.parse(localStorage.getItem(key)||'null'); } catch { return null; } }
 
   function applyStored() {
-    let changed=false;
     for(const key of KEYS){
-      const state=readState(key);
-      if(!state)continue;
+      const state=readState(key); if(!state)continue;
       const list=Array.isArray(state?.characters) ? state.characters : (Array.isArray(state) ? state : null);
       if(!list)continue;
       for(const c of list){
         const p=c?.profile;if(!p)continue;
         const spec=authoritativeSpec(c), cls=authoritativeClass(c,spec), icon=iconFor(cls);
-        if(spec && p.spec!==spec){p.spec=spec;changed=true;}
-        if(cls!=='Unknown' && p.class!==cls){p.class=cls;changed=true;}
-        if(icon && p.classIcon!==icon){p.classIcon=icon;changed=true;}
+        if(spec && p.spec!==spec)p.spec=spec;
+        if(cls!=='Unknown' && p.class!==cls)p.class=cls;
+        if(icon && p.classIcon!==icon)p.classIcon=icon;
       }
       localStorage.setItem(key,JSON.stringify(state));
     }
-    return changed;
   }
 
   function updateVisibleDom(){
@@ -140,13 +156,8 @@
     });
   }
 
-  function run(){
-    applyStored();
-    updateVisibleDom();
-  }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,250),{once:true});
-  else setTimeout(run,250);
+  function run(){ applyStored(); updateVisibleDom(); }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(run,250),{once:true}); else setTimeout(run,250);
   window.addEventListener('lostark-build-profiles-v3-ready',()=>setTimeout(run,100));
   const observer=new MutationObserver(()=>setTimeout(updateVisibleDom,50));
   observer.observe(document.documentElement,{subtree:true,childList:true});

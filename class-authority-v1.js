@@ -8,7 +8,8 @@
     glaivier:'Glaivier', glavier:'Glaivier', scrapper:'Scrapper', soulfist:'Soulfist', striker:'Striker', wardancer:'Wardancer', breaker:'Breaker',
     artillerist:'Artillerist', deadeye:'Deadeye', machinist:'Machinist', sharpshooter:'Sharpshooter', gunslinger:'Gunslinger',
     deathblade:'Deathblade', shadowhunter:'Shadowhunter', reaper:'Reaper', soul_eater:'Souleater', souleater:'Souleater',
-    artist:'Artist', aeromancer:'Aeromancer', wildsoul:'Wildsoul', dragon_knight:'Guardianknight', holyknight:'Paladin', holyknight_female:'Paladin',
+    artist:'Artist', aeromancer:'Aeromancer', wildsoul:'Wildsoul', dragon_knight:'Guardianknight', dragonknight:'Guardianknight',
+    guardianknight:'Guardianknight', holyknight:'Paladin', holyknight_female:'Paladin',
     weather_artist:'Aeromancer', yinyangshi:'Yinyangshi', alchemist:'Alchemist'
   };
   const normalizeId = v => String(v || '').trim().toLowerCase().replace(/[ -]+/g, '_');
@@ -16,17 +17,11 @@
 
   function classFromHtml(html) {
     const source = String(html || '');
-
-    // The Bible character page itself displays the authoritative class in its
-    // profile header, e.g. <div class="class">Souleater</div>. Prefer this over
-    // classId fields because Bible pages can contain multiple unrelated classId
-    // values for loadouts, presets, or other embedded data.
     const visibleClass = source.match(/<[^>]*class=["'][^"']*\bclass\b[^"']*["'][^>]*>\s*([^<]+?)\s*<\//i);
     if (visibleClass) {
       const text = visibleClass[1].replace(/\s+/g, ' ').trim();
-      if (text && text.length < 40) return text;
+      if (text && text.length < 40) return mapped(text) || text;
     }
-
     const raidWindows = [];
     const raidRe = /raid_merged/ig;
     let rm;
@@ -41,7 +36,6 @@
         while ((m = re.exec(windowText))) { const name = mapped(m[1]); if (name) return name; }
       }
     }
-
     const profilePatterns = [
       /(?:character|profile|characterProfile)[\s\S]{0,1800}?classId\s*[:=]\s*["']([a-z_]+)["']/ig,
       /(?:character|profile|characterProfile)[\s\S]{0,1800}?["']classId["']\s*:\s*["']([a-z_]+)["']/ig
@@ -50,7 +44,6 @@
       let m;
       while ((m = re.exec(source))) { const name = mapped(m[1]); if (name) return name; }
     }
-
     const all = /(?:classId|["']classId["'])\s*[:=]\s*["']([a-z_]+)["']/ig;
     let m;
     while ((m = all.exec(source))) { const name = mapped(m[1]); if (name) return name; }
