@@ -38,7 +38,7 @@ document.head.appendChild(newAdditionsAuthorityScript);
 // Load the isolated candidate-roster layer without changing any optimizer,
 // hover, arrow, or formatting implementation.
 const candidateRosterScript = document.createElement('script');
-candidateRosterScript.src = 'candidate-roster-v1.js?v=20260821candidate7';
+candidateRosterScript.src = 'candidate-roster-v1.js?v=20260821candidate8';
 candidateRosterScript.async = false;
 document.head.appendChild(candidateRosterScript);
 
