@@ -6,12 +6,16 @@
   const NEW_KEY='lostark-hideout-new-additions-v1';
   // Bible's Valkyrie roster asset. Keep this as the class-wide fallback for every Valkyrie.
   const VALK_ICON='https://cms.poyoanon.fyi/assets/d3a00d6c-f439-4a8e-9a42-38f7367cc7f2.png?height=636&width=816';
+  // Fandom's standard class-icon asset for the Specialist Wildsoul class.
+  const WILDSOUL_ICON='https://lostark.fandom.com/wiki/Special:Redirect/file/ClassIcon-Specialist-Wildsoul.png';
 
   const SPECS=[
     ['full moon harvester','Full Moon Harvester'],
     ['night\'s edge',"Night's Edge"],['nights edge',"Night's Edge"],
-    ['empress\'s grace',"Empress's Grace"],['empress grace',"Empress's Grace"],
-    ['emperor\'s decree',"Emperor's Decree"],['emperor decree',"Emperor's Decree"],
+    ['empress\'s grace',"Grace of the Empress"],['empress grace',"Grace of the Empress"],
+    ['grace of the empress',"Grace of the Empress"],
+    ['emperor\'s decree',"Order of the Emperor"],['emperor decree',"Order of the Emperor"],
+    ['order of the emperor',"Order of the Emperor"],
     ['master summoner','Master Summoner'],['communication overflow','Communication Overflow'],
     ['lone knight','Lone Knight'],['combat readiness','Combat Readiness'],
     ['rage hammer','Rage Hammer'],['gravity training','Gravity Training'],
@@ -29,7 +33,8 @@
     ['asura\'s path',"Asura's Path"],['asuras path',"Asura's Path"],['brawl king storm','Brawl King Storm'],
     ['deathblow','Deathblow'],['full bloom','Full Bloom'],['recurrence','Recurrence'],
     ['desperate salvation','Desperate Salvation'],['true courage','True Courage'],
-    ['blessed aura','Blessed Aura'],['judgment','Judgment'],['liberator','Liberator'],['shining knight','Shining Knight']
+    ['blessed aura','Blessed Aura'],['judgment','Judgment'],['liberator','Liberator'],['shining knight','Shining Knight'],
+    ['ferality','Ferality'],['phantom beast awakening','Phantom Beast Awakening']
   ];
 
   function decodeEntities(v){
@@ -42,7 +47,6 @@
 
   function findSpec(text){
     const s=normalized(text);
-    // Prefer the most specific multi-word class specialization names before short names such as Control.
     const ordered=[...SPECS].sort((a,b)=>b[0].length-a[0].length);
     for(const [needle,name] of ordered)if(s.includes(needle))return name;
     return '';
@@ -79,19 +83,27 @@
   }
 
   function iconFromHtml(html,profile){
-    if(className(profile)!=='Valkyrie')return '';
+    const cls=className(profile);
+    if(cls!=='Valkyrie'&&cls!=='Wildsoul')return '';
     try{
       const d=new DOMParser().parseFromString(String(html||''),'text/html');
       const candidates=[...d.querySelectorAll('img[src],img[data-src],svg')];
       for(const el of candidates){
         const meta=[el.getAttribute?.('alt'),el.getAttribute?.('title'),el.getAttribute?.('aria-label'),el.getAttribute?.('data-class'),el.getAttribute?.('data-character-class')].filter(Boolean).join(' ');
-        if(/valkyrie/i.test(meta)){
+        if(new RegExp(cls,'i').test(meta)){
           const src=el.getAttribute?.('src')||el.getAttribute?.('data-src');
           if(src)return src;
           if(el.tagName?.toLowerCase()==='svg')return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(el.outerHTML)}`;
         }
       }
     }catch{}
+    return '';
+  }
+
+  function fallbackIcon(profile){
+    const cls=className(profile);
+    if(cls==='Valkyrie')return VALK_ICON;
+    if(cls==='Wildsoul')return WILDSOUL_ICON;
     return '';
   }
 
@@ -113,29 +125,27 @@
         const data=await fetchPayload(c.url);
         const html=data?.html||data?.characterHtml||data?.content||data?.page||'';
         const spec=specFromProfile(c.profile,c)||specFromHtml(html,c.profile);
-        const icon=iconFromHtml(html,c.profile);
+        const icon=iconFromHtml(html,c.profile)||fallbackIcon(c.profile);
         if(spec&&c.profile.spec!==spec){c.profile.spec=spec;changed=true}
-        if(className(c.profile)==='Valkyrie'){
-          const nextIcon=icon||VALK_ICON;
-          if(c.profile.classIcon!==nextIcon){c.profile.classIcon=nextIcon;changed=true}
-        }
+        if(icon&&c.profile.classIcon!==icon){c.profile.classIcon=icon;changed=true}
       }
       if(changed)localStorage.setItem(NEW_KEY,JSON.stringify(list));
       document.querySelectorAll('.new-addition-card[data-candidate-id]').forEach(card=>{
         const c=list.find(x=>x?.id===card.dataset.candidateId);
         if(!c?.profile)return;
-        const spec=specFromProfile(c.profile,c);
+        const spec=specFromProfile(c.profile,c)||specFromHtml('',c.profile);
         const label=card.querySelector('.class');
         if(label&&spec)label.textContent=spec;
-        if(className(c.profile)==='Valkyrie'){
+        const cls=className(c.profile);
+        if(cls==='Valkyrie'||cls==='Wildsoul'){
           const img=card.querySelector('img.class-icon');
-          if(img){img.src=c.profile.classIcon||VALK_ICON;img.alt='Valkyrie'}
+          if(img){img.src=c.profile.classIcon||fallbackIcon(c.profile);img.alt=cls}
         }
       });
     }catch{}
   }
 
-  window.NewAdditionsClassSpecAuthority={specFromProfile,specFromHtml,enrichExisting,VALK_ICON};
+  window.NewAdditionsClassSpecAuthority={specFromProfile,specFromHtml,enrichExisting,VALK_ICON,WILDSOUL_ICON};
 
   const originalFetchCharacter=window.fetchCharacter;
   if(typeof originalFetchCharacter==='function'&&!window.__NewAdditionsSpecWrapped){
@@ -147,12 +157,12 @@
       const html=data?.html||data?.characterHtml||data?.content||data?.page||'';
       const spec=specFromProfile(profile,candidate)||specFromHtml(html,profile);
       if(spec)profile.spec=spec;
-      if(className(profile)==='Valkyrie')profile.classIcon=iconFromHtml(html,profile)||VALK_ICON;
+      const icon=iconFromHtml(html,profile)||fallbackIcon(profile);
+      if(icon)profile.classIcon=icon;
       return profile;
     };
   }
 
-  // Repair the already-stored New Additions once after the page has initialized.
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(enrichExisting,0),{once:true});
   else setTimeout(enrichExisting,0);
 })();
