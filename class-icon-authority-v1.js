@@ -1,6 +1,7 @@
 /* Final class-icon authority for non-Fandom / special classes.
- * Valkyrie is a repository-hosted hardcoded SVG asset. Wildsoul uses the
- * verified Specialist class icon supplied by the user.
+ * Manual/repository-supplied class icons always take precedence over Fandom.
+ * Valkyrie and Guardianknight are repository-hosted hardcoded SVG assets.
+ * Wildsoul uses the verified Specialist class icon supplied by the user.
  * This file only changes class icon identity/display; it does not touch
  * optimization, scoring, hover, arrow, swap, or party logic.
  */
@@ -9,8 +10,13 @@
 
   const asset = name => new URL(name, document.baseURI).href;
   const VALKYRIE_ICON = asset('valkyrie-icon.svg');
+  const GUARDIANKNIGHT_ICON = asset('guardianknight-icon.svg');
   const WILDSOUL_ICON = 'https://static.wikia.nocookie.net/lostark_gamepedia/images/3/3b/ClassIcon-Specialist.png/revision/latest/scale-to-width-down/120?cb=20230901205506';
-  const SPECIAL = { valkyrie: VALKYRIE_ICON, wildsoul: WILDSOUL_ICON, guardianknight: '' };
+  const SPECIAL = {
+    valkyrie: VALKYRIE_ICON,
+    wildsoul: WILDSOUL_ICON,
+    guardianknight: GUARDIANKNIGHT_ICON
+  };
 
   function iconFor(name) {
     return SPECIAL[String(name || '').trim().toLowerCase()] || '';
@@ -18,10 +24,10 @@
 
   function patchClassData() {
     const data = window.LostArkHideoutClassData;
-    if (!data || typeof data.iconUrl !== 'function' || data.__specialIconAuthorityV2) return !!data;
+    if (!data || typeof data.iconUrl !== 'function' || data.__specialIconAuthorityV3) return !!data;
     const original = data.iconUrl.bind(data);
     data.iconUrl = name => iconFor(name) || original(name);
-    data.__specialIconAuthorityV2 = true;
+    data.__specialIconAuthorityV3 = true;
     return true;
   }
 
@@ -52,7 +58,7 @@
       if (!icon) return;
       if (img.getAttribute('src') !== icon) img.src = icon;
       img.removeAttribute('srcset');
-      img.alt = cls === 'valkyrie' ? 'Valkyrie' : 'Wildsoul';
+      img.alt = cls === 'valkyrie' ? 'Valkyrie' : cls === 'guardianknight' ? 'Guardianknight' : 'Wildsoul';
     });
   }
 
