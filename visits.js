@@ -34,6 +34,12 @@ classRenderFixScript.src = 'class-render-fix-v2.js?v=20260821newadditions2';
 classRenderFixScript.async = false;
 document.head.appendChild(classRenderFixScript);
 
+// Re-assert the class-aware spec after the generic class renderer has finished.
+const newAdditionsPostRenderSpecScript = document.createElement('script');
+newAdditionsPostRenderSpecScript.src = 'new-additions-class-spec-v2.js?v=20260821authority7';
+newAdditionsPostRenderSpecScript.async = false;
+document.head.appendChild(newAdditionsPostRenderSpecScript);
+
 const wildsoulIconGuardScript = document.createElement('script');
 wildsoulIconGuardScript.src = 'wildsoul-icon-guard-v1.js?v=20260821wildsoul3';
 wildsoulIconGuardScript.async = false;
