@@ -18,11 +18,10 @@ newAdditionsAuthorityScript.src = 'new-additions-class-spec-v2.js?v=20260821auth
 newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
-// Install the build-refresh isolation wrapper BEFORE candidate-roster-v1 runs.
-// candidate-roster-v1 initializes immediately and may request a build refresh
-// during script evaluation, so this must be loaded first.
+// Install candidate build-refresh isolation before candidate-roster-v1 runs.
+// v2 also handles the case where BuildProfilesV3 has not been initialized yet.
 const candidateBuildRefreshIsolationScript = document.createElement('script');
-candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v1.js?v=20260821isolate3';
+candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v2.js?v=20260821isolate4';
 candidateBuildRefreshIsolationScript.async = false;
 document.head.appendChild(candidateBuildRefreshIsolationScript);
 
@@ -42,7 +41,6 @@ classRenderFixScript.src = 'class-render-fix-v2.js?v=20260821newadditions2';
 classRenderFixScript.async = false;
 document.head.appendChild(classRenderFixScript);
 
-// Re-assert the class-aware spec after the generic class renderer has finished.
 const newAdditionsPostRenderSpecScript = document.createElement('script');
 newAdditionsPostRenderSpecScript.src = 'new-additions-class-spec-v2.js?v=20260821authority7';
 newAdditionsPostRenderSpecScript.async = false;
@@ -53,19 +51,16 @@ wildsoulIconGuardScript.src = 'wildsoul-icon-guard-v1.js?v=20260821wildsoul3';
 wildsoulIconGuardScript.async = false;
 document.head.appendChild(wildsoulIconGuardScript);
 
-// Final hard authority for the supplied Valkyrie SVG and verified Wildsoul asset.
 const classIconAuthorityScript = document.createElement('script');
 classIconAuthorityScript.src = 'class-icon-authority-v1.js?v=20260821icons1';
 classIconAuthorityScript.async = false;
 document.head.appendChild(classIconAuthorityScript);
 
-// Guardianknight was supplied as an exact Bible SVG, not a Fandom asset.
 const guardianknightInlineAuthorityScript = document.createElement('script');
 guardianknightInlineAuthorityScript.src = 'guardianknight-inline-authority-v1.js?v=20260821gk1';
 guardianknightInlineAuthorityScript.async = false;
 document.head.appendChild(guardianknightInlineAuthorityScript);
 
-// Final display-only specialization authority for the Optimized Party Setup.
 const optimizerSpecDisplayGuardScript = document.createElement('script');
 optimizerSpecDisplayGuardScript.src = 'optimizer-spec-display-guard-v1.js?v=20260821optspec1';
 optimizerSpecDisplayGuardScript.async = false;
