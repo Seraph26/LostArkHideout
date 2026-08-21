@@ -49,4 +49,31 @@ function repair(){const profiles=stateProfiles();repairTop(profiles);repairBotto
 let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;repair()})};
 function start(){repair();new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});window.addEventListener('lostark-build-profiles-v3-ready',()=>setTimeout(repair,100))}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+
+/* General Optimize lifecycle guard. UI state only: no scoring, hover, arrow,
+   or displayed optimization text is changed here. */
+function installGeneralOptimizeGuard(){
+ const b=document.getElementById('optimizeBtn');
+ if(!b||b.dataset.generalOptimizeGuard)return;
+ b.dataset.generalOptimizeGuard='1';
+ let started=0,lastMutation=0,observer=null,watch=null,timeout=null;
+ const clear=()=>{if(observer){observer.disconnect();observer=null}if(watch){clearInterval(watch);watch=null}if(timeout){clearTimeout(timeout);timeout=null}started=0};
+ const restore=()=>{b.disabled=false;b.setAttribute('aria-busy','false');b.textContent='Optimize Parties'};
+ const begin=()=>{
+   const host=document.getElementById('suggestedParties');
+   if(!host)return;
+   clear();started=Date.now();lastMutation=started;
+   observer=new MutationObserver(()=>{lastMutation=Date.now()});
+   observer.observe(host,{childList:true,subtree:true,characterData:true});
+   watch=setInterval(()=>{
+     if(b.getAttribute('aria-busy')!=='true'){clear();return}
+     const now=Date.now();
+     if(now-started>12000&&now-lastMutation>1500){clear();restore()}
+   },250);
+   timeout=setTimeout(()=>{if(b.getAttribute('aria-busy')==='true'){clear();restore()}},20000);
+ };
+ document.addEventListener('click',e=>{if(e.target?.closest?.('#optimizeBtn'))begin()},true);
+ setInterval(()=>{if(!started&&b.getAttribute('aria-busy')==='true')restore()},1000);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(installGeneralOptimizeGuard,0),{once:true});else setTimeout(installGeneralOptimizeGuard,0);
 })();
