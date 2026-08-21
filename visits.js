@@ -20,10 +20,9 @@ document.head.appendChild(newAdditionsAuthorityScript);
 
 // Install the build-refresh isolation wrapper BEFORE candidate-roster-v1 runs.
 // candidate-roster-v1 initializes immediately and may request a build refresh
-// during script evaluation, so loading this after it is too late: the temporary
-// private-v3 candidate state can become visible to the main roster/optimizer.
+// during script evaluation, so this must be loaded first.
 const candidateBuildRefreshIsolationScript = document.createElement('script');
-candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v1.js?v=20260821isolate2';
+candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v1.js?v=20260821isolate3';
 candidateBuildRefreshIsolationScript.async = false;
 document.head.appendChild(candidateBuildRefreshIsolationScript);
 
