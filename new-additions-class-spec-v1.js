@@ -3,6 +3,7 @@
   'use strict';
 
   const CONNECTOR = 'https://lostark-bible-connector.seraph0226.workers.dev/character';
+  const NEW_KEY = 'lostark-hideout-new-additions-v1';
   const VALK_ICON = 'https://cms.poyoanon.fyi/assets/d3a00d6c-f439-4a8e-9a42-38f7367cc7f2.png?height=636&width=816';
 
   const RULES = [
@@ -74,6 +75,42 @@
     return '';
   }
 
+  async function enrichExisting() {
+    try {
+      const list = JSON.parse(localStorage.getItem(NEW_KEY) || '[]');
+      if (!Array.isArray(list) || !list.length) return;
+      let changed = false;
+      for (const c of list) {
+        if (!c?.profile) continue;
+        let spec = c.profile.spec || c.profile.specialization || c.profile.specName || c.profile.buildSpec || specFromProfile(c.profile);
+        if (!spec) {
+          try {
+            const r = await fetch(`${CONNECTOR}?url=${encodeURIComponent(c.url)}`, {cache:'no-store'});
+            const data = await r.json();
+            spec = specFromHtml(data?.html || data?.characterHtml || data?.content || data?.page || '', c.profile);
+          } catch {}
+        }
+        if (spec && c.profile.spec !== spec) { c.profile.spec = spec; changed = true; }
+        if (String(c.profile.class).toLowerCase() === 'valkyrie' && c.profile.classIcon !== VALK_ICON) { c.profile.classIcon = VALK_ICON; changed = true; }
+      }
+      if (changed) localStorage.setItem(NEW_KEY, JSON.stringify(list));
+      document.querySelectorAll('.new-addition-card[data-candidate-id]').forEach(card => {
+        const c = list.find(x => x?.id === card.dataset.candidateId);
+        if (!c?.profile) return;
+        const spec = c.profile.spec || specFromProfile(c.profile);
+        const cls = className(c.profile);
+        const label = card.querySelector('.class');
+        if (label && spec) label.textContent = spec;
+        if (cls === 'Valkyrie') {
+          const img = card.querySelector('img.class-icon');
+          if (img) { img.src = VALK_ICON; img.alt = 'Valkyrie'; }
+        }
+      });
+    } catch {}
+  }
+
+  window.NewAdditionsClassSpecAuthority = { specFromProfile, specFromHtml, enrichExisting };
+
   const originalFetchCharacter = window.fetchCharacter;
   if (typeof originalFetchCharacter === 'function' && !window.__NewAdditionsSpecWrapped) {
     window.__NewAdditionsSpecWrapped = true;
@@ -85,11 +122,11 @@
         try {
           const r = await fetch(`${CONNECTOR}?url=${encodeURIComponent(candidate.url)}`, {cache:'no-store'});
           const data = await r.json();
-          const html = data?.html || data?.characterHtml || data?.content || data?.page || '';
-          spec = specFromHtml(html, profile);
+          spec = specFromHtml(data?.html || data?.characterHtml || data?.content || data?.page || '', profile);
         } catch {}
       }
       if (spec) profile.spec = spec;
+      if (className(profile) === 'Valkyrie') profile.classIcon = VALK_ICON;
       return profile;
     };
   }
