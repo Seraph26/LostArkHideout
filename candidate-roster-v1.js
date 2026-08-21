@@ -1,7 +1,7 @@
 (()=>{
 'use strict';
 const NEW_KEY='lostark-hideout-new-additions-v1',HIDDEN_KEY='lostark-hideout-hidden-v1',MAX=12;
-const CLASS_CORRECTIONS=new Map([['hismistress','Valkyrie']]);
+const CLASS_CORRECTIONS=new Map([['hismistress','Valkyrie'],['valkevi','Valkyrie'],['thisisfine','Artist']]);
 const $=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c])),fmt=v=>v==null||v===''?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
 const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??d}catch{return d}};
 const write=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
