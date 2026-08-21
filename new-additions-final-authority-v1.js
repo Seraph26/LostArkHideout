@@ -8,22 +8,20 @@
   const write=v=>{try{localStorage.setItem(NEW_KEY,JSON.stringify(v))}catch{}};
   const cls=c=>String(c?.profile?.class||c?.profile?.className||'').trim();
   const norm=v=>String(v??'').toLowerCase().replace(/[’']/g,"'").replace(/\s+/g,' ');
+  const usableIcon=s=>{
+    const v=String(s||'').trim();
+    if(!/^https?:\/\//i.test(v)||!/\.(png|jpe?g|webp|svg)(\?|#|$)/i.test(v))return '';
+    if(/poyoanon\.fyi|lostark\.fandom\.com/i.test(v))return '';
+    return v;
+  };
 
-  function profileText(c){
-    try{
-      const p=c?.profile||{};
-      return norm(JSON.stringify(p));
-    }catch{return ''}
-  }
+  function profileText(c){try{return norm(JSON.stringify(c?.profile||{}))}catch{return ''}}
 
-  function findValkIcon(value, key=''){
+  function findValkIcon(value,key=''){
     const keyText=norm(key);
     if(value==null)return '';
     if(typeof value==='string'){
-      const s=value.trim();
-      if(!/^https?:\/\//i.test(s))return '';
-      if(!/\.(png|jpe?g|webp|svg)(\?|#|$)/i.test(s))return '';
-      if(/valkyrie|class.?icon|icon/i.test(keyText))return s;
+      if(/valkyrie|class.?icon|icon|avatar|image/.test(keyText))return usableIcon(value);
       return '';
     }
     if(Array.isArray(value)){
@@ -47,11 +45,12 @@
       for(const el of d.querySelectorAll('*')){
         const meta=[el.getAttribute?.('alt'),el.getAttribute?.('title'),el.getAttribute?.('aria-label'),el.getAttribute?.('class'),el.getAttribute?.('data-class'),el.getAttribute?.('data-character-class')].filter(Boolean).join(' ');
         if(!/valkyrie/i.test(meta))continue;
-        const src=el.getAttribute?.('src')||el.getAttribute?.('data-src')||el.getAttribute?.('href');
-        if(src&&/^https?:\/\//i.test(src))return src;
+        const src=usableIcon(el.getAttribute?.('src')||el.getAttribute?.('data-src')||el.getAttribute?.('href'));
+        if(src)return src;
         const style=el.getAttribute?.('style')||'';
         const m=style.match(/url\((['"]?)(https?:[^'"\)]+)\1\)/i);
-        if(m)return m[2];
+        const styled=usableIcon(m?.[2]);
+        if(styled)return styled;
       }
     }catch{}
     return '';
@@ -79,7 +78,7 @@
       if(cls(c)==='Valkyrie'){
         const data=await payload(c.url);
         const html=data?.html||data?.characterHtml||data?.content||data?.page||'';
-        const icon=findValkIcon(data)||findValkIconInHtml(html)||p.classIcon||'';
+        const icon=findValkIcon(data)||findValkIconInHtml(html)||usableIcon(p.classIcon);
         if(icon&&p.classIcon!==icon){p.classIcon=icon;changed=true}
         const card=document.querySelector(`.new-addition-card[data-candidate-id="${CSS.escape(String(c.id))}"]`);
         const img=card?.querySelector('img.class-icon');
