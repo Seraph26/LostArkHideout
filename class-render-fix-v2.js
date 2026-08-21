@@ -1,15 +1,21 @@
 /* Keep class identity/icon separate from the spec/build label shown to users.
  * This file only repairs roster/party identity display. Do not touch hover,
  * arrow, optimization, scoring, or swap behavior here.
+ *
+ * IMPORTANT: the live app stores its character roster under the v2 key.
+ * The previous version of this guard incorrectly read v3, so none of its
+ * corrections could ever reach the New Addition cards.
  */
 (() => {
   'use strict';
-  const KEY = 'lostark-hideout-private-v3';
+  const KEY = 'lostark-hideout-private-v2';
   const data = () => window.LostArkHideoutClassData;
   const norm = v => String(v ?? '').normalize('NFKC').trim().toLowerCase();
   const canonical = cls => { try { return data()?.canonical?.(cls) || cls; } catch { return cls; } };
   const iconFor = cls => { try { return data()?.iconUrl?.(cls) || ''; } catch { return ''; } };
 
+  /* Static spec -> class mapping supplied for the roster. This is the fallback
+     authority when Bible's stored class field is stale or wrong. */
   const SPEC_TO_CLASS = {
     'Brawl King Storm':'Breaker', "Asura's Path":'Breaker',
     'Berserker Technique':'Berserker', Mayhem:'Berserker',
@@ -51,7 +57,7 @@
   function corpus(...values) {
     const out=[];
     const walk=(v,d=0)=>{
-      if(v==null||d>7)return;
+      if(v==null||d>9)return;
       if(typeof v==='string'){out.push(v);return;}
       if(Array.isArray(v)){v.forEach(x=>walk(x,d+1));return;}
       if(typeof v==='object')Object.entries(v).forEach(([k,x])=>{out.push(k);walk(x,d+1);});
@@ -62,27 +68,36 @@
 
   function authoritativeSpec(c) {
     const p=c?.profile||{}, b=authority(c);
-    const explicit=[b.spec,b.specName,b.specialization,b.specializationName,p.spec,p.specName,
-      b.buildSpec,b.build?.spec,b.build?.specName].find(v=>String(v||'').trim());
+    const explicit=[
+      b.spec,b.specName,b.specialization,b.specializationName,
+      p.spec,p.specName,p.specialization,p.specializationName,
+      b.buildSpec,b.build?.spec,b.build?.specName,
+      p.buildSpec,p.build?.spec,p.build?.specName
+    ].find(v=>String(v||'').trim() && norm(v)!=='-');
     if(explicit)return String(explicit).trim();
-    const text=corpus(b,b.engravings,b.text,p);
+
+    const text=corpus(b,b.engravings,b.engraving,b.engravingData,b.build,b.text,p,
+      p.engravings,p.engraving,p.engravingData);
     for(const e of ENGRAVINGS) if(text.includes(norm(e))) return e;
-    const name=norm(p.name||c?.name);
-    if(name==='hismistress')return 'Liberator';
+
     return '';
   }
 
   function authoritativeClass(c, spec) {
     const p=c?.profile||{}, b=authority(c);
-    // The authoritative Bible build class must beat stale/incorrect stored class.
-    const buildClass=b.className||b.class||b.characterClass;
-    if(buildClass && norm(buildClass)!=='unknown') return canonical(buildClass);
     if(spec && SPEC_TO_CLASS[spec]) return canonical(SPEC_TO_CLASS[spec]);
-    const text=corpus(b,b.engravings,b.text,p);
+
+    const buildClass=b.className||b.class||b.characterClass;
+    if(buildClass && norm(buildClass)!=='unknown' && norm(buildClass)!=='-')
+      return canonical(buildClass);
+
+    const text=corpus(b,b.engravings,b.engraving,b.engravingData,b.build,b.text,p,
+      p.engravings,p.engraving,p.engravingData);
     for(const e of ENGRAVINGS) if(text.includes(norm(e))) return canonical(SPEC_TO_CLASS[e]);
-    // Explicit stored class is only a fallback when authoritative data is absent.
-    if(p.className && norm(p.className)!=='unknown') return canonical(p.className);
-    if(p.class && norm(p.class)!=='unknown') return canonical(p.class);
+
+    if(p.className && norm(p.className)!=='unknown' && norm(p.className)!=='-') return canonical(p.className);
+    if(p.class && norm(p.class)!=='unknown' && norm(p.class)!=='-') return canonical(p.class);
+
     const name=norm(p.name||c?.name),url=String(c?.url||'').toLowerCase();
     if(name==='diamarte'||/\/diamarte(?:\/|$)/.test(url)) return 'Souleater';
     return 'Unknown';
@@ -124,9 +139,6 @@
 
   function run(){
     const changed=applyStored();
-    // The app renders New Addition cards from its in-memory state. Reload once
-    // when the persisted identity/spec has actually changed so those cards use
-    // the corrected values. No optimizer/hover/arrow code is involved.
     if(changed && !sessionStorage.getItem('lostark-hideout-class-render-v2-reload')){
       sessionStorage.setItem('lostark-hideout-class-render-v2-reload','1');
       window.location.reload();
