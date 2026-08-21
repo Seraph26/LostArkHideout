@@ -1,11 +1,11 @@
-/* Lost Ark Hideout — General Optimization metrics: single Raid-style swap hover */
+/* Lost Ark Hideout — General Optimization metrics: persistent Raid-style swap hover */
 (()=>{
 'use strict';
-const STORE='lostark-general-optimization-baseline-v6';
+const STORE='lostark-general-optimization-baseline-v7';
 const BASE_TITLE='Base DPS Power is the combined CP of the DPS characters in this party before modeled Party Synergy and Support Impact are applied.';
 const SYNERGY_TITLE='Estimated increase to this party’s modeled potential from offensive synergies supplied by the other DPS characters in the party. This is a model contribution, not a direct in-game damage percentage.';
 const SUPPORT_TITLE='Estimated increase to this party’s modeled potential from the party support. This is a model contribution, not a direct in-game damage percentage.';
-let optimizing=false,armTimer=null,swapBefore=null;
+let swapBefore=null;
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=s=>{const n=Number(String(s??'').replace(/[^0-9.+-]/g,''));return Number.isFinite(n)?n:0};
@@ -22,12 +22,42 @@ function swapNames(before,after){if(!before||!after)return'Manual party swap';co
 function snapshot(){const m=all();return{state:domState(),metrics:m?m.map(x=>({base:x.base,sy:x.sy,su:x.su})):[]}}
 function change(current,before,key,title){if(!before)return'';const d=current[key]-before[key];if(Math.abs(d)<.005)return'';const up=d>0,label=key==='base'?Math.abs(Math.round(d)).toLocaleString():Math.abs(d).toFixed(2)+' pts';return` <span class="general-swap-arrow ${up?'general-swap-up':'general-swap-down'}" data-swap-title="${esc(title)}" aria-label="${esc(title)}">${up?'▲':'▼'} ${label}</span>`}
 function removeLegacy(){if(!general())return;document.querySelectorAll('#suggestedParties .swap-impact,#suggestedParties .manual-party-change,#suggestedParties .party-manual-summary').forEach(e=>e.remove());document.querySelectorAll('#suggestedParties *').forEach(e=>{if(e.classList.contains('general-metrics-block'))return;const t=clean(e.textContent);if(/^Manual party change\s+Best available swap:/i.test(t)&&e.children.length<8)e.remove()})}
-function render(){if(!general()||optimizing)return;removeLegacy();const z=zones(),m=all();if(!m)return;const before=swapBefore?.metrics||null,changed=!!swapBefore&&sig()!==sig(swapBefore.state),title=changed?swapNames(swapBefore,{state:domState()}):'';z.forEach((zone,i)=>{let box=zone.querySelector('.general-metrics-block');if(!box){box=document.createElement('div');box.className='general-metrics-block';const a=zone.querySelector('.party-synergies');if(a)a.insertAdjacentElement('afterend',box);else zone.appendChild(box)}const c={base:m[i].base,sy:m[i].sy,su:m[i].su},o=changed?before?.[i]:null;box.innerHTML=`<div class="general-metric"><span class="general-metric-label" title="${esc(BASE_TITLE)}" aria-label="${esc(BASE_TITLE)}">Base DPS Power</span> <strong>${Math.round(c.base).toLocaleString()}</strong>${changed?change(c,o,'base',title):''}</div><div class="general-metric"><span class="general-metric-label" title="${esc(SYNERGY_TITLE)}" aria-label="${esc(SYNERGY_TITLE)}">Party Synergy</span> <strong>+${c.sy.toFixed(2)}%</strong>${changed?change(c,o,'sy',title):''}</div><div class="general-metric"><span class="general-metric-label" title="${esc(SUPPORT_TITLE)}" aria-label="${esc(SUPPORT_TITLE)}">Support Impact</span> <strong>+${c.su.toFixed(2)}%</strong>${changed?change(c,o,'su',title):''}</div>`})}
-function css(){if(document.getElementById('general-metrics-style'))document.getElementById('general-metrics-style').remove();const s=document.createElement('style');s.id='general-metrics-style';s.textContent=`.general-metrics-block{display:flex;flex-direction:column;gap:4px;margin-top:12px;font-size:12px;line-height:1.55}.general-metric{position:relative}.general-metric-label{border-bottom:1px dotted currentColor;cursor:help}.general-swap-arrow{font-weight:800!important;margin-left:5px;white-space:nowrap;cursor:help!important}.general-swap-arrow.general-swap-up{color:#65c878!important}.general-swap-arrow.general-swap-down{color:#ef6b6b!important}.general-swap-arrow:hover::after{content:attr(data-swap-title);position:absolute;left:0;bottom:calc(100% + 7px);z-index:99999;background:#17191d;color:#eee;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:7px 9px;font-size:11px;font-weight:400;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.4)}`;document.head.appendChild(s)}
-function arm(){if(!general())return;optimizing=false;swapBefore=null;const m=all();if(!m)return;try{localStorage.setItem(STORE,JSON.stringify({metrics:m,state:domState(),sig:sig()}))}catch{}render()}
-function onOptimize(){if(!general())return;optimizing=true;swapBefore=null;removeLegacy();if(armTimer)clearTimeout(armTimer);armTimer=setTimeout(()=>{armTimer=null;arm()},4500)}
-function captureBefore(){if(!general()||optimizing||swapBefore)return;const s=snapshot();if(s.metrics.length===2)swapBefore=s}
-function captureAfter(){if(!general()||optimizing||!swapBefore)return;const beforeSig=sig(swapBefore.state);setTimeout(()=>{if(!general()||optimizing||!swapBefore)return;if(sig()!==beforeSig)render()},100)}
-function start(){css();const root=document.getElementById('suggestedParties')||document.body;root.addEventListener('pointerdown',e=>{if(e.target.closest?.('.authoritative-member'))captureBefore()},true);root.addEventListener('dragstart',e=>{if(e.target.closest?.('.authoritative-member'))captureBefore()},true);root.addEventListener('drop',()=>captureAfter(),true);document.getElementById('optimizeBtn')?.addEventListener('click',onOptimize,true);new MutationObserver(()=>{if(general()){removeLegacy();if(!optimizing&&swapBefore&&sig()!==sig(swapBefore.state))setTimeout(()=>render(),80)}}).observe(root,{childList:true,subtree:true});setInterval(()=>{if(!general()){optimizing=false;swapBefore=null;return}removeLegacy();if(!optimizing&&swapBefore&&sig()!==sig(swapBefore.state))render()},200);setTimeout(()=>{if(general()&&!optimizing)render()},900)}
+function render(){
+ if(!general())return;
+ removeLegacy();
+ const z=zones(),m=all();
+ if(!m)return;
+ const before=swapBefore?.metrics||null,changed=!!swapBefore&&sig()!==sig(swapBefore.state),title=changed?swapNames(swapBefore,{state:domState()}):'';
+ z.forEach((zone,i)=>{
+   let box=zone.querySelector('.general-metrics-block');
+   if(!box){box=document.createElement('div');box.className='general-metrics-block';const a=zone.querySelector('.party-synergies');if(a)a.insertAdjacentElement('afterend',box);else zone.appendChild(box)}
+   const c={base:m[i].base,sy:m[i].sy,su:m[i].su},o=changed?before?.[i]:null;
+   const existing=box.querySelectorAll('.general-metric');
+   const html=`<div class="general-metric"><span class="general-metric-label" data-metric-title="${esc(BASE_TITLE)}" aria-label="${esc(BASE_TITLE)}">Base DPS Power</span> <strong>${Math.round(c.base).toLocaleString()}</strong>${changed?change(c,o,'base',title):''}</div><div class="general-metric"><span class="general-metric-label" data-metric-title="${esc(SYNERGY_TITLE)}" aria-label="${esc(SYNERGY_TITLE)}">Party Synergy</span> <strong>+${c.sy.toFixed(2)}%</strong>${changed?change(c,o,'sy',title):''}</div><div class="general-metric"><span class="general-metric-label" data-metric-title="${esc(SUPPORT_TITLE)}" aria-label="${esc(SUPPORT_TITLE)}">Support Impact</span> <strong>+${c.su.toFixed(2)}%</strong>${changed?change(c,o,'su',title):''}</div>`;
+   if(existing.length!==3||clean(box.textContent)!==clean(html.replace(/<[^>]+>/g,' ')))box.innerHTML=html;
+ });
+}
+function css(){
+ let s=document.getElementById('general-metrics-style');
+ if(s)return;
+ s=document.createElement('style');s.id='general-metrics-style';
+ s.textContent=`.general-metrics-block{display:flex;flex-direction:column;gap:4px;margin-top:12px;font-size:12px;line-height:1.55}.general-metric{position:relative}.general-metric-label{position:relative;display:inline-block;border-bottom:1px dotted currentColor;cursor:help}.general-metric-label:hover::after{content:attr(data-metric-title);position:absolute;left:0;bottom:calc(100% + 8px);z-index:100000;width:350px;max-width:min(350px,80vw);padding:9px 11px;background:#17191d;color:#eee;border:1px solid rgba(255,255,255,.18);border-radius:7px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:11px;font-weight:400;line-height:1.45;white-space:normal;pointer-events:none}.general-swap-arrow{font-weight:800!important;margin-left:5px;white-space:nowrap;cursor:help!important}.general-swap-arrow.general-swap-up{color:#65c878!important}.general-swap-arrow.general-swap-down{color:#ef6b6b!important}.general-swap-arrow:hover::after{content:attr(data-swap-title);position:absolute;left:0;bottom:calc(100% + 7px);z-index:99999;background:#17191d;color:#eee;border:1px solid rgba(255,255,255,.18);border-radius:6px;padding:7px 9px;font-size:11px;font-weight:400;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.4)}`;
+ document.head.appendChild(s);
+}
+function arm(){swapBefore=null;try{localStorage.setItem(STORE,JSON.stringify({metrics:all(),state:domState(),sig:sig()}))}catch{}render()}
+function onOptimize(){if(!general())return;swapBefore=null;setTimeout(render,50);setTimeout(render,150);setTimeout(render,300);setTimeout(render,600);setTimeout(arm,1200)}
+function captureBefore(){if(!general()||swapBefore)return;const s=snapshot();if(s.metrics.length===2)swapBefore=s}
+function captureAfter(){if(!general()||!swapBefore)return;const beforeSig=sig(swapBefore.state);setTimeout(()=>{if(!general()||!swapBefore)return;if(sig()!==beforeSig)render()},100)}
+function start(){
+ css();
+ const root=document.getElementById('suggestedParties')||document.body;
+ root.addEventListener('pointerdown',e=>{if(e.target.closest?.('.authoritative-member'))captureBefore()},true);
+ root.addEventListener('dragstart',e=>{if(e.target.closest?.('.authoritative-member'))captureBefore()},true);
+ root.addEventListener('drop',()=>captureAfter(),true);
+ document.getElementById('optimizeBtn')?.addEventListener('click',onOptimize,true);
+ const observer=new MutationObserver(()=>{if(general()){removeLegacy();setTimeout(render,0)}});
+ observer.observe(root,{childList:true,subtree:true,characterData:true});
+ [50,150,300,600,1000,2000].forEach(ms=>setTimeout(render,ms));
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
