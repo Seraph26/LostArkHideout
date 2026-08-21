@@ -4,7 +4,7 @@
 
   const CONNECTOR = 'https://lostark-bible-connector.seraph0226.workers.dev/character';
   const NEW_KEY = 'lostark-hideout-new-additions-v1';
-  const VALK_ICON = 'https://cms.poyoanon.fyi/assets/d3a00d6c-f439-4a8e-9a42-38f7367cc7f2.png?height=636&width=816';
+  const VALK_ICON = 'https://lostark.fandom.com/wiki/Special:Redirect/file/ClassIcon-Warrior-Valkyrie.png';
 
   const RULES = [
     [/lone knight|combat readiness/, ['Lone Knight', 'Combat Readiness']],
@@ -20,7 +20,8 @@
     [/enhanced weapon|pistoleer/, ['Enhanced Weapon', 'Pistoleer']],
     [/demonic impulse|perfect suppression/, ['Demonic Impulse', 'Perfect Suppression']],
     [/hunger|night'?s edge/, ['Hunger', "Night's Edge"]],
-    [/empress'?s grace|emperor'?s decree/, ["Empress's Grace", "Emperor's Decree"]],
+    [/full moon harvester/, ['Full Moon Harvester']],
+    [/empress'?s grace|empress grace|emperor'?s decree|emperor decree/, ["Empress's Grace", "Emperor's Decree"]],
     [/pinnacle|control/, ['Pinnacle', 'Control']],
     [/shock training|taijutsu/, ['Shock Training', 'Taijutsu']],
     [/esoteric flurry|first intention/, ['Esoteric Flurry', 'First Intention']],
@@ -34,6 +35,8 @@
     [/liberator|shining knight/, ['Liberator', 'Shining Knight']]
   ];
 
+  const KNOWN_SPEC = /master summoner|communication overflow|lone knight|combat readiness|rage hammer|gravity training|mayhem|berserker'?s technique|igniter|reflux|surge|remaining energy|peacemaker|time to hunt|death strike|loyal companion|barrage enhancement|firepower enhancement|enhanced weapon|pistoleer|demonic impulse|perfect suppression|hunger|night'?s edge|full moon harvester|empress'?s grace|empress grace|emperor'?s decree|emperor decree|pinnacle|control|shock training|taijutsu|esoteric flurry|first intention|esoteric skill enhancement|wind fury|drizzle|brawl king storm|asura'?s path|deathblow|full bloom|recurrence|desperate salvation|true courage|blessed aura|judgment|liberator|shining knight/i;
+
   function textOf(v) {
     try { return JSON.stringify(v).toLowerCase().replace(/[’']/g, "'"); } catch { return ''; }
   }
@@ -42,37 +45,66 @@
     return String(profile?.class || profile?.className || '').trim();
   }
 
+  function findNamedSpec(text) {
+    const normalized = String(text || '').toLowerCase().replace(/[’']/g, "'");
+    const aliases = [
+      ['full moon harvester', 'Full Moon Harvester'],
+      ['empress\'s grace', "Empress's Grace"], ['empress grace', "Empress's Grace"],
+      ['emperor\'s decree', "Emperor's Decree"], ['emperor decree', "Emperor's Decree"],
+      ['night\'s edge', "Night's Edge"], ['nights edge', "Night's Edge"],
+      ['berserker\'s technique', "Berserker's Technique"], ['berserkers technique', "Berserker's Technique"],
+      ['asura\'s path', "Asura's Path"], ['asuras path', "Asura's Path"],
+      ['master summoner', 'Master Summoner'], ['communication overflow', 'Communication Overflow'],
+      ['lone knight', 'Lone Knight'], ['combat readiness', 'Combat Readiness'],
+      ['rage hammer', 'Rage Hammer'], ['gravity training', 'Gravity Training'],
+      ['mayhem', 'Mayhem'], ['igniter', 'Igniter'], ['reflux', 'Reflux'],
+      ['surge', 'Surge'], ['remaining energy', 'Remaining Energy'],
+      ['peacemaker', 'Peacemaker'], ['time to hunt', 'Time to Hunt'],
+      ['death strike', 'Death Strike'], ['loyal companion', 'Loyal Companion'],
+      ['barrage enhancement', 'Barrage Enhancement'], ['firepower enhancement', 'Firepower Enhancement'],
+      ['enhanced weapon', 'Enhanced Weapon'], ['pistoleer', 'Pistoleer'],
+      ['demonic impulse', 'Demonic Impulse'], ['perfect suppression', 'Perfect Suppression'],
+      ['hunger', 'Hunger'], ['pinnacle', 'Pinnacle'], ['control', 'Control'],
+      ['shock training', 'Shock Training'], ['taijutsu', 'Taijutsu'],
+      ['esoteric flurry', 'Esoteric Flurry'], ['first intention', 'First Intention'],
+      ['esoteric skill enhancement', 'Esoteric Skill Enhancement'],
+      ['wind fury', 'Wind Fury'], ['drizzle', 'Drizzle'],
+      ['brawl king storm', 'Brawl King Storm'], ['deathblow', 'Deathblow'],
+      ['full bloom', 'Full Bloom'], ['recurrence', 'Recurrence'],
+      ['desperate salvation', 'Desperate Salvation'], ['true courage', 'True Courage'],
+      ['blessed aura', 'Blessed Aura'], ['judgment', 'Judgment'],
+      ['liberator', 'Liberator'], ['shining knight', 'Shining Knight']
+    ];
+    for (const [needle, name] of aliases) if (normalized.includes(needle)) return name;
+    return '';
+  }
+
   function specFromProfile(profile) {
     const cls = className(profile);
     const text = textOf(profile);
-    for (const [re, names] of RULES) {
-      if (!re.test(text)) continue;
-      for (const name of names) if (new RegExp(`\\b${name.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i').test(text)) return name;
-    }
-    if (cls === 'Artist') return /\\brecurrence\\b/i.test(text) ? 'Recurrence' : 'Full Bloom';
-    if (cls === 'Valkyrie') return /\\bshining knight\\b/i.test(text) ? 'Shining Knight' : 'Liberator';
+    const direct = findNamedSpec(text);
+    if (direct) return direct;
+    if (cls === 'Artist') return /\brecurrence\b/i.test(text) ? 'Recurrence' : 'Full Bloom';
+    if (cls === 'Valkyrie') return /\bshining knight\b/i.test(text) ? 'Shining Knight' : 'Liberator';
     return '';
   }
 
   function specFromHtml(html, profile) {
     const text = String(html || '').toLowerCase().replace(/[’']/g, "'");
+    const direct = findNamedSpec(text);
+    if (direct) return direct;
     const cls = className(profile);
-    const engravingNames = Array.isArray(profile?.engravings)
-      ? profile.engravings.map(x => String(x?.name || x || '').trim()).filter(Boolean)
-      : [];
-    for (const name of engravingNames) {
-      if (/master summoner|communication overflow|lone knight|combat readiness|rage hammer|gravity training|mayhem|berserker'?s technique|igniter|reflux|surge|remaining energy|peacemaker|time to hunt|death strike|loyal companion|barrage enhancement|firepower enhancement|enhanced weapon|pistoleer|demonic impulse|perfect suppression|hunger|night'?s edge|empress'?s grace|emperor'?s decree|pinnacle|control|shock training|taijutsu|esoteric flurry|first intention|esoteric skill enhancement|wind fury|drizzle|brawl king storm|asura'?s path|deathblow|full bloom|recurrence|desperate salvation|true courage|blessed aura|judgment|liberator|shining knight/i.test(name)) return name;
-    }
-    for (const [re, names] of RULES) {
-      if (!re.test(text)) continue;
-      for (const name of names) {
-        const r = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i');
-        if (r.test(text)) return name;
-      }
-    }
-    if (cls === 'Artist') return /\\brecurrence\\b/i.test(text) ? 'Recurrence' : 'Full Bloom';
-    if (cls === 'Valkyrie') return /\\bshining knight\\b/i.test(text) ? 'Shining Knight' : 'Liberator';
+    if (cls === 'Artist') return /\brecurrence\b/i.test(text) ? 'Recurrence' : 'Full Bloom';
+    if (cls === 'Valkyrie') return /\bshining knight\b/i.test(text) ? 'Shining Knight' : 'Liberator';
     return '';
+  }
+
+  async function fetchPayload(url) {
+    try {
+      const r = await fetch(`${CONNECTOR}?url=${encodeURIComponent(url)}`, {cache:'no-store'});
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
   }
 
   async function enrichExisting() {
@@ -84,11 +116,10 @@
         if (!c?.profile) continue;
         let spec = c.profile.spec || c.profile.specialization || c.profile.specName || c.profile.buildSpec || specFromProfile(c.profile);
         if (!spec) {
-          try {
-            const r = await fetch(`${CONNECTOR}?url=${encodeURIComponent(c.url)}`, {cache:'no-store'});
-            const data = await r.json();
-            spec = specFromHtml(data?.html || data?.characterHtml || data?.content || data?.page || '', c.profile);
-          } catch {}
+          const data = await fetchPayload(c.url);
+          if (data) {
+            spec = specFromProfile(data) || specFromHtml(textOf(data), c.profile);
+          }
         }
         if (spec && c.profile.spec !== spec) { c.profile.spec = spec; changed = true; }
         if (String(c.profile.class).toLowerCase() === 'valkyrie' && c.profile.classIcon !== VALK_ICON) { c.profile.classIcon = VALK_ICON; changed = true; }
@@ -119,11 +150,8 @@
       if (!profile) return profile;
       let spec = profile.spec || profile.specialization || profile.specName || profile.buildSpec || specFromProfile(profile);
       if (!spec) {
-        try {
-          const r = await fetch(`${CONNECTOR}?url=${encodeURIComponent(candidate.url)}`, {cache:'no-store'});
-          const data = await r.json();
-          spec = specFromHtml(data?.html || data?.characterHtml || data?.content || data?.page || '', profile);
-        } catch {}
+        const data = await fetchPayload(candidate.url);
+        if (data) spec = specFromProfile(data) || specFromHtml(textOf(data), profile);
       }
       if (spec) profile.spec = spec;
       if (className(profile) === 'Valkyrie') profile.classIcon = VALK_ICON;
