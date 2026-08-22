@@ -65,7 +65,14 @@ function extractEnlightenment(d){const t=normalizedText(d.body?.textContent||'')
  const ends=[' Evolution ',' Leap ',' Paradise',' Cards',' Skills',' Engravings'].map(k=>seg.indexOf(k)).filter(x=>x>0);
  if(ends.length)seg=seg.slice(0,Math.min(...ends));
  return[...seg.matchAll(/T\d\s+([A-Za-z][A-Za-z'’:.\- ]*?)\s+Lv\.\s*\d+/g)].map(m=>m[1].trim()).filter(Boolean)}
-function parseProfile(html,fallback,region){const d=makeDocument(html),l=getLines(d),cp=extractRaidCP(d),cls=findClass(d,l,fallback),classIcon=svgDataUrl(extractBibleClassIcon(d,region,fallback));return{skillTripods:extractSkillTripods(html),allyEffects:extractAllyEffects(d),enlightenment:extractEnlightenment(d),name:findProfileName(d,fallback),class:cls,role:detectRole(extractPresetSnippet(d,cp.source==='Estimated Raid Loadout'?'Estimated Raid Loadout':'Current Loadout (Raid)'),cls),ilvl:findItemLevel(d,l),cp:cp.value,cpSource:cp.source,loadout:cp.source,classIcon,retrievedAt:new Date().toISOString()}}
+/* Bible ranks a character against either "<Class>" or "DPS <Class>" -- e.g.
+   "Top 27.6% of 1800-1810 Bards" versus "Top 98.1% of 1780-1790 DPS Bards" --
+   which is its own read of whether the character is specced support or DPS.
+   Recorded for reference only; role is still decided by class, because this
+   marker follows the allocated class engraving and can disagree with how a
+   character is actually geared and played. */
+function extractBibleRoleHint(d){const m=normalizedText(d.body?.textContent||'').match(/Top\s+[\d.]+%\s+of\s+[\d\-]+\s+(DPS\s+)?[A-Za-z]/i);return m?(m[1]?'dps':'support-or-dps-unmarked'):''}
+function parseProfile(html,fallback,region){const d=makeDocument(html),l=getLines(d),cp=extractRaidCP(d),cls=findClass(d,l,fallback),classIcon=svgDataUrl(extractBibleClassIcon(d,region,fallback));return{skillTripods:extractSkillTripods(html),allyEffects:extractAllyEffects(d),enlightenment:extractEnlightenment(d),bibleRoleHint:extractBibleRoleHint(d),name:findProfileName(d,fallback),class:cls,role:detectRole(extractPresetSnippet(d,cp.source==='Estimated Raid Loadout'?'Estimated Raid Loadout':'Current Loadout (Raid)'),cls),ilvl:findItemLevel(d,l),cp:cp.value,cpSource:cp.source,loadout:cp.source,classIcon,retrievedAt:new Date().toISOString()}}
 async function fetchCharacter(c){let r;try{r=await fetch(`${BIBLE_CONNECTOR}?url=${encodeURIComponent(c.url)}`,{method:'GET',cache:'no-store',headers:{Accept:'application/json'}})}catch(e){throw Error(`Unable to reach the Bible connector: ${e.message||'network error'}`)}const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw Error(`Bible connector returned non-JSON data (HTTP ${r.status}).`)}if(!r.ok||data.ok===false)throw Error(data.error||`Bible connector returned HTTP ${r.status}.`);return parseProfile(data.html||data.characterHtml||data.content||data.page,c.name,c.region)}
 /* Defer to the shared class-data authority, which knows the newer classes and is
    further patched by class-icon-authority-v1.js with the repository-hosted SVGs.
