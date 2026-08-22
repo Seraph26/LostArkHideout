@@ -19,18 +19,46 @@ const MAIN='lostark-hideout-private-v3',ADDS='lostark-hideout-new-additions-v1',
 const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??d}catch{return d}};
 const status=m=>{const e=document.getElementById('status');if(e)e.textContent=m};
 
-/* Keep the link small: carry what the dashboard renders and what scoring reads,
-   not the entire imported record. */
-function trimProfile(p){
+/* Keep the link short. Everything here is either rendered or read by scoring;
+   anything reconstructable is left out and rebuilt on import.
+   - url is dropped and rebuilt from region + name (a fixed prefix per character)
+   - only Shurdi's tripods are kept; that one skill is all any scoring reads
+   - the resolved specialization replaces the Ark Passive node list it came from
+   - loadout duplicates cpSource, and retrievedAt would make the recipient's own
+     Refresh Profiles skip everything as already fresh */
+const BIBLE_PREFIX='https://lostark.bible/character/';
+const SHURDI_ID='20160';
+/* The spec as actually displayed, so the node list it was derived from can go. */
+function shownSpec(c){
+ const url=c?.url||'';
+ for(const card of document.querySelectorAll('#roster .character,#newAdditionsRoster .candidate-character')){
+  const a=card.querySelector('a[href*="lostark.bible/character/"]');
+  if(!a||a.getAttribute('href')!==url)continue;
+  const s=(card.querySelector('.class')?.textContent||'').trim();
+  if(s&&s!=='—')return s;
+ }
+ return '';
+}
+function trimProfile(p,c){
  if(!p||typeof p!=='object')return null;
  const out={};
- for(const k of ['name','class','role','cp','ilvl','cpSource','loadout','spec','specialization','positional','enlightenment','allyEffects','skillTripods','bibleRoleHint'])
+ for(const k of ['name','class','role','cp','ilvl','cpSource','positional','allyEffects'])
   if(p[k]!==undefined)out[k]=p[k];
- /* Bible SVG icons are data URIs and can be large; keep only modest ones. */
- if(typeof p.classIcon==='string'&&p.classIcon.length<2000)out.classIcon=p.classIcon;
+ const spec=String(p.spec||p.specialization||shownSpec(c)||'').trim();
+ if(spec)out.specialization=spec; else if(p.enlightenment)out.enlightenment=p.enlightenment;
+ const shurdi=p.skillTripods&&(p.skillTripods[SHURDI_ID]||p.skillTripods[Number(SHURDI_ID)]);
+ if(Array.isArray(shurdi))out.skillTripods={[SHURDI_ID]:shurdi};
  return out;
 }
-const trimChar=c=>c&&c.id?{id:c.id,url:c.url,region:c.region,name:c.name,profile:trimProfile(c.profile)}:null;
+function trimChar(c){
+ if(!c||!c.id)return null;
+ const out={id:c.id,region:c.region,name:c.name,profile:trimProfile(c.profile,c)};
+ /* Only carry the URL when it is not the standard region/name form. */
+ const rebuilt=BIBLE_PREFIX+encodeURIComponent(c.region||'NA')+'/'+encodeURIComponent(c.name||'');
+ if(c.url&&c.url!==rebuilt)out.url=c.url;
+ return out;
+}
+const restoreChar=c=>c&&c.id?{...c,url:c.url||BIBLE_PREFIX+encodeURIComponent(c.region||'NA')+'/'+encodeURIComponent(c.name||'')}:null;
 
 function snapshot(){
  return{v:1,
@@ -95,8 +123,8 @@ function restoreState(){
  const snap=rec.snap,total=snap.main.length+snap.adds.length;
  const existing=(read(MAIN,{characters:[]}).characters||[]).length+(read(ADDS,[])||[]).length;
  if(existing&&!confirm(`Restore the saved dashboard (${total} characters)?\n\nThis replaces the ${existing} currently loaded.`))return;
- localStorage.setItem(MAIN,JSON.stringify({characters:snap.main||[]}));
- localStorage.setItem(ADDS,JSON.stringify(snap.adds||[]));
+ localStorage.setItem(MAIN,JSON.stringify({characters:(snap.main||[]).map(restoreChar).filter(Boolean)}));
+ localStorage.setItem(ADDS,JSON.stringify((snap.adds||[]).map(restoreChar).filter(Boolean)));
  localStorage.setItem(HIDDEN,JSON.stringify(snap.hidden||[]));
  if(snap.party)localStorage.setItem(PARTY,JSON.stringify(snap.party));else localStorage.removeItem(PARTY);
  if(snap.mode)localStorage.setItem(MODE,JSON.stringify(snap.mode));else localStorage.removeItem(MODE);
@@ -151,8 +179,8 @@ async function importFromHash(){
  if(existing&&!confirm(`This link contains ${snap.main.length+snap.adds.length} characters.\n\nLoading it will replace the ${existing} already on this dashboard. Continue?`)){
   history.replaceState(null,'',location.pathname);return;
  }
- localStorage.setItem(MAIN,JSON.stringify({characters:snap.main||[]}));
- localStorage.setItem(ADDS,JSON.stringify(snap.adds||[]));
+ localStorage.setItem(MAIN,JSON.stringify({characters:(snap.main||[]).map(restoreChar).filter(Boolean)}));
+ localStorage.setItem(ADDS,JSON.stringify((snap.adds||[]).map(restoreChar).filter(Boolean)));
  localStorage.setItem(HIDDEN,JSON.stringify(snap.hidden||[]));
  if(snap.party)localStorage.setItem(PARTY,JSON.stringify(snap.party));else localStorage.removeItem(PARTY);
  if(snap.mode)localStorage.setItem(MODE,JSON.stringify(snap.mode));else localStorage.removeItem(MODE);
