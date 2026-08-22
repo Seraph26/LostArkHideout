@@ -66,6 +66,36 @@ function allCharacters(){return [...(mainState().characters||[]),...normalizeNew
 function eligibleCharacters(){const hs=hidden();return allCharacters().filter(c=>!hs.has(c.id))}
 function expose(){window.LostArkCandidateRoster={getAll:allCharacters,getEligible:eligibleCharacters,isHidden:id=>hidden().has(id),getNew:newChars,MAX_NEW:MAX}}
 function styles(){if($('#candidate-roster-style'))return;const s=document.createElement('style');s.id='candidate-roster-style';s.textContent='.character.candidate-character,#roster .character{transition:opacity .22s ease}@media (prefers-reduced-motion:reduce){.character.candidate-character,#roster .character{transition:none}}.new-addition-toggle-all{margin-left:8px;font:inherit;font-size:9px;font-weight:700;padding:3px 7px;line-height:1.2;border-radius:6px;border:1px solid #46516a;background:#1a2230;color:#edf2fb;cursor:pointer;vertical-align:middle}.new-addition-toggle-all:hover{background:#222c3d}.character-group-tag{display:inline-block;margin-top:5px;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.04em;background:rgba(120,160,220,.14);color:#8fb4ef}.candidate-card-actions{display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap}.candidate-card-actions button{font:inherit;cursor:pointer;white-space:nowrap}.candidate-card-actions .candidate-hide,.candidate-card-actions .candidate-remove,.candidate-card-actions .remove-character{font-size:10px;padding:5px 8px;line-height:1.2;border-radius:7px}.candidate-card-actions .candidate-hide{border:1px solid #46516a;background:#1a2230;color:#edf2fb}.candidate-card-actions .candidate-remove,.candidate-card-actions .remove-character{border:1px solid #4a3340;background:#20151c;color:#efb0bb}.candidate-hidden{opacity:.52}.candidate-hidden-note{margin-top:10px;color:#e0a35b;font-size:11px}.new-addition-card{margin:0}.new-addition-card .class-icon{width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-right:5px;filter:none}';document.head.appendChild(s)}
-function init(){styles();expose();prepareControls();renderNew();patchMain();updateHeaderCount();refreshCandidateBuilds()}
+/* Refresh Profiles only ever re-imported the Main Group, so New Addition
+   profiles kept whatever CP the import stored when they were first added --
+   including values from before the CP extraction was fixed. Re-import them
+   through the same path. Connector calls are globally paced, so these queue
+   behind the Main Group rather than tripping Bible's rate limit. */
+let candidateRefreshRunning=false;
+async function refreshCandidates(){
+ if(candidateRefreshRunning||typeof window.fetchCharacter!=='function')return;
+ const list=newChars();if(!list.length)return;
+ candidateRefreshRunning=true;
+ let ok=0,failed=0;
+ for(const c of list){
+  if(!c?.url)continue;
+  try{const p=await window.fetchCharacter(c);
+   if(p){p.class=canonicalClass({...c,profile:p});p.classIcon=classIcon(p.class,p);p.spec=specialization({...c,profile:p});c.profile=p;delete c.profileError;ok++}
+  }catch(e){c.profileError=String(e?.message||e);failed++}
+ }
+ write(NEW_KEY,list);renderNew();applyHiddenState();
+ candidateRefreshRunning=false;
+ const status=document.getElementById('status');
+ if(status)status.textContent=`${status.textContent} New Additions: refreshed ${ok}${failed?`, ${failed} failed`:''}.`;
+}
+function wireCandidateRefresh(){const btn=document.getElementById('refreshBtn');if(!btn||btn.dataset.candidateRefresh)return;btn.dataset.candidateRefresh='1';
+ btn.addEventListener('click',()=>{
+  /* wait for the Main Group pass to report before appending our own result */
+  const status=document.getElementById('status');const started=Date.now();
+  const poll=()=>{if(!status||/^Refreshed /i.test(status.textContent||'')||Date.now()-started>180000)refreshCandidates();else setTimeout(poll,500)};
+  setTimeout(poll,500);
+ });
+}
+function init(){styles();expose();prepareControls();renderNew();patchMain();updateHeaderCount();refreshCandidateBuilds();wireCandidateRefresh()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();

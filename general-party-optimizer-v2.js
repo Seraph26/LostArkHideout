@@ -11,7 +11,7 @@ function load(){try{return JSON.parse(localStorage.getItem(STORE)||'null')||{cha
    values are pure, so scoring is unchanged. Caches drop whenever the stored
    roster changes or build profiles finish loading. */
 let rosterSnapshot=null;const textCache=new Map(),buildCache=new Map();
-function dropCaches(){textCache.clear();buildCache.clear()}
+function dropCaches(){textCache.clear();buildCache.clear();for(const k of Object.keys(meanCache))delete meanCache[k]}
 function cacheKey(c){return String(c&&(c.id||c.url)||'')}
 function roster(){const raw=localStorage.getItem(STORE);if(raw!==rosterSnapshot){rosterSnapshot=raw;dropCaches()}return(load().characters||[]).filter(c=>c&&c.id)}
 window.addEventListener('lostark-build-profiles-v3-ready',dropCaches);
@@ -29,11 +29,62 @@ function effects(c){try{const x=window.LostArkPartySynergyAuthorityV1?.provided?
 function weight(c,type){const t=text(c),p=pos(c);let w=1;if(type==='crit'&&/keen blunt|adrenaline|burst|full moon/.test(t))w+=.35;if(type==='critDamage'&&/keen blunt|burst/.test(t))w+=.30;if(type==='attackSpeed'&&/raid captain|swiftness/.test(t))w+=.35;if(type==='positional')w=p==='Back Attack'||p==='Front Attack'?1.35:p==='Hit Master'?.55:.85;if(type==='mana')w=/summoner|mana|boundless/.test(t)?1.55:.2;if(type==='damage'&&/summoner/.test(t))w+=.10;return w}
 function supportEffects(c){switch(info(c).cls){case'Bard':return[{type:'supportAmplification',value:.10},{type:'mana',value:.12},{type:'attackSpeed',value:.035}];case'Artist':return[{type:'supportAmplification',value:.10},{type:'mana',value:.08},{type:'attackSpeed',value:.04}];case'Paladin':return[{type:'supportAmplification',value:.10},{type:'damage',value:.03}];case'Valkyrie':return[{type:'supportAmplification',value:.095},{type:'attackSpeed',value:.06}];default:return[{type:'supportAmplification',value:.09}]}}
 function encounterProfile(){try{return window.LostArkEncounterModel?.getProfile?.()||null}catch{return null}}
-function supportUptime(p,target){const s=p.find(x=>role(x)==='Support');if(!s)return 0;const dps=p.filter(x=>role(x)==='DPS'),sc=info(s).cls,ep=encounterProfile(),mechanics=ep?.mechanics||{},positions=dps.map(pos),known=positions.filter(x=>x!=='Unknown'),mixed=new Set(known).size>1,targetPos=pos(target);let u;if(ep){if(targetPos==='Back Attack'&&Number.isFinite(Number(ep.back)))u=Number(ep.back);else if(targetPos==='Front Attack'&&Number.isFinite(Number(ep.front)))u=Number(ep.front);else if(targetPos==='Hit Master'&&Number.isFinite(Number(ep.hitmaster)))u=Number(ep.hitmaster);else if(Number.isFinite(Number(ep.ranged))&&Number.isFinite(Number(ep.melee))){const ranged=/Sorceress|Sharpshooter|Artillerist|Machinist|Scouter|Summoner|Aeromancer|Gunslinger|Deadeye|Arcana|Arcanist/.test(info(target).cls);u=ranged?Number(ep.ranged):Number(ep.melee)}else u=Number(ep.baseUptime)||.95}else u=mixed?.76:.95;if(sc==='Bard'){if(mixed)u*=.97;if(targetPos==='Front Attack'&&known.includes('Back Attack'))u*=.99;if(mechanics.movement==='high'||mechanics.movement==='very-high')u*=.99}else if(sc==='Artist'){if(mixed)u*=.985;if(targetPos==='Front Attack'&&known.includes('Back Attack'))u*=.995}return Math.max(.60,Math.min(1,u))}
-function contribution(p,c){if(role(c)!=='DPS')return{base:0,build:0,synergy:0,support:0,total:0,uptime:0,details:[]};const cp=info(c).cp,b=build(c),fit=(b.engravings&&b.engravings.length?.004:0)+(b.grid&&b.grid.length?.004:0)+(b.arkPassive&&b.arkPassive.length?.004:0)+(/master summoner|communication overflow/.test(text(c))?.002:0);let synergy=0,support=0,details=[];for(const src of p.filter(x=>x!==c&&role(x)==='DPS'))for(const e of effects(src)){const v=cp*num(e.magnitude??e.value)*weight(c,e.type);synergy+=v;details.push({source:info(src).name,type:e.type,value:v,direction:'from'})}const sup=p.find(x=>role(x)==='Support');let uptime=0;if(sup){uptime=supportUptime(p,c);for(const e of supportEffects(sup)){const v=cp*e.value*weight(c,e.type)*uptime;support+=v;details.push({source:info(sup).name,type:e.type,value:v,uptime,direction:'from'})}}return{base:cp,build:cp*fit,synergy,support,total:cp+cp*fit+synergy+support,uptime,details}}
+/* What a character GIVES the party used to depend only on their class, so a
+   better-geared character of the same class supplied exactly the same buff.
+   A character's own CP already drives what they receive (contribution scales
+   off it), but not what they provide. CP is the Bible-derived measure of the
+   whole character -- gear, bracelet, gems, ark passive -- so scale the synergy
+   and support each one supplies by their CP relative to the mean for their role.
+   Square-rooted and clamped, so it shifts the choice without letting CP swamp
+   the class effects themselves. */
+const meanCache={};
+function meanCp(r){if(meanCache[r]!=null)return meanCache[r];const all=eligible().filter(c=>role(c)===r).map(c=>info(c).cp).filter(n=>n>0);meanCache[r]=all.length>=2?all.reduce((a,b)=>a+b,0)/all.length:0;return meanCache[r]}
+function strength(c){const mean=meanCp(role(c)),cp=info(c).cp;if(!mean||!cp)return 1;return Math.max(.85,Math.min(1.15,Math.sqrt(cp/mean)))}
+function supportUptime(p,target){const s=p.find(x=>role(x)==='Support');if(!s)return 0;const dps=p.filter(x=>role(x)==='DPS'),sc=info(s).cls,ep=encounterProfile(),mechanics=ep?.mechanics||{},positions=dps.map(pos),known=positions.filter(x=>x!=='Unknown'),mixed=new Set(known).size>1,targetPos=pos(target);let u;if(ep){if(targetPos==='Back Attack'&&Number.isFinite(Number(ep.back)))u=Number(ep.back);else if(targetPos==='Front Attack'&&Number.isFinite(Number(ep.front)))u=Number(ep.front);else if(targetPos==='Hit Master'&&Number.isFinite(Number(ep.hitmaster)))u=Number(ep.hitmaster);else if(Number.isFinite(Number(ep.ranged))&&Number.isFinite(Number(ep.melee))){const ranged=/Sorceress|Sharpshooter|Artillerist|Machinist|Scouter|Summoner|Aeromancer|Gunslinger|Deadeye|Arcana|Arcanist/.test(info(target).cls);u=ranged?Number(ep.ranged):Number(ep.melee)}else u=Number(ep.baseUptime)||.95}else{
+ /* Raid-model positional uptime, adopted here so General agrees with Raid
+    Specific: Paladin and Valkyrie hold uptime far better than Bard and Artist
+    across a party running mixed positions, rather than the flat mixed?.76:.95
+    that treated every support class the same. */
+ const uniq=[...new Set(known)],front=uniq.includes('Front Attack'),back=uniq.includes('Back Attack'),hm=uniq.includes('Hit Master');
+ if(sc==='Paladin'||sc==='Valkyrie')u=uniq.length>=3?.94:front&&back?.96:.99;
+ else u=uniq.length>=3?.72:front&&back?.76:hm&&(front||back)?.84:.95;
+ if((sc==='Bard'||sc==='Artist')&&targetPos==='Hit Master'&&uniq.length>=2)u-=.05;
+ if((sc==='Bard'||sc==='Artist')&&targetPos!=='Unknown'&&uniq.length===1)u+=.02;
+ return Math.max(.60,Math.min(1,u));
+}
+if(sc==='Bard'){if(mixed)u*=.97;if(targetPos==='Front Attack'&&known.includes('Back Attack'))u*=.99;if(mechanics.movement==='high'||mechanics.movement==='very-high')u*=.99}else if(sc==='Artist'){if(mixed)u*=.985;if(targetPos==='Front Attack'&&known.includes('Back Attack'))u*=.995}return Math.max(.60,Math.min(1,u))}
+function contribution(p,c){if(role(c)!=='DPS')return{base:0,build:0,synergy:0,support:0,total:0,uptime:0,details:[]};const cp=info(c).cp,b=build(c),fit=(b.engravings&&b.engravings.length?.004:0)+(b.grid&&b.grid.length?.004:0)+(b.arkPassive&&b.arkPassive.length?.004:0)+(/master summoner|communication overflow/.test(text(c))?.002:0);let synergy=0,support=0,details=[];for(const src of p.filter(x=>x!==c&&role(x)==='DPS')){const ss=strength(src);for(const e of effects(src)){const v=cp*num(e.magnitude??e.value)*weight(c,e.type)*ss;synergy+=v;details.push({source:info(src).name,type:e.type,value:v,direction:'from'})}}const sup=p.find(x=>role(x)==='Support');let uptime=0;if(sup){uptime=supportUptime(p,c);const ss=strength(sup);for(const e of supportEffects(sup)){const v=cp*e.value*weight(c,e.type)*uptime*ss;support+=v;details.push({source:info(sup).name,type:e.type,value:v,uptime,direction:'from'})}}return{base:cp,build:cp*fit,synergy,support,total:cp+cp*fit+synergy+support,uptime,details}}
 function score(p){if(p.length!==4||p.filter(x=>role(x)==='DPS').length!==3||p.filter(x=>role(x)==='Support').length!==1)return null;const c=p.filter(x=>role(x)==='DPS').map(x=>({c:x,...contribution(p,x)}));return{total:c.reduce((n,x)=>n+x.total,0),base:c.reduce((n,x)=>n+x.base,0),build:c.reduce((n,x)=>n+x.build,0),synergy:c.reduce((n,x)=>n+x.synergy,0),support:c.reduce((n,x)=>n+x.support,0),coherence:Math.round(c.reduce((n,x)=>n+x.uptime,0)/3*100),c}}
 function combos(a,k){const o=[];function r(i,p){if(p.length===k){o.push(p);return}for(let j=i;j<=a.length-(k-p.length);j++)r(j+1,p.concat(a[j]))}r(0,[]);return o}
-function resolve(a){const m=new Map(roster().map(c=>[c.id,c])),p1=[],p2=[],u=new Set();for(const id of a.party1||[])if(m.has(id)&&!u.has(id)&&p1.length<4){p1.push(m.get(id));u.add(id)}for(const id of a.party2||[])if(m.has(id)&&!u.has(id)&&p2.length<4){p2.push(m.get(id));u.add(id)}for(const c of m.values())if(!u.has(c.id)){if(p1.length<4)p1.push(c);else if(p2.length<4)p2.push(c);u.add(c.id)}return{p1,p2}}
+/* Optimization pool: the Main Group plus any New Addition that is not hidden,
+   which is the point of the comparison section -- an outside character should be
+   able to displace a current member. Hidden characters are excluded, so hiding
+   all New Additions restores Main-Group-only behaviour. */
+function eligible(){const base=roster();let list=null;try{list=window.LostArkCandidateRoster?.getEligible?.()}catch{}
+ if(!Array.isArray(list)||!list.length)list=base;
+ const seen=new Set();
+ return list.filter(c=>{const id=c&&c.id;if(!id||seen.has(id)||!(c.profile||c.data))return false;seen.add(id);return true})}
+/* Enumerate 4+4 arrangements by role. Two supports and six DPS are chosen from
+   the pool, so this stays exact at eight characters and still terminates quickly
+   when New Additions widen it. Candidates beyond the strongest few by CP are
+   trimmed: they cannot realistically make the best six. */
+const MAX_SUPPORTS=4,MAX_DPS=9;
+function strongest(list,n){return list.slice().sort((x,y)=>info(y).cp-info(x).cp).slice(0,n)}
+function arrangements(list){
+ const sup=strongest(list.filter(c=>role(c)==='Support'),MAX_SUPPORTS),dps=strongest(list.filter(c=>role(c)==='DPS'),MAX_DPS);
+ if(sup.length<2||dps.length<6)return[];
+ const out=[];
+ for(const pair of combos(sup,2))for(const six of combos(dps,6)){
+  const anchor=six[0];
+  for(const three of combos(six,3)){
+   if(!three.includes(anchor))continue;            /* anchor kills mirror duplicates */
+   const rest=six.filter(c=>!three.includes(c));
+   out.push([three.concat(pair[0]),rest.concat(pair[1])]);
+   out.push([three.concat(pair[1]),rest.concat(pair[0])]);
+  }
+ }
+ return out}
+function resolve(a){const m=new Map(eligible().map(c=>[c.id,c])),p1=[],p2=[],u=new Set();for(const id of a.party1||[])if(m.has(id)&&!u.has(id)&&p1.length<4){p1.push(m.get(id));u.add(id)}for(const id of a.party2||[])if(m.has(id)&&!u.has(id)&&p2.length<4){p2.push(m.get(id));u.add(id)}for(const c of m.values())if(!u.has(c.id)){if(p1.length<4)p1.push(c);else if(p2.length<4)p2.push(c);u.add(c.id)}return{p1,p2}}
 function swapRows(p1,p2){const before=(score(p1)?.total||0)+(score(p2)?.total||0),rows=[];for(let i=0;i<4;i++)for(let j=0;j<4;j++){const a=p1.slice(),b=p2.slice();[a[i],b[j]]=[b[j],a[i]];const next=(score(a)?.total||0)+(score(b)?.total||0);rows.push({a:p1[i],b:p2[j],next,pct:before?((next-before)/before)*100:0})}return rows.sort((a,b)=>b.pct-a.pct)}
 function bestSwapHtml(p1,p2){const r=swapRows(p1,p2);if(!r.length)return'';const x=r[0],direction=x.pct>.005?'↑':x.pct<-.005?'↓':'→',clsx=x.pct>.005?'positive':x.pct<-.005?'negative':'neutral';return`<div class="swap-impact ${clsx}"><strong>Best available swap: ${esc(info(x.a).name)} ↔ ${esc(info(x.b).name)}</strong><div class="swap-impact-number">${direction} ${x.pct>=0?'+':''}${x.pct.toFixed(2)}%</div><span>Combined party potential would be ${Math.round(x.next).toLocaleString()}.</span></div>`}
 function encounterGuidance(){try{const p=window.LostArkEncounterModel?.getProfile?.();if(!p)return'';const notes=Array.isArray(p.notes)?p.notes:[],f=[];if(p.back<.94)f.push('Back Attack uptime is constrained');else if(p.back<.97)f.push('Back Attack uptime is moderately constrained');else f.push('Back Attack uptime is relatively favorable');if(p.front>p.back+.01)f.push('Front Attack builds are favored over back attacks');if(p.hitmaster>=.985)f.push('Hit Master builds retain high uptime');else if(p.hitmaster<.97)f.push('Hit Master uptime is constrained');if(p.melee<p.ranged-.01)f.push('Ranged uptime is favored over melee');if(p.burst>1.02)f.push('Burst-window builds receive additional value');const mech=p.mechanics||{};if(mech.forcedPositioning==='high'||mech.forcedPositioning==='very-high')f.push('Forced movement/positioning is a major factor');if(mech.movement==='high'||mech.movement==='very-high')f.push('High movement demand is modeled');const lead=[...new Set(f)].slice(0,4).join('; ');return`<div class="encounter-priority-note"><strong>Raid calculation priority:</strong> ${esc(lead||'Encounter-specific uptime and positioning factors are active.')} ${notes[0]?`<span class="encounter-priority-detail">${esc(notes[0])}</span>`:''}</div>`}catch{return''}}
@@ -50,9 +101,9 @@ function busy(b,v){b.disabled=v;b.setAttribute('aria-busy',v?'true':'false');b.t
 function baselineKey(list){return list.map(c=>String(c.id)).sort().join('|')}
 function readBaseline(key){try{const x=JSON.parse(localStorage.getItem(BASELINE)||'null');return x?.key===key&&x?.party1?.length===4&&x?.party2?.length===4?x:null}catch{return null}}
 function writeBaseline(key,best){try{localStorage.setItem(BASELINE,JSON.stringify({key,party1:best.party1,party2:best.party2}))}catch{}}
-function optimize(b){const list=roster().slice(0,8);if(list.length!==8)return;const key=baselineKey(list),cached=readBaseline(key);/* Cached baseline still re-renders, which visibly churns the page, so show the
+function optimize(b){const list=eligible();if(list.length<8)return;const key=baselineKey(list),cached=readBaseline(key);/* Cached baseline still re-renders, which visibly churns the page, so show the
    busy label across it rather than returning with no feedback at all. */
-if(cached){save({party1:cached.party1,party2:cached.party2});busy(b,true);requestAnimationFrame(()=>requestAnimationFrame(()=>{try{render({party1:cached.party1,party2:cached.party2},false)}finally{busy(b,false)}}));return}busy(b,true);requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>{try{let best=null;for(const p1 of combos(list,4)){const p2=list.filter(c=>!p1.includes(c)),a=score(p1),z=score(p2);if(!a||!z)continue;const total=a.total+z.total;if(!best||total>best.total)best={total,party1:p1.map(c=>c.id),party2:p2.map(c=>c.id)}}if(best){writeBaseline(key,best);save(best);busy(b,false);queueMicrotask(()=>render(best,false))}else busy(b,false)}catch(e){busy(b,false);console.error('General Optimization failed',e)}},0)))}
+if(cached){save({party1:cached.party1,party2:cached.party2});busy(b,true);requestAnimationFrame(()=>requestAnimationFrame(()=>{try{render({party1:cached.party1,party2:cached.party2},false)}finally{busy(b,false)}}));return}busy(b,true);requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>{try{let best=null;for(const [p1,p2] of arrangements(list)){const a=score(p1),z=score(p2);if(!a||!z)continue;const total=a.total+z.total;if(!best||total>best.total)best={total,party1:p1.map(c=>c.id),party2:p2.map(c=>c.id)}}if(best){writeBaseline(key,best);save(best);busy(b,false);queueMicrotask(()=>render(best,false))}else busy(b,false)}catch(e){busy(b,false);console.error('General Optimization failed',e)}},0)))}
 function install(){const b=document.getElementById('optimizeBtn'),h=document.getElementById('suggestedParties');if(!b||!h||h.dataset.generalV3)return;h.dataset.generalV3='1';const active=()=>window.LostArkOptimizerMode?.general!==false;
 const invoke=e=>{if(!active())return;e.preventDefault();e.stopImmediatePropagation();if(b.disabled)b.disabled=false;optimize(b)};
 b.addEventListener('pointerdown',e=>{if(e.target?.closest?.('#optimizeBtn'))invoke(e)},{capture:true});
