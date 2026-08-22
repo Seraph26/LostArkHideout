@@ -18,11 +18,9 @@ newAdditionsAuthorityScript.src = 'new-additions-class-spec-v2.js?v=20260821auth
 newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
-// Install candidate build-refresh isolation before candidate-roster-v1 runs.
-// v3 also recovers a Main Group that was already replaced by a previous
-// candidate refresh, using the preserved main snapshot or legacy roster.
+// Install Main Group authority before New Addition candidate initialization.
 const candidateBuildRefreshIsolationScript = document.createElement('script');
-candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v2.js?v=20260821isolate5';
+candidateBuildRefreshIsolationScript.src = 'candidate-build-refresh-isolation-v2.js?v=20260821isolate6';
 candidateBuildRefreshIsolationScript.async = false;
 document.head.appendChild(candidateBuildRefreshIsolationScript);
 
