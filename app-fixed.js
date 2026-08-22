@@ -46,7 +46,15 @@ function svgDataUrl(svg){return svg?`data:image/svg+xml;charset=utf-8,${encodeUR
    raw map so scoring can test specific tripod choices -- Summoner's Shurdi mana
    tripod, for one -- since there is no other way to detect them. */
 function extractSkillTripods(html){const map={};try{for(const m of String(html||'').matchAll(/\{id:(\d+),[^{}]*?tripods:\[([0-9,]*)\]/g)){const arr=m[2]?m[2].split(',').map(Number):[];if(arr.length)map[m[1]]=arr}}catch{}return map}
-function parseProfile(html,fallback,region){const d=makeDocument(html),l=getLines(d),cp=extractRaidCP(d),cls=findClass(d,l,fallback),classIcon=svgDataUrl(extractBibleClassIcon(d,region,fallback));return{skillTripods:extractSkillTripods(html),name:findProfileName(d,fallback),class:cls,role:detectRole(extractPresetSnippet(d,cp.source==='Estimated Raid Loadout'?'Estimated Raid Loadout':'Current Loadout (Raid)'),cls),ilvl:findItemLevel(d,l),cp:cp.value,cpSource:cp.source,loadout:cp.source,classIcon,retrievedAt:new Date().toISOString()}}
+/* Accessory and bracelet affixes that amplify what this character gives allies.
+   These never affect CP -- CP comes from the loadout panel -- but they directly
+   scale a support's buff output, which a general power number cannot express.
+   Values are de-duplicated: the page renders a loadout more than once, so the
+   same affix appears repeatedly and must not be counted twice. */
+function extractAllyEffects(d){const t=normalizedText(d.body?.textContent||'');
+ const sum=re=>{const seen=new Set();for(const m of t.matchAll(re)){const v=Number(m[1]);if(Number.isFinite(v))seen.add(v)}return[...seen].reduce((a,b)=>a+b,0)};
+ return{allyDamage:sum(/Ally Damage Enhancement Effect \+([\d.]+)%/g),allyAtkPower:sum(/Ally Atk\. Power Enhancement Effect \+([\d.]+)%/g)}}
+function parseProfile(html,fallback,region){const d=makeDocument(html),l=getLines(d),cp=extractRaidCP(d),cls=findClass(d,l,fallback),classIcon=svgDataUrl(extractBibleClassIcon(d,region,fallback));return{skillTripods:extractSkillTripods(html),allyEffects:extractAllyEffects(d),name:findProfileName(d,fallback),class:cls,role:detectRole(extractPresetSnippet(d,cp.source==='Estimated Raid Loadout'?'Estimated Raid Loadout':'Current Loadout (Raid)'),cls),ilvl:findItemLevel(d,l),cp:cp.value,cpSource:cp.source,loadout:cp.source,classIcon,retrievedAt:new Date().toISOString()}}
 async function fetchCharacter(c){let r;try{r=await fetch(`${BIBLE_CONNECTOR}?url=${encodeURIComponent(c.url)}`,{method:'GET',cache:'no-store',headers:{Accept:'application/json'}})}catch(e){throw Error(`Unable to reach the Bible connector: ${e.message||'network error'}`)}const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw Error(`Bible connector returned non-JSON data (HTTP ${r.status}).`)}if(!r.ok||data.ok===false)throw Error(data.error||`Bible connector returned HTTP ${r.status}.`);return parseProfile(data.html||data.characterHtml||data.content||data.page,c.name,c.region)}
 /* Defer to the shared class-data authority, which knows the newer classes and is
    further patched by class-icon-authority-v1.js with the repository-hosted SVGs.
