@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const NEW_KEY='lostark-hideout-new-additions-v1',HIDDEN_KEY='lostark-hideout-hidden-v1',MAX=12;
+const NEW_KEY='lostark-hideout-new-additions-v1',HIDDEN_KEY='lostark-hideout-hidden-v1',MAX=8;
 const $=s=>document.querySelector(s),read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??d}catch{return d}},write=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
 const fmt=v=>v==null||v===''?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
@@ -76,9 +76,14 @@ async function refreshCandidates(){
  if(candidateRefreshRunning||typeof window.fetchCharacter!=='function')return;
  const list=newChars();if(!list.length)return;
  candidateRefreshRunning=true;
- let ok=0,failed=0;
+ let ok=0,failed=0,skipped=0;
+ /* Same freshness rule as the Main Group: Bible is slow and rate-limits bursts,
+    so a profile fetched minutes ago is not worth re-fetching. */
+ const FRESH_MS=10*60*1000;
+ const fresh=c=>{const t=Date.parse(c?.profile?.retrievedAt||'');return c?.profile&&Number.isFinite(t)&&(Date.now()-t)<FRESH_MS};
  for(const c of list){
   if(!c?.url)continue;
+  if(!window.__lostarkForceRefresh&&fresh(c)){skipped++;continue}
   try{const p=await window.fetchCharacter(c);
    if(p){p.class=canonicalClass({...c,profile:p});p.classIcon=classIcon(p.class,p);p.spec=specialization({...c,profile:p});c.profile=p;delete c.profileError;ok++}
   }catch(e){c.profileError=String(e?.message||e);failed++}
@@ -86,7 +91,7 @@ async function refreshCandidates(){
  write(NEW_KEY,list);renderNew();applyHiddenState();
  candidateRefreshRunning=false;
  const status=document.getElementById('status');
- if(status)status.textContent=`${status.textContent} New Additions: refreshed ${ok}${failed?`, ${failed} failed`:''}.`;
+ if(status)status.textContent=`${status.textContent} New Additions: refreshed ${ok}${failed?`, ${failed} failed`:''}${skipped?`, ${skipped} already up to date`:''}.`;
 }
 function wireCandidateRefresh(){const btn=document.getElementById('refreshBtn');if(!btn||btn.dataset.candidateRefresh)return;btn.dataset.candidateRefresh='1';
  btn.addEventListener('click',()=>{

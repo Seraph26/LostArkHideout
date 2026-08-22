@@ -20,7 +20,7 @@ function info(c){const ik=ckey(c);if(infoCache.has(ik))return infoCache.get(ik);
    short-circuit the class check below -- marking every character DPS, leaving
    no valid 3+1 party, and making Raid Specific silently produce nothing. Only
    an explicit Support/DPS counts as stated. */
-const pinned=String(p.roleOverride||'').trim();if(pinned==='Support'||pinned==='DPS'){const rv={name:String(p.name||c.name||'Unknown'),cls,role:pinned,cp:num(p.cp??p.combatPower),ilvl:num(p.ilvl??p.itemLevel),url:c.url||p.url||'',build:b};infoCache.set(ik,rv);return rv}const stated=String(p.role||'').trim();const role=(stated==='Support'||stated==='DPS')?stated:(['Bard','Artist','Paladin','Valkyrie'].includes(cls)?'Support':'DPS');const resolved={name:String(p.name||c.name||'Unknown'),cls,role:role==='Support'?'Support':'DPS',cp:num(p.cp??p.combatPower),ilvl:num(p.ilvl??p.itemLevel),url:c.url||p.url||'',build:b};infoCache.set(ik,resolved);return resolved}
+const stated=String(p.role||'').trim();const role=(stated==='Support'||stated==='DPS')?stated:(['Bard','Artist','Paladin','Valkyrie'].includes(cls)?'Support':'DPS');const resolved={name:String(p.name||c.name||'Unknown'),cls,role:role==='Support'?'Support':'DPS',cp:num(p.cp??p.combatPower),ilvl:num(p.ilvl??p.itemLevel),url:c.url||p.url||'',build:b};infoCache.set(ik,resolved);return resolved}
 /* Per-character and independent of party composition, but called once per member
    of every candidate arrangement -- memoise it, keyed by encounter. */
 const valueCache=new Map();

@@ -14,8 +14,13 @@ const characterName=url=>{try{const raw=decodeURIComponent(new URL(url).searchPa
    calls are serialised with a minimum gap and rate-limit retries back off far
    harder than ordinary transient ones. */
 const rateLimited=(status,body)=>status===429||/\b429\b/.test(String(body||''));
+/* Serialised with a fixed gap. Running three at once was tried and is markedly
+   worse: Bible rate-limits the burst, the retry backoff engages, and ten
+   characters took over 107s against about 21s single-file with zero failures.
+   Bible's own latency dominates, so the only real lever is fewer requests. */
 const MIN_GAP=650;
 let chain=Promise.resolve(),lastAt=0;
+function throttleDown(){}
 function paced(run){const next=chain.then(async()=>{const wait=MIN_GAP-(Date.now()-lastAt);if(wait>0)await sleep(wait);try{return await run()}finally{lastAt=Date.now()}});chain=next.then(()=>{},()=>{});return next}
 window.fetch=function(input,init){
  const url=typeof input==='string'?input:(input?.url||'');
@@ -32,6 +37,7 @@ window.fetch=function(input,init){
     if(!retryable){failures.push({name:characterName(url),status:response.status,body:lastBody});return response}
     lastError=new Error(`Bible connector HTTP ${response.status}`);
    }catch(e){lastError=e;lastStatus=0;lastBody=String(e?.message||e)}
+   if(rateLimited(lastStatus,lastBody))throttleDown();
    if(attempt<3)await sleep((rateLimited(lastStatus,lastBody)?2500:700)*(attempt+1));
   }
   failures.push({name:characterName(url),status:lastStatus,body:lastBody||lastError?.message||'network error'});

@@ -24,7 +24,7 @@ const status=m=>{const e=document.getElementById('status');if(e)e.textContent=m}
 function trimProfile(p){
  if(!p||typeof p!=='object')return null;
  const out={};
- for(const k of ['name','class','role','cp','ilvl','cpSource','loadout','spec','specialization','positional','enlightenment','allyEffects','skillTripods','bibleRoleHint','specOverride','roleOverride'])
+ for(const k of ['name','class','role','cp','ilvl','cpSource','loadout','spec','specialization','positional','enlightenment','allyEffects','skillTripods','bibleRoleHint'])
   if(p[k]!==undefined)out[k]=p[k];
  /* Bible SVG icons are data URIs and can be large; keep only modest ones. */
  if(typeof p.classIcon==='string'&&p.classIcon.length<2000)out.classIcon=p.classIcon;
