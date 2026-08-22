@@ -5,14 +5,15 @@
   function extractRaidCp(html) {
     if (typeof html !== 'string') return null;
 
-    const estimated = html.match(
-      /classification:\s*"raid_merged"[\s\S]{0,5000}?combatPower:\{id:1,score:([0-9]+(?:\.[0-9]+)?)\}/i
-    );
+    // Tolerate whitespace and any id, so a payload formatting change does not
+    // silently drop us back to the magnitude-based scan in app-fixed.js.
+    const score = 'combatPower:\\s*\\{\\s*id:\\s*\\d+\\s*,\\s*score:\\s*([0-9]+(?:\\.[0-9]+)?)\\s*\\}';
+    const near = cls => html.match(new RegExp('classification:\\s*"' + cls + '"[\\s\\S]{0,5000}?' + score, 'i'));
+
+    const estimated = near('raid_merged');
     if (estimated) return { value: Number(estimated[1]), source: 'Estimated Raid Loadout' };
 
-    const current = html.match(
-      /classification:\s*"raid"[\s\S]{0,5000}?combatPower:\{id:1,score:([0-9]+(?:\.[0-9]+)?)\}/i
-    );
+    const current = near('raid') || near('most_recent_raid');
     if (current) return { value: Number(current[1]), source: 'Current Loadout (Raid)' };
 
     return null;
