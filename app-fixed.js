@@ -54,7 +54,18 @@ function extractSkillTripods(html){const map={};try{for(const m of String(html||
 function extractAllyEffects(d){const t=normalizedText(d.body?.textContent||'');
  const sum=re=>{const seen=new Set();for(const m of t.matchAll(re)){const v=Number(m[1]);if(Number.isFinite(v))seen.add(v)}return[...seen].reduce((a,b)=>a+b,0)};
  return{allyDamage:sum(/Ally Damage Enhancement Effect \+([\d.]+)%/g),allyAtkPower:sum(/Ally Atk\. Power Enhancement Effect \+([\d.]+)%/g)}}
-function parseProfile(html,fallback,region){const d=makeDocument(html),l=getLines(d),cp=extractRaidCP(d),cls=findClass(d,l,fallback),classIcon=svgDataUrl(extractBibleClassIcon(d,region,fallback));return{skillTripods:extractSkillTripods(html),allyEffects:extractAllyEffects(d),name:findProfileName(d,fallback),class:cls,role:detectRole(extractPresetSnippet(d,cp.source==='Estimated Raid Loadout'?'Estimated Raid Loadout':'Current Loadout (Raid)'),cls),ilvl:findItemLevel(d,l),cp:cp.value,cpSource:cp.source,loadout:cp.source,classIcon,retrievedAt:new Date().toISOString()}}
+/* Ark Passive Enlightenment node names. The class engraving that defines a
+   character's specialization is one of these, and nothing else the import stored
+   carried it -- the spec rules had no text at all to match against, so they all
+   failed and a hardcoded per-class fallback answered instead. Its tier position
+   varies by class, so store the names and let the existing rules identify it. */
+function extractEnlightenment(d){const t=normalizedText(d.body?.textContent||'');
+ const i=t.indexOf('Enlightenment');if(i<0)return[];
+ let seg=t.slice(i+'Enlightenment'.length);
+ const ends=[' Evolution ',' Leap ',' Paradise',' Cards',' Skills',' Engravings'].map(k=>seg.indexOf(k)).filter(x=>x>0);
+ if(ends.length)seg=seg.slice(0,Math.min(...ends));
+ return[...seg.matchAll(/T\d\s+([A-Za-z][A-Za-z'’:.\- ]*?)\s+Lv\.\s*\d+/g)].map(m=>m[1].trim()).filter(Boolean)}
+function parseProfile(html,fallback,region){const d=makeDocument(html),l=getLines(d),cp=extractRaidCP(d),cls=findClass(d,l,fallback),classIcon=svgDataUrl(extractBibleClassIcon(d,region,fallback));return{skillTripods:extractSkillTripods(html),allyEffects:extractAllyEffects(d),enlightenment:extractEnlightenment(d),name:findProfileName(d,fallback),class:cls,role:detectRole(extractPresetSnippet(d,cp.source==='Estimated Raid Loadout'?'Estimated Raid Loadout':'Current Loadout (Raid)'),cls),ilvl:findItemLevel(d,l),cp:cp.value,cpSource:cp.source,loadout:cp.source,classIcon,retrievedAt:new Date().toISOString()}}
 async function fetchCharacter(c){let r;try{r=await fetch(`${BIBLE_CONNECTOR}?url=${encodeURIComponent(c.url)}`,{method:'GET',cache:'no-store',headers:{Accept:'application/json'}})}catch(e){throw Error(`Unable to reach the Bible connector: ${e.message||'network error'}`)}const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw Error(`Bible connector returned non-JSON data (HTTP ${r.status}).`)}if(!r.ok||data.ok===false)throw Error(data.error||`Bible connector returned HTTP ${r.status}.`);return parseProfile(data.html||data.characterHtml||data.content||data.page,c.name,c.region)}
 /* Defer to the shared class-data authority, which knows the newer classes and is
    further patched by class-icon-authority-v1.js with the repository-hosted SVGs.
