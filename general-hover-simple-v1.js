@@ -21,7 +21,10 @@
 window.LostArkGeneralHoverBridgeV2={active:true,version:3,delegatedTo:'LostArkHoverSummaryV1'};
 const isGeneral=()=>!!document.getElementById('generalOptimization')?.checked&&!(document.getElementById('raidSpecificSelect')?.value||'');
 const root=()=>document.getElementById('suggestedParties');
-function normalize(){if(!isGeneral())return;root()?.querySelectorAll('.authoritative-member').forEach(m=>m.classList.add('party-member'));}
+/* Only touch members that are actually missing the class. This ran on every
+   mutation and re-added it to all eight members each time -- thousands of
+   redundant calls per second feeding the page-wide mutation churn. */
+function normalize(){if(!isGeneral())return;const pending=root()?.querySelectorAll('.authoritative-member:not(.party-member)');if(!pending||!pending.length)return;pending.forEach(m=>m.classList.add('party-member'));}
 function start(){normalize();const r=root()||document.body;new MutationObserver(()=>{if(isGeneral())normalize()}).observe(r,{childList:true,subtree:true});document.getElementById('generalOptimization')?.addEventListener('change',normalize,true);}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();

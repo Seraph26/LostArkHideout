@@ -4,12 +4,23 @@
 const STORE='lostark-hideout-private-v3',PARTY='lostark-hideout-party-assignments-v2',BASELINE='lostark-hideout-general-baseline-v1',SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim(),num=x=>Number.isFinite(Number(x))?Number(x):0,esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function load(){try{return JSON.parse(localStorage.getItem(STORE)||'null')||{characters:[]}}catch{return{characters:[]}}}
-function roster(){return(load().characters||[]).filter(c=>c&&c.id)}
+/* text() and build() are called from weight() on every effect of every scoring
+   pass. A single manual swap runs ~32 full party scorings, so the raw profile
+   string was being rebuilt and lowercased hundreds of times, blocking the main
+   thread for seconds before the swap could paint. Memoise per character; the
+   values are pure, so scoring is unchanged. Caches drop whenever the stored
+   roster changes or build profiles finish loading. */
+let rosterSnapshot=null;const textCache=new Map(),buildCache=new Map();
+function dropCaches(){textCache.clear();buildCache.clear()}
+function cacheKey(c){return String(c&&(c.id||c.url)||'')}
+function roster(){const raw=localStorage.getItem(STORE);if(raw!==rosterSnapshot){rosterSnapshot=raw;dropCaches()}return(load().characters||[]).filter(c=>c&&c.id)}
+window.addEventListener('lostark-build-profiles-v3-ready',dropCaches);
 function partyState(){try{const x=JSON.parse(localStorage.getItem(PARTY)||'null');if(x?.party1&&x?.party2)return x}catch{}return{party1:[],party2:[]}}
 function save(x){localStorage.setItem(PARTY,JSON.stringify(x))}
 function profile(c){return c.profile||c.data||{}}
-function build(c){try{return window.LostArkBuildProfilesV3?.get(c.url)||window.LostArkBuildProfilesV2?.get(c.url)||{}}catch{return{}}}
-function text(c){const p=profile(c),b=build(c);return clean([p.rawText,p.text,p.characterText,p.arkGridText,p.arkPassiveText,p.engravingsText,p.gemsText,p.tripodsText,b.text,b.className,b.engravings?.join(' '),b.grid?.map(x=>x.name+' '+x.points).join(' '),b.arkPassive?.map(x=>x.name+' '+x.level).join(' '),b.tripods?.map(x=>x.skill+' '+x.name).join(' ')].filter(Boolean).join(' ')).toLowerCase()}
+function build(c){const k=cacheKey(c);if(buildCache.has(k))return buildCache.get(k);let v;try{v=window.LostArkBuildProfilesV3?.get(c.url)||window.LostArkBuildProfilesV2?.get(c.url)||{}}catch{v={}}buildCache.set(k,v);return v}
+function text(c){const k=cacheKey(c);if(textCache.has(k))return textCache.get(k);const v=textUncached(c);textCache.set(k,v);return v}
+function textUncached(c){const p=profile(c),b=build(c);return clean([p.rawText,p.text,p.characterText,p.arkGridText,p.arkPassiveText,p.engravingsText,p.gemsText,p.tripodsText,b.text,b.className,b.engravings?.join(' '),b.grid?.map(x=>x.name+' '+x.points).join(' '),b.arkPassive?.map(x=>x.name+' '+x.level).join(' '),b.tripods?.map(x=>x.skill+' '+x.name).join(' ')].filter(Boolean).join(' ')).toLowerCase()}
 function cls(c){const p=profile(c),b=build(c),v=clean(p.class||p.className||p.characterClass||b.className);if(v&&v.toLowerCase()!=='unknown')return({'Soul Eater':'Souleater','Arcana':'Arcanist','Glavier':'Glaivier'}[v]||v);const t=text(c),m=[['Summoner',/\bsummoner\b|master summoner|ancient spear/],['Souleater',/souleater|soul eater|full moon harvester|night.?s edge/],['Arcanist',/arcanist|arcana|empress grace|emperor.?s decree/],['Glaivier',/glaivier|glavier|pinnacle|control/],['Bard',/\bbard\b|desperate salvation|true courage/],['Artist',/\bartist\b|full bloom|recurrence/],['Paladin',/\bpaladin\b|blessed aura/],['Slayer',/\bslayer\b|predator|punisher/],['Breaker',/\bbreaker\b|asura.?s path|brawl king/],['Deathblade',/\bdeathblade\b|surge|remaining energy/],['Gunlancer',/\bgunlancer\b|lone knight|combat readiness/]];for(const[n,r]of m)if(r.test(t))return n;return'Unknown'}
 function role(c){const p=profile(c);return p.role==='Support'||SUPPORTS.has(cls(c))?'Support':'DPS'}
 function info(c){const p=profile(c);return{name:clean(p.name||c.name)||'Unknown',cls:cls(c),role:role(c),cp:num(p.cp??p.combatPower),url:c.url||p.url||''}}

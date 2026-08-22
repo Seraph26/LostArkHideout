@@ -55,7 +55,22 @@ function start(){
  root.addEventListener('dragstart',e=>{if(e.target.closest?.('.authoritative-member'))captureBefore()},true);
  root.addEventListener('drop',()=>captureAfter(),true);
  document.getElementById('optimizeBtn')?.addEventListener('click',onOptimize,true);
- const observer=new MutationObserver(()=>{if(general()){removeLegacy();setTimeout(render,0)}});
+ /* This observer used to re-render on any mutation under #suggestedParties, but
+    render() writes .general-metrics-block inside that same root, so every render
+    retriggered it -- roughly 4,000 DOM mutations per second, forever, which is
+    what made the page crawl and kept rewriting hover text. Ignore our own
+    output, suppress reentry while rendering, and debounce. */
+ let rendering=false,pending=0;
+ /* Also ignore hover cards: they are display-only and say nothing about party
+    membership or potentials, but rewriting them used to retrigger a recompute. */
+ const ownOutput=r=>{const el=r.target&&(r.target.nodeType===1?r.target:r.target.parentElement);return !!el?.closest?.('.general-metrics-block,.character-hover-breakdown')};
+ const observer=new MutationObserver(recs=>{
+  if(rendering||!general())return;
+  if(recs.every(ownOutput))return;
+  removeLegacy();
+  clearTimeout(pending);
+  pending=setTimeout(()=>{rendering=true;try{render()}finally{setTimeout(()=>{rendering=false},0)}},80);
+ });
  observer.observe(root,{childList:true,subtree:true,characterData:true});
  [50,150,300,600,1000,2000].forEach(ms=>setTimeout(render,ms));
 }
