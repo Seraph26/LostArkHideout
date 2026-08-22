@@ -45,4 +45,20 @@ function installGeneralOptimizeGuard(){
  setInterval(()=>{if(!generalActive()){clear();return}if(!started&& (b.getAttribute('aria-busy')==='true'||b.disabled))restore()},250);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(installGeneralOptimizeGuard,0),{once:true});else setTimeout(installGeneralOptimizeGuard,0);
+
+/* Manual-swap arrows state a delta against the previous arrangement within one
+   optimization mode. Switching modes makes that comparison meaningless, so the
+   residue is removed. Nothing here recalculates or reformats an arrow. */
+function installModeSwitchArrowClear(){
+ const sel=document.getElementById('raidSpecificSelect'),gen=document.getElementById('generalOptimization');
+ if(!gen||gen.dataset.modeArrowClear)return;
+ gen.dataset.modeArrowClear='1';
+ const SEL='#suggestedParties .metric-change,#suggestedParties .general-top-swap-arrow,#suggestedParties .general-swap-arrow';
+ const clearArrows=()=>{document.querySelectorAll(SEL).forEach(e=>e.remove());document.getElementById('raid-manual-party-summary')?.remove();document.querySelectorAll('#suggestedParties .swap-comparison').forEach(e=>e.remove())};
+ /* repeat briefly: other display layers re-render shortly after a mode change */
+ const sweep=()=>{clearArrows();[60,180,400].forEach(ms=>setTimeout(clearArrows,ms))};
+ gen.addEventListener('change',sweep);
+ sel?.addEventListener('change',sweep);
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(installModeSwitchArrowClear,0),{once:true});else setTimeout(installModeSwitchArrowClear,0);
 })();
