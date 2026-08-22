@@ -15,7 +15,10 @@
   const SPECIAL = {
     valkyrie: VALKYRIE_ICON,
     wildsoul: WILDSOUL_ICON,
-    guardianknight: GUARDIANKNIGHT_ICON
+    guardianknight: GUARDIANKNIGHT_ICON,
+    'guardian knight': GUARDIANKNIGHT_ICON,
+    guardian_knight: GUARDIANKNIGHT_ICON,
+    'guardian-knight': GUARDIANKNIGHT_ICON
   };
 
   function iconFor(name) {
@@ -58,7 +61,7 @@
       if (!icon) return;
       if (img.getAttribute('src') !== icon) img.src = icon;
       img.removeAttribute('srcset');
-      img.alt = cls === 'valkyrie' ? 'Valkyrie' : cls === 'guardianknight' ? 'Guardianknight' : 'Wildsoul';
+      img.alt = cls === 'valkyrie' ? 'Valkyrie' : (cls === 'guardianknight' || cls === 'guardian knight' || cls === 'guardian_knight' || cls === 'guardian-knight') ? 'Guardianknight' : 'Wildsoul';
     });
   }
 
