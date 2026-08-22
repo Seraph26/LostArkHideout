@@ -1,20 +1,21 @@
 {
   "source": "lostark.bible raid filter",
   "updatedAt": null,
+  "_players": "Party size for the encounter: 8 for two full parties, 4 for single-party content. Horizon Cathedral and Serca are 4-player.",
   "raids": [
-    {"id":"horizon-cathedral-g1","label":"Horizon Cathedral — Gate 1","boss":"Archbishop Arcenos","kind":"raid","schema":"level"},
-    {"id":"horizon-cathedral-g2","label":"Horizon Cathedral — Gate 2","boss":"Arcenos, Vanguard of Fanaticism","kind":"raid","schema":"level"},
-    {"id":"serca-g1","label":"Serca — Gate 1","boss":"Witch of Agony, Serca","kind":"raid","schema":"difficulty"},
-    {"id":"serca-g2","label":"Serca — Gate 2","boss":"Corvus Tul Rak","kind":"raid","schema":"difficulty"},
-    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Abyss Lord Kazeros","kind":"raid","schema":"difficulty","difficulty":"Hard","patch":"mar26","minIlvl":1730,"maxIlvl":1810},
-    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Death Incarnate Kazeros","kind":"raid","schema":"difficulty","difficulty":"Hard","patch":"mar26","minIlvl":1730,"maxIlvl":1810}
+    {"id":"horizon-cathedral-g1","label":"Horizon Cathedral — Gate 1","boss":"Archbishop Arcenos","kind":"raid","schema":"level","players":4},
+    {"id":"horizon-cathedral-g2","label":"Horizon Cathedral — Gate 2","boss":"Arcenos, Vanguard of Fanaticism","kind":"raid","schema":"level","players":4},
+    {"id":"serca-g1","label":"Serca — Gate 1","boss":"Witch of Agony, Serca","kind":"raid","schema":"difficulty","players":4},
+    {"id":"serca-g2","label":"Serca — Gate 2","boss":"Corvus Tul Rak","kind":"raid","schema":"difficulty","players":4},
+    {"id":"kazeros-g1","label":"Kazeros — Gate 1","boss":"Abyss Lord Kazeros","kind":"raid","schema":"difficulty","difficulty":"Hard","patch":"mar26","minIlvl":1730,"maxIlvl":1810,"players":8},
+    {"id":"kazeros-g2","label":"Kazeros — Gate 2","boss":"Death Incarnate Kazeros","kind":"raid","schema":"difficulty","difficulty":"Hard","patch":"mar26","minIlvl":1730,"maxIlvl":1810,"players":8}
   ],
   "optional": [
-    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Brelshaza, Ember in the Ashes","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810},
-    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche, Sentinel of the Abyss","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810}
+    {"id":"armoche-g1","label":"Armoche — Gate 1","boss":"Brelshaza, Ember in the Ashes","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810,"players":8},
+    {"id":"armoche-g2","label":"Armoche — Gate 2","boss":"Armoche, Sentinel of the Abyss","kind":"optional","schema":"difficulty","difficulty":"Hard","patch":"nov25","minIlvl":1720,"maxIlvl":1810,"players":8}
   ],
   "events": [
-    {"id":"extreme-aegir-g2","label":"[EXTREME] Aegir — Gate 2","boss":"Aegir, the Oppressor","kind":"event","schema":"extreme","difficulty":"Extreme Nightmare","patch":"nov25","gate":2},
-    {"id":"extreme-brelshaza-g2","label":"[EXTREME] Brelshaza — Gate 2","boss":"Phantom Manifester Brelshaza","kind":"event","schema":"extreme","difficulty":"Extreme Nightmare","patch":"nov25","gate":2}
+    {"id":"extreme-aegir-g2","label":"[EXTREME] Aegir — Gate 2","boss":"Aegir, the Oppressor","kind":"event","schema":"extreme","difficulty":"Extreme Nightmare","patch":"nov25","gate":2,"players":8},
+    {"id":"extreme-brelshaza-g2","label":"[EXTREME] Brelshaza — Gate 2","boss":"Phantom Manifester Brelshaza","kind":"event","schema":"extreme","difficulty":"Extreme Nightmare","patch":"nov25","gate":2,"players":8}
   ]
 }
