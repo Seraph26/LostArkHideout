@@ -25,7 +25,24 @@ function cls(c){const p=profile(c),b=build(c),v=clean(p.class||p.className||p.ch
 function role(c){const p=profile(c);return p.role==='Support'||SUPPORTS.has(cls(c))?'Support':'DPS'}
 function info(c){const p=profile(c);return{name:clean(p.name||c.name)||'Unknown',cls:cls(c),role:role(c),cp:num(p.cp??p.combatPower),url:c.url||p.url||''}}
 function pos(c){const b=build(c),t=text(c);if(b.positional&&b.positional!=='Unknown')return b.positional;if(b.behavior?.positioning&&b.behavior.positioning!=='flexible')return b.behavior.positioning;if(/ambush master|back attack/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(/master summoner|summoner/.test(t)&&/summoner/.test(t))return'Hit Master';return'Unknown'}
-function effects(c){try{const x=window.LostArkPartySynergyAuthorityV1?.provided?.(info(c).cls,build(c),text(c));if(Array.isArray(x)&&x.length)return x}catch{}const m={Summoner:['damage','mana'],Glaivier:['crit','critDamage'],Arcanist:['crit'],Wardancer:['crit','attackSpeed'],Striker:['crit','attackSpeed'],Deathblade:['attackSpeed'],Gunlancer:['attackSpeed','damage'],Soulfist:['attackPower']},out=[];for(const k of(m[info(c).cls]||[]))out.push({type:k,value:k==='crit'?.10:k==='critDamage'?.08:.06});return out}
+/* Summoner supplies party mana through Shurdi, but only with the mana tripod
+   selected: skill 20160, third tripod line, choice 2. Bible exposes tripods as
+   bare indices, so this is the only way to tell. Profiles imported before
+   skillTripods was captured have no data -- assume the tripod is taken so an
+   un-refreshed roster does not silently lose the buff. */
+const SHURDI_ID='20160',SHURDI_MANA_LINE=2,SHURDI_MANA_CHOICE=2;
+function summonerGivesMana(c){const t=profile(c).skillTripods;if(!t)return true;const s=t[SHURDI_ID]||t[Number(SHURDI_ID)];return Array.isArray(s)?s[SHURDI_MANA_LINE]===SHURDI_MANA_CHOICE:true}
+function effects(c){
+ let list=null;
+ try{const x=window.LostArkPartySynergyAuthorityV1?.provided?.(info(c).cls,build(c),text(c));if(Array.isArray(x)&&x.length)list=x}catch{}
+ if(!list){const m={Summoner:['damage','mana'],Glaivier:['crit','critDamage'],Arcanist:['crit'],Wardancer:['crit','attackSpeed'],Striker:['crit','attackSpeed'],Deathblade:['attackSpeed'],Gunlancer:['attackSpeed','damage'],Soulfist:['attackPower']};list=[];for(const k of(m[info(c).cls]||[]))list.push({type:k,value:k==='crit'?.10:k==='critDamage'?.08:.06})}
+ /* The synergy authority reports Summoner as defenseReduction only, so her
+    Shurdi mana was not modelled at all. Add it when the tripod is taken, drop
+    it when it is not, whichever source supplied the list. */
+ if(info(c).cls==='Summoner'){const gives=summonerGivesMana(c),has=list.some(e=>e.type==='mana');
+  if(gives&&!has)list=list.concat({type:'mana',value:.06});
+  else if(!gives&&has)list=list.filter(e=>e.type!=='mana')}
+ return list}
 /* Mana is a real constraint for a few sustained-casting builds and close to
    irrelevant for everyone else, so it is graded per class and, where the
    specialization changes the answer, per spec.
@@ -34,10 +51,24 @@ function effects(c){try{const x=window.LostArkPartySynergyAuthorityV1?.provided?
    Passive node name, and the bare word "mana" appears all over tooltips. Only
    distinctive spec names are matched here. Summoner is rated low deliberately --
    she gains little from mana despite summoning. */
-const MANA_NEED={arcanist:.9,aeromancer:.8,soulfist:.6,summoner:.35};
-const MANA_DEFAULT=.3;
-function manaNeed(c){const cls=String(info(c).cls||'').toLowerCase();
- if(cls==='sorceress')return /\breflux\b/.test(text(c))?1.45:.7;   /* Reflux spams; Igniter is burst */
+/* Graded by playstyle rather than by class name: constant low-cooldown skill
+   cycling with no burst window drains MP, while long animation-locked burst
+   skills leave natural downtime. Only archetypes actually identified are listed;
+   everything else sits at the neutral default rather than being guessed at.
+   Lost Ark rebalances mana frequently, so treat these as tunable, not settled.
+   Bard is listed for completeness but is inert today: supports do not receive
+   contributions in this model. */
+/* Summoner sits at .35 on the strength of the direct observation that she gains
+   little from mana. The general archetype list groups her with high-uptime specs
+   but qualifies it as summon uptime rather than the player's own MP spend, which
+   is a reason to receive less, not more. This value is the hinge for pairing a
+   Summoner with a Bard versus a Valkyrie: at .35 the Valkyrie wins, at .40 the
+   Bard does. Worth revisiting first if support pairings look wrong. */
+const MANA_NEED={wildsoul:1.35,scrapper:1.25,bard:1.20,summoner:.35,artillerist:.35,gunlancer:.35};
+const MANA_DEFAULT=.60;
+function manaNeed(c){const cls=String(info(c).cls||'').toLowerCase(),t=text(c);
+ if(cls==='sorceress')return /\breflux\b/.test(t)?1.45:.35;        /* Reflux never stops; Igniter is burst */
+ if(cls==='striker')return /esoteric flurry/.test(t)?1.35:1.00;    /* Flurry spams to build meter */
  return MANA_NEED[cls]??MANA_DEFAULT}
 function weight(c,type){const t=text(c),p=pos(c);let w=1;if(type==='crit'&&/keen blunt|adrenaline|burst|full moon/.test(t))w+=.35;if(type==='critDamage'&&/keen blunt|burst/.test(t))w+=.30;if(type==='attackSpeed'&&/raid captain|swiftness/.test(t))w+=.35;if(type==='positional')w=p==='Back Attack'||p==='Front Attack'?1.35:p==='Hit Master'?.55:.85;if(type==='mana')w=manaNeed(c);if(type==='damage'&&/summoner/.test(t))w+=.10;return w}
 function supportEffects(c){switch(info(c).cls){case'Bard':return[{type:'supportAmplification',value:.10},{type:'mana',value:.12},{type:'attackSpeed',value:.035}];case'Artist':return[{type:'supportAmplification',value:.10},{type:'mana',value:.08},{type:'attackSpeed',value:.04}];case'Paladin':return[{type:'supportAmplification',value:.10},{type:'damage',value:.03}];case'Valkyrie':return[{type:'supportAmplification',value:.095},{type:'attackSpeed',value:.06}];default:return[{type:'supportAmplification',value:.09}]}}
