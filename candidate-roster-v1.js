@@ -79,7 +79,7 @@ async function refreshCandidates(){
  let ok=0,failed=0,skipped=0;
  /* Same freshness rule as the Main Group: Bible is slow and rate-limits bursts,
     so a profile fetched minutes ago is not worth re-fetching. */
- const FRESH_MS=10*60*1000;
+ const FRESH_MS=60*1000;
  const fresh=c=>{const t=Date.parse(c?.profile?.retrievedAt||'');return c?.profile&&Number.isFinite(t)&&(Date.now()-t)<FRESH_MS};
  for(const c of list){
   if(!c?.url)continue;

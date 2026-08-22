@@ -44,8 +44,13 @@ function trimProfile(p,c){
  const out={};
  for(const k of ['name','class','role','cp','ilvl','cpSource','positional','allyEffects'])
   if(p[k]!==undefined)out[k]=p[k];
- const spec=String(p.spec||p.specialization||shownSpec(c)||'').trim();
- if(spec)out.specialization=spec; else if(p.enlightenment)out.enlightenment=p.enlightenment;
+ /* Carry the Ark Passive nodes, not a resolved specialization string. Freezing
+    the string looked like a saving, but the spec rules read the nodes first and
+    only fall back to the string -- so a shared or restored dashboard kept
+    showing whatever the spec was when the link was made, even after a respec,
+    until a full re-import replaced the profile. */
+ if(p.enlightenment)out.enlightenment=p.enlightenment;
+ else{const spec=String(p.spec||p.specialization||shownSpec(c)||'').trim();if(spec)out.specialization=spec}
  const shurdi=p.skillTripods&&(p.skillTripods[SHURDI_ID]||p.skillTripods[Number(SHURDI_ID)]);
  if(Array.isArray(shurdi))out.skillTripods={[SHURDI_ID]:shurdi};
  return out;

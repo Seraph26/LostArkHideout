@@ -23,6 +23,9 @@ function repairBottom(profiles){document.querySelectorAll('#suggestedParties .pa
 function repair(){const profiles=stateProfiles();repairTop(profiles);repairBottom(profiles)}
 let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;repair()})};
 function start(){repair();new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});window.addEventListener('lostark-build-profiles-v3-ready',()=>setTimeout(repair,100))}
+/* Single source of truth for the displayed specialization, shared so Raid
+   Specific shows the same label as the Main Group instead of the class name. */
+window.LostArkSpecAuthority={specFor,className};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 
 /* General Optimize lifecycle guard. UI state only: no scoring, hover, arrow,
