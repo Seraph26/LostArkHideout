@@ -1,9 +1,10 @@
-/* Lost Ark Hideout — raid-focused build profile cache v6 */
+/* Lost Ark Hideout — raid-focused build profile cache v7 */
 (()=>{
 'use strict';
 const KEY='lostark-hideout-build-profiles-v3';
 const STATE='lostark-hideout-private-v3';
 const CONNECTOR='https://lostark-bible-connector.seraph0226.workers.dev/character';
+const REQUEST_TIMEOUT_MS=8000;
 const load=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch{return{}}};
 const save=x=>localStorage.setItem(KEY,JSON.stringify(x));
 const clean=s=>String(s||'').replace(/\s+/g,' ').trim();
@@ -28,7 +29,7 @@ function parse(html){const d=new DOMParser().parseFromString(html,'text/html'),t
  const sectionLabels=['Gems','Skills','Tripods','Accessories','Bracelet','Ability Stone','Ark Passive','Ark Grid','Engravings'];
  for(let i=0;i<ls.length;i++){const label=ls[i].replace(/[:：]$/,'');const known=sectionLabels.find(x=>x.toLowerCase()===label.toLowerCase());if(!known)continue;const rows=[];for(let j=i+1;j<ls.length&&rows.length<80;j++){const v=ls[j];if(sectionLabels.some(x=>x.toLowerCase()===v.replace(/[:：]$/,'').toLowerCase()))break;rows.push(v)}sections[known]=rows}
  return{className,engravings:engr,grid,arkPassive,tripods,stats,positional,burst,behavior,text:buildText,raidText:t,raidLines:ls,sections,retrievedAt:new Date().toISOString()}}
-async function fetchBuild(c){const r=await fetch(`${CONNECTOR}?url=${encodeURIComponent(c.url)}`,{cache:'no-store',headers:{Accept:'application/json'}});const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw Error('Bible connector returned non-JSON data')}if(!r.ok||data.ok===false)throw Error(data.error||`HTTP ${r.status}`);return parse(data.html||data.characterHtml||data.content||data.page)}
-async function refresh(){let state;try{state=JSON.parse(localStorage.getItem(STATE)||'null')}catch{return}if(!Array.isArray(state?.characters))return;const cache=load();for(const c of state.characters){if(!c?.url)continue;try{cache[c.url]=await fetchBuild(c)}catch(e){if(!cache[c.url])cache[c.url]={error:e.message}}}save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-v3-ready'))}
+async function fetchBuild(c){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),REQUEST_TIMEOUT_MS);try{const r=await fetch(`${CONNECTOR}?url=${encodeURIComponent(c.url)}`,{cache:'no-store',headers:{Accept:'application/json'},signal:controller.signal});const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw Error('Bible connector returned non-JSON data')}if(!r.ok||data.ok===false)throw Error(data.error||`HTTP ${r.status}`);return parse(data.html||data.characterHtml||data.content||data.page)}finally{clearTimeout(timer)}}
+async function refresh(){let state;try{state=JSON.parse(localStorage.getItem(STATE)||'null')}catch{return}if(!Array.isArray(state?.characters))return;const cache=load();for(const c of state.characters){if(!c?.url)continue;try{cache[c.url]=await fetchBuild(c)}catch(e){if(!cache[c.url])cache[c.url]={error:e?.name==='AbortError'?'Build profile request timed out':e.message}}}save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-v3-ready'))}
 window.LostArkBuildProfilesV3={get:url=>load()[url]||null,refresh};
 })();
