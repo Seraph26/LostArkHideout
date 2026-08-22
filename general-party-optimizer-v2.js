@@ -175,7 +175,12 @@ if(cached){save({party1:cached.party1,party2:cached.party2});busy(b,true);reques
 function installFormat(){
  const sel=document.getElementById('generalFormatSelect');if(!sel||sel.dataset.wired)return;sel.dataset.wired='1';
  const stored=localStorage.getItem(FORMAT_KEY);if(stored==='4'||stored==='8')sel.value=stored;
- const sync=()=>{const gen=document.getElementById('generalOptimization');sel.disabled=!(gen?gen.checked:true)};
+ /* Hidden rather than greyed out while Raid Specific is selected: a visible
+    "4-player" control that the encounter overrides reads as a contradiction. */
+ const sync=()=>{const gen=document.getElementById('generalOptimization'),on=gen?gen.checked:true;
+  sel.disabled=!on;
+  const label=sel.closest('.general-format-control');
+  if(label)label.style.display=on?'':'none'};
  sel.addEventListener('change',()=>{localStorage.setItem(FORMAT_KEY,sel.value);localStorage.removeItem(BASELINE);
   const st=partyState();if(st.party1.length||st.party2.length)render(st,false)});
  document.getElementById('generalOptimization')?.addEventListener('change',sync);
