@@ -36,7 +36,12 @@ function installGeneralOptimizeGuard(){
  const generalActive=()=>window.LostArkOptimizerMode?.general!==false;
  const restore=()=>{b.disabled=false;b.setAttribute('aria-busy','false');b.removeAttribute('aria-disabled');b.textContent='Optimize Parties'};
  const begin=()=>{const host=document.getElementById('suggestedParties');if(!host)return;clear();started=Date.now();lastMutation=started;observer=new MutationObserver(()=>{lastMutation=Date.now()});observer.observe(host,{childList:true,subtree:true,characterData:true});watch=setInterval(()=>{if(b.getAttribute('aria-busy')!=='true'){clear();return}const now=Date.now();if(now-started>12000&&now-lastMutation>1500){clear();restore()}},250);timeout=setTimeout(()=>{if(b.getAttribute('aria-busy')==='true'){clear();restore()}},20000)};
- document.addEventListener('click',e=>{if(e.target?.closest?.('#optimizeBtn')&&generalActive())begin()},true);
+ /* General Optimization starts on pointerdown, so the guard must arm there too;
+    arming only on click leaves a window where the 250ms sweep below wipes the
+    "Optimizing..." label while the run is still in progress. */
+ const arm=e=>{if(e.target?.closest?.('#optimizeBtn')&&generalActive())begin()};
+ document.addEventListener('pointerdown',arm,true);
+ document.addEventListener('click',arm,true);
  setInterval(()=>{if(!generalActive()){clear();return}if(!started&& (b.getAttribute('aria-busy')==='true'||b.disabled))restore()},250);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(installGeneralOptimizeGuard,0),{once:true});else setTimeout(installGeneralOptimizeGuard,0);
