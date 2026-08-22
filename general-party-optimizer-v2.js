@@ -26,7 +26,20 @@ function role(c){const p=profile(c);return p.role==='Support'||SUPPORTS.has(cls(
 function info(c){const p=profile(c);return{name:clean(p.name||c.name)||'Unknown',cls:cls(c),role:role(c),cp:num(p.cp??p.combatPower),url:c.url||p.url||''}}
 function pos(c){const b=build(c),t=text(c);if(b.positional&&b.positional!=='Unknown')return b.positional;if(b.behavior?.positioning&&b.behavior.positioning!=='flexible')return b.behavior.positioning;if(/ambush master|back attack/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(/master summoner|summoner/.test(t)&&/summoner/.test(t))return'Hit Master';return'Unknown'}
 function effects(c){try{const x=window.LostArkPartySynergyAuthorityV1?.provided?.(info(c).cls,build(c),text(c));if(Array.isArray(x)&&x.length)return x}catch{}const m={Summoner:['damage','mana'],Glaivier:['crit','critDamage'],Arcanist:['crit'],Wardancer:['crit','attackSpeed'],Striker:['crit','attackSpeed'],Deathblade:['attackSpeed'],Gunlancer:['attackSpeed','damage'],Soulfist:['attackPower']},out=[];for(const k of(m[info(c).cls]||[]))out.push({type:k,value:k==='crit'?.10:k==='critDamage'?.08:.06});return out}
-function weight(c,type){const t=text(c),p=pos(c);let w=1;if(type==='crit'&&/keen blunt|adrenaline|burst|full moon/.test(t))w+=.35;if(type==='critDamage'&&/keen blunt|burst/.test(t))w+=.30;if(type==='attackSpeed'&&/raid captain|swiftness/.test(t))w+=.35;if(type==='positional')w=p==='Back Attack'||p==='Front Attack'?1.35:p==='Hit Master'?.55:.85;if(type==='mana')w=/summoner|mana|boundless/.test(t)?1.55:.2;if(type==='damage'&&/summoner/.test(t))w+=.10;return w}
+/* Mana is a real constraint for a few sustained-casting builds and close to
+   irrelevant for everyone else, so it is graded per class and, where the
+   specialization changes the answer, per spec.
+   The previous test was /summoner|mana|boundless/ against the whole profile
+   text, which is why a Glaivier scored full mana need: "boundless" is an Ark
+   Passive node name, and the bare word "mana" appears all over tooltips. Only
+   distinctive spec names are matched here. Summoner is rated low deliberately --
+   she gains little from mana despite summoning. */
+const MANA_NEED={arcanist:.9,aeromancer:.8,soulfist:.6,summoner:.35};
+const MANA_DEFAULT=.3;
+function manaNeed(c){const cls=String(info(c).cls||'').toLowerCase();
+ if(cls==='sorceress')return /\breflux\b/.test(text(c))?1.45:.7;   /* Reflux spams; Igniter is burst */
+ return MANA_NEED[cls]??MANA_DEFAULT}
+function weight(c,type){const t=text(c),p=pos(c);let w=1;if(type==='crit'&&/keen blunt|adrenaline|burst|full moon/.test(t))w+=.35;if(type==='critDamage'&&/keen blunt|burst/.test(t))w+=.30;if(type==='attackSpeed'&&/raid captain|swiftness/.test(t))w+=.35;if(type==='positional')w=p==='Back Attack'||p==='Front Attack'?1.35:p==='Hit Master'?.55:.85;if(type==='mana')w=manaNeed(c);if(type==='damage'&&/summoner/.test(t))w+=.10;return w}
 function supportEffects(c){switch(info(c).cls){case'Bard':return[{type:'supportAmplification',value:.10},{type:'mana',value:.12},{type:'attackSpeed',value:.035}];case'Artist':return[{type:'supportAmplification',value:.10},{type:'mana',value:.08},{type:'attackSpeed',value:.04}];case'Paladin':return[{type:'supportAmplification',value:.10},{type:'damage',value:.03}];case'Valkyrie':return[{type:'supportAmplification',value:.095},{type:'attackSpeed',value:.06}];default:return[{type:'supportAmplification',value:.09}]}}
 function encounterProfile(){try{return window.LostArkEncounterModel?.getProfile?.()||null}catch{return null}}
 /* What a character GIVES the party used to depend only on their class, so a
