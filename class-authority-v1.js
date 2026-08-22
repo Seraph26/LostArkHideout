@@ -8,15 +8,35 @@
     glaivier:'Glaivier', glavier:'Glaivier', scrapper:'Scrapper', soulfist:'Soulfist', striker:'Striker', wardancer:'Wardancer', breaker:'Breaker',
     artillerist:'Artillerist', deadeye:'Deadeye', machinist:'Machinist', sharpshooter:'Sharpshooter', gunslinger:'Gunslinger',
     deathblade:'Deathblade', shadowhunter:'Shadowhunter', reaper:'Reaper', soul_eater:'Souleater', souleater:'Souleater',
-    artist:'Artist', aeromancer:'Aeromancer', wildsoul:'Wildsoul', dragon_knight:'Guardianknight', dragonknight:'Guardianknight',
-    guardianknight:'Guardianknight', holyknight:'Paladin', holyknight_female:'Paladin',
-    weather_artist:'Aeromancer', yinyangshi:'Yinyangshi', alchemist:'Alchemist'
+    // Bible's internal id for Wildsoul is "alchemist"; it is not a separate class.
+    artist:'Artist', aeromancer:'Aeromancer', wildsoul:'Wildsoul', alchemist:'Wildsoul', dragon_knight:'Guardianknight', dragonknight:'Guardianknight',
+    // Valkyrie is the female Holy Knight; holyknight_female is Valkyrie, not Paladin.
+    guardianknight:'Guardianknight', holyknight:'Paladin', holyknight_male:'Paladin', holyknight_female:'Valkyrie',
+    weather_artist:'Aeromancer', yinyangshi:'Yinyangshi'
   };
   const normalizeId = v => String(v || '').trim().toLowerCase().replace(/[ -]+/g, '_');
   const mapped = v => CLASS_IDS[normalizeId(v)] || null;
+  const CLASS_NAMES = [...new Set(Object.values(CLASS_IDS))];
+
+  /* Bible renders the class as a short chip in the profile header, e.g.
+     <p ...>Valkyrie</p>. That is the class the site itself displays, so it
+     outranks the id map above -- which is hand-maintained and has drifted
+     before (holyknight_female and alchemist were both wrong). */
+  function classFromChip(source) {
+    const re = /<p[^>]*>\s*([A-Za-z][A-Za-z ]{2,23})\s*<\/p>/ig;
+    let m;
+    while ((m = re.exec(source))) {
+      const text = m[1].replace(/\s+/g, ' ').trim();
+      const hit = CLASS_NAMES.find(k => k.toLowerCase() === text.toLowerCase());
+      if (hit) return hit;
+    }
+    return null;
+  }
 
   function classFromHtml(html) {
     const source = String(html || '');
+    const chip = classFromChip(source);
+    if (chip) return chip;
     const visibleClass = source.match(/<[^>]*class=["'][^"']*\bclass\b[^"']*["'][^>]*>\s*([^<]+?)\s*<\//i);
     if (visibleClass) {
       const text = visibleClass[1].replace(/\s+/g, ' ').trim();
