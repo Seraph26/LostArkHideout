@@ -42,6 +42,16 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
   deployed by hand: Cloudflare dashboard → Workers & Pages → `lostark-bible-connector` → Edit
   code → paste `worker/src/index-support-v2.js` → Save and deploy. There is no `node`/`wrangler`
   on this machine.
+- **Short share links.** A full roster's `#s=` link runs past 2,000 characters, which Discord's
+  message limit rejects, so the worker also offers `POST /share` (store the encoded snapshot in
+  KV, 30-day TTL, binding `SHARES`, id `3d2236be086d46fbb4e2cdb70c7d8ae8`) and `GET /share/:id`.
+  `copyShare()` in `share-and-reset-v1.js` tries this first and silently falls back to the long
+  `#s=` link on any failure, so nothing breaks if the worker is out of date. **The KV binding is
+  not in the pasted worker code** — after pasting a new worker version, also confirm in
+  Settings → Variables and Bindings that `SHARES` is still bound to that namespace, or `/share`
+  fails with a 500 even though the code is correct. This is the one deliberate exception to
+  "nothing ever reaches a server": an `#id=` link's snapshot sits in Cloudflare KV for 30 days,
+  never logged, never tied to an account. Old `#s=` links are unaffected.
 - **CP** = the right-hand Combat Power panel, priority *Estimated Raid Loadout → Current Loadout (Raid)*, never Chaos Dungeon. In the payload that is `combatPower:{id:N,score:X}`. The header `≈` figure is `maxCombatPower`/`estimatedMaxCombatPower` = **best ever**, and the **roster tab shows that max too** — do not source CP from it (Mattnx: panel 5434.14 vs roster/header 5755.2).
 - **Class** comes from the class chip Bible renders in the header (a short `<p>`). The `classId` map is hand-maintained and has drifted twice: `holyknight_female` = Valkyrie (not Paladin), `alchemist` = Wildsoul (not Alchemist), `dragon_knight` = Guardianknight.
 - **Specialization** = an Ark Passive **Enlightenment** node name. Its tier position varies by class (Seraphh T1, Diamarté T2, Hetawl T5), so store all node names and match them against the spec rules. `parseProfile` stores `enlightenment` for this.
