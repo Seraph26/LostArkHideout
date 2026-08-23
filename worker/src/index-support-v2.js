@@ -1,3 +1,4 @@
+const WORKER_VERSION = "2026-08-23-git-test";
 const BIBLE_HOST = "lostark.bible";
 const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
 /* Counting changed from "every page load" to "once per browser session", and the
@@ -84,8 +85,11 @@ export default {
       return json({ ok: false, error: "Only GET requests are supported (POST /share is the one exception)." }, 405, origin);
 
     /* Left open: it touches nothing, and it lets an uptime check or a blocked
-       caller tell the difference between "refused" and "down". */
-    if (u.pathname === "/health") return json({ ok: true, service: "lostark-bible-connector" });
+       caller tell the difference between "refused" and "down". The version is
+       here so which build is actually live can be checked over HTTP -- this
+       worker is deployed by hand, so the repo and the deployed code can silently
+       drift apart. Bump it whenever this file changes. */
+    if (u.pathname === "/health") return json({ ok: true, service: "lostark-bible-connector", version: WORKER_VERSION });
 
     /* Everything past here either spends a Bible request or writes to KV. */
     if (!origin) return json({ ok: false, error: "This connector only serves the Lost Ark Hideout dashboard." }, 403);
