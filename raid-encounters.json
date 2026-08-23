@@ -1,7 +1,9 @@
 {
-  "source": "lostark.bible raid filter",
-  "updatedAt": null,
+  "source": "hand-maintained",
+  "updatedAt": "2026-08-23",
+  "_maintenance": "Edited by hand. A scheduled job used to regenerate this from Bible's raid filter; it was retired on 2026-08-23 because Bible's enabled list means 'logs can be uploaded', not 'currently runnable' (it still lists Extreme Aegir, an event whose window has closed), and because its output carried no players field or optional group. Adding or removing a raid means editing this file, the fallback list in raid-selector-v1.js, and — for a new raid — a scoring profile in encounter-scoring-v2.js.",
   "_players": "Party size for the encounter: 8 for two full parties, 4 for single-party content. Horizon Cathedral and Serca are 4-player.",
+  "_events": "Extreme raids are ~4-week events. Remove them here and from the raid-selector-v1.js fallback once the window closes; the scoring profile can stay for a later return.",
   "raids": [
     {"id":"horizon-cathedral-g1","label":"Horizon Cathedral — Gate 1","boss":"Archbishop Arcenos","kind":"raid","schema":"level","players":4},
     {"id":"horizon-cathedral-g2","label":"Horizon Cathedral — Gate 2","boss":"Arcenos, Vanguard of Fanaticism","kind":"raid","schema":"level","players":4},

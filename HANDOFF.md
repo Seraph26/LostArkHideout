@@ -182,9 +182,20 @@ Supports score 0 contribution individually by design — their value is inside t
 9. **New classes** (e.g. Warpweaver): the class *name* resolves automatically
    from the Bible header chip, but icon, support/DPS role, spec rules and synergy
    table are hardcoded lists needing manual entries.
-10. **New raids** (e.g. Belgardin) do **not** appear automatically —
-    `raid-encounters.json` is a static file. A new raid needs an entry with
-    `players`, plus an encounter scoring profile.
+10. **The raid list is hand-maintained, deliberately.** `raid-encounters.json` is edited
+    directly; a new or departing raid needs an entry there **and** in the `fallback()` list
+    inside `raid-selector-v1.js` (used when the manifest fetch fails), plus a scoring profile
+    in `encounter-scoring-v2.js` for anything new. A scheduled job used to regenerate the
+    manifest from Bible; it was **retired on 2026-08-23** and should not be rebuilt without
+    reading why. It had reported success every 6 hours for months while never writing
+    anything: it only descended into a `<select>` whose `name`/`aria-label` contained "raid",
+    and Bible's selects carry neither -- only Tailwind classes -- so it collected no options
+    and took its own "do not overwrite a good manifest" fallback. More importantly, syncing
+    from Bible is wrong in principle: their enabled flag means "logs can be uploaded", not
+    "currently runnable" (Extreme Aegir is still enabled there after its event window closed),
+    their output carried **no `players` field and no `optional` group** -- so 4-player
+    detection for Horizon Cathedral and Serca would silently break -- and their optgroups
+    ("Epic Raid", "Kazeros Raid", "Shadow Raid") do not map to this app's grouping.
 11. If more than 8 New Additions are stored, the counter reads e.g. "10/8" until
     some are removed; the cap only blocks adding.
 12. **Specialization has one authority: `LostArkSpecAuthority.specFor`, which keys
