@@ -86,7 +86,25 @@ function supportUptimeFactor(cls){
  const factor=.80+.20*weighted;
  return{factor,weighted,metrics:Object.keys(weights).filter(k=>Number.isFinite(Number(stats[k]))),source:'bible'};
 }
-function supportFactor(t,p){if(!t.support)return 1;const base=t.behavior.supportPlacement==='placement-sensitive'&&p.mechanics?.forcedPositioning==='very-high'?p.support*.995:t.behavior.supportPlacement==='flexible'?Math.min(1,p.support*1.002):p.support;const live=supportUptimeFactor(t.cls);return base*live.factor}
+/* How much a fight pulls the party apart, 0 (stationary) to 1 (constant movement
+   plus forced repositioning). Both mechanics matter: movement scatters the party,
+   forced positioning decides where they end up. */
+const PRESSURE={'very-high':1,high:.75,'moderate-high':.5,moderate:.25,low:0};
+function scatterPressure(p){const m=PRESSURE[p.mechanics?.movement]??0,f=PRESSURE[p.mechanics?.forcedPositioning]??0;return (m+f)/2}
+/* A flexible, area-style support (Valkyrie, Paladin) keeps buffs on a party that
+   is forced to spread out; a placement-sensitive one (Bard, Artist) needs the
+   party to come to the buff and loses uptime when the fight will not allow it.
+   That difference used to be worth +-0.5% and only on very-high forced
+   positioning, so on extreme content two supports landed within 0.1 points of
+   each other and then both hit the clamp floor and displayed identically. It now
+   scales with the fight's scatter pressure, up to +-2%, plus a smaller term for
+   the support's own mobility -- how easily they can chase the party. */
+function supportFactor(t,p){if(!t.support)return 1;
+ const swing=.02*scatterPressure(p),place=t.behavior.supportPlacement;
+ const placed=place==='flexible'?1+swing:place==='placement-sensitive'?1-swing:1;
+ const mob=t.behavior.mobility==='high'?1+swing*.25:t.behavior.mobility==='low'?1-swing*.25:1;
+ const base=Math.min(1,p.support*placed*mob);
+ const live=supportUptimeFactor(t.cls);return base*live.factor}
 function characterScore(c){const p=profile();if(!p)return{score:1,components:{},reasons:[]};const t=traits(c);let score=p.baseUptime||1;const components={baseUptime:p.baseUptime||1};const reasons=[];
  const posKey=t.position==='backattack'?'back':t.position==='frontattack'?'front':t.position==='hitmaster'?'hitmaster':null;if(posKey){score*=p[posKey];components.position=p[posKey];reasons.push(`${t.positionLabel} uptime × ${p[posKey].toFixed(3)}`)}else components.position=1;
  if(t.ranged){score*=p.ranged;components.range=p.ranged;reasons.push(`Ranged uptime × ${p.ranged.toFixed(3)}`)}else if(t.cls){score*=p.melee;components.range=p.melee;reasons.push(`Melee uptime × ${p.melee.toFixed(3)}`)}else components.range=1;
@@ -95,7 +113,10 @@ function characterScore(c){const p=profile();if(!p)return{score:1,components:{},
  const bf=burstFactor(t.behavior.burstDependency,p.mechanics);score*=bf;components.buildBurst=bf;if(bf!==1)reasons.push(`Build burst dependence vs encounter windows × ${bf.toFixed(3)}`);
  const pf=pushFactor(t.behavior.pushResilience,p.mechanics);score*=pf;components.pushResilience=pf;if(pf!==1)reasons.push(`Push resilience × ${pf.toFixed(3)}`);
  const sf=supportFactor(t,p);if(t.support){score*=sf;components.support=sf;const live=supportUptimeFactor(t.cls);if(live.source==='bible'){components.bibleSupportUptime=live.factor;if(live.weighted!==null)components.bibleWeightedUptime=live.weighted;reasons.push(`Bible support uptime × ${live.factor.toFixed(3)} (${(live.weighted*100).toFixed(1)}% weighted uptime)`)}else reasons.push(`Support encounter fit × ${sf.toFixed(3)}`)}else components.support=1;
- score=Math.max(.75,Math.min(1.15,score));return{score,components,reasons,profile:p.name,confidence:p.confidence,traits:t};}
+ /* The floor was .75, which extreme content reached for every support, so real
+    differences between them were flattened into one identical number. .60 leaves
+    the guard against a runaway product while letting the model separate them. */
+ score=Math.max(.60,Math.min(1.15,score));return{score,components,reasons,profile:p.name,confidence:p.confidence,traits:t};}
 function partyScore(chars){const results=(chars||[]).map(characterScore);if(!results.length)return{score:0,characters:[],partyFactors:{}};const avg=results.reduce((s,r)=>s+r.score,0)/results.length;const supports=results.filter((r,i)=>traits(chars[i]).support).length;return{score:avg,characters:results,partyFactors:{averageEncounterFit:avg,supportCount:supports}}}
 function explain(chars){const r=partyScore(chars);return{...r,encounter:profile()?.name||null,mechanics:profile()?.mechanics||{}}}
 window.LostArkEncounterScoring={profiles:PROFILES,selected,profile,traits,characterScore,partyScore,explain};

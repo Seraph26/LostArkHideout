@@ -80,7 +80,7 @@ const SECTIONS=[
 
  ['Encounter Favorability (Raid Specific only)',
   `<p>On the hover card in Raid Specific mode. <strong>How much the selected fight suits that character</strong> — nothing to do with how strong they are.</p>
-   <p><strong>100% is neutral, not perfect.</strong> Above 100% the fight plays to their kit; below it, the fight costs them uptime they would have had in a plain tank-and-spank. The scale is capped at <strong>75% to 115%</strong>, so it is a nudge, never a verdict.</p>
+   <p><strong>100% is neutral, not perfect.</strong> Above 100% the fight plays to their kit; below it, the fight costs them uptime they would have had in a plain tank-and-spank. The scale is capped at <strong>60% to 115%</strong>, so it is a nudge, never a verdict.</p>
    <p>It is built by multiplying together, for that fight:</p>
    <ul>
     <li><strong>Position</strong> — how reliably a Back Attack, Front Attack or Hit Master character can hold their spot. A character whose position could not be determined skips this entirely.</li>
@@ -88,7 +88,7 @@ const SECTIONS=[
     <li><strong>Burst windows</strong> — whether the fight has them, and whether the build needs them.</li>
     <li><strong>Mobility</strong> — the build's movement against how much the fight makes you move.</li>
     <li><strong>Push resilience</strong> — against forced repositioning and stagger checks.</li>
-    <li><strong>Support fit</strong> — supports only: placement sensitivity, and their measured support uptime.</li>
+    <li><strong>Support fit</strong> — supports only. An area-style, flexible support (Valkyrie, Paladin) keeps buffs on a party the fight has forced apart; a placement-sensitive one (Bard, Artist) needs the party to come to the buff and loses uptime when the fight will not allow it. The gap grows with how much the fight moves people around, and their own measured support uptime is folded in on top.</li>
    </ul>
    <p>The <strong>Fit %</strong> next to a party's encounter score is simply the average of its four characters' Encounter Favorability.</p>
    <p>Compare it across characters in the same fight, never across fights. It says which raid suits a character, not which character is better.</p>`],

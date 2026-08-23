@@ -90,12 +90,45 @@ Supports score 0 contribution individually by design — their value is inside t
 
 ## Outstanding / in progress
 
-1. **Metrics parity between General and Raid (in progress).** The user wants the same three metric lines (Base DPS Power, Party Synergy, Support Impact) **with arrow indicators** in both modes. `general-party-metrics-v1.js` currently gates on `general()` and reads `.authoritative-dropzone` / `.authoritative-member`; raid uses `.slots` / `.slot`. Because raid cards now carry canonical hovers, `metric()` can parse them unchanged — generalising `general()`, `zones()`, `members()` and relaxing `all()`'s "exactly 2 zones" should give raid the same block. Arrows come from `general-render-guard-v1.js` (`.general-top-swap-arrow`) and the metrics block itself.
-2. **User reported General's three metric lines missing.** Could not reproduce — a test right after a General optimize showed 2 blocks reading "Base DPS Power 27,791 / Party Synergy +43.52% / Support Impact +28.12%". Suspect they had not hard-refreshed. **Confirm with them before changing anything.**
-3. **Raid manual-swap panel removed** (`raid-manual-party-summary-v1.js` unloaded from `index.html`) — user did not want it. It was also printing nonsense ("Combined party potential would be 2.").
-4. **Raid card position reads "unknown"** where General shows Back Attack — encounter scoring's own `positionLabel`, a separate path from the positional data General uses.
-5. **Manual swapping in the raid optimized layout** works for 8-player (handled inside `encounter-optimizer-v1.js`, rejects anything breaking 3 DPS + 1 support) and is deliberately inert for 4-player.
-6. **Ihzanami / Bard spec.** Bible currently reports her Ark Passive as *True Courage* (a DPS spec) and scores her as a DPS Bard, though she is geared as a support. "Desperate Salvation" appears nowhere on her page. Left as-is by user decision. A per-character Pin/override was built and then **rolled back** — the user disliked it. If revisited, they suggested something narrower than free-text fields (e.g. a single "treat as support" toggle).
-7. **New classes** (e.g. Warpweaver): the class *name* resolves automatically from the Bible header chip, but icon, support/DPS role, spec rules and synergy table are all hardcoded lists needing manual entries.
-8. **New raids** (e.g. Belgardin) do **not** appear automatically — `raid-encounters.json` is a static file. A new raid needs an entry with `players`, plus an encounter scoring profile.
-9. If the user has more than 8 New Additions stored, the counter reads e.g. "10/8" until they remove some; the cap only blocks adding.
+1. **Metrics parity — done.** `general-party-metrics-v1.js` renders in both modes
+   (`zones()` matches `.authoritative-dropzone` and `.encounter-optimized-party
+   .slots`), accepts one party for 4-player content, and carries its own arrows.
+2. **Raid cards are the General cards — done.** Raid renders through
+   `LostArkGeneralModel.member(c,s,p,'slot')`; there is no second card template.
+   Anything that decorates a General card (spec, class icon, position, hover)
+   decorates the raid one automatically. Do not reintroduce a raid-side card.
+3. **Best/Worst available swap panels removed from both optimizers** by user
+   decision, along with the raid manual-swap panel before them. Do not add
+   "what if you swapped X" panels back.
+4. **Encounter Favorability** is the old per-card "Encounter N%", renamed, on the
+   hover under the compatibility line. It is injected by `hover-summary-v6`'s
+   encounter block via the `window.LostArkHoverExtras` hook that
+   `encounter-optimizer-v1.js` registers — not by the card markup, because
+   hover-summary rebuilds the card afterwards.
+5. **Support encounter fit was flattened by the clamp.** Every support hit the
+   old `.75` floor on extreme content and displayed an identical 75%. The floor
+   is now `.60`, and `supportFactor` scales placement (flexible vs
+   placement-sensitive) by the fight's scatter pressure up to ±2%, plus a
+   quarter of that for the support's own mobility. Measured on Extreme
+   Brelshaza G2: Valkyrie 75.2% vs Bard 72.4% where both read 75% before.
+6. **Anything that reads the roster must read New Additions too.** Three layers
+   read only `lostark-hideout-private-v3` and broke for New Additions: the card
+   repair in `ui-fixes-clean.js` (raw class name and no position) and both
+   swap-arrow name maps (raw uuids in the tooltip). Use
+   `window.LostArkCandidateRoster.getAll()`.
+7. **The optimizer's `drop` handler calls `stopImmediatePropagation()`** as a
+   capture listener on `#suggestedParties`. Anything that needs the drop must
+   listen on `document` — a listener on that root never fires.
+8. **Ihzanami / Bard spec.** Bible reports her Ark Passive as *True Courage* (a
+   DPS spec) though she is geared as a support. Left as-is by user decision. A
+   per-character override was built and **rolled back** — the user disliked it.
+   If revisited, something narrower than free text (e.g. a "treat as support"
+   toggle).
+9. **New classes** (e.g. Warpweaver): the class *name* resolves automatically
+   from the Bible header chip, but icon, support/DPS role, spec rules and synergy
+   table are hardcoded lists needing manual entries.
+10. **New raids** (e.g. Belgardin) do **not** appear automatically —
+    `raid-encounters.json` is a static file. A new raid needs an entry with
+    `players`, plus an encounter scoring profile.
+11. If more than 8 New Additions are stored, the counter reads e.g. "10/8" until
+    some are removed; the cap only blocks adding.
