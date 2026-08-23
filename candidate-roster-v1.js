@@ -61,7 +61,7 @@ function updateHideAllButton(){
 function removeNew(id){write(NEW_KEY,newChars().filter(c=>c.id!==id));const s=hidden();s.delete(id);setHidden(s);renderNew()}
 function wireNew(){document.querySelectorAll('.candidate-hide').forEach(b=>b.onclick=()=>toggleHidden(b.dataset.id));document.querySelectorAll('.candidate-remove').forEach(b=>b.onclick=()=>removeNew(b.dataset.id))}
 function mainState(){try{return JSON.parse(localStorage.getItem('lostark-hideout-private-v3')||'null')||{characters:[]}}catch{return{characters:[]}}}
-function patchMain(){const roster=$('#roster');if(!roster)return;const hs=hidden();roster.querySelectorAll('.character:not(.candidate-character)').forEach(el=>{const id=el.querySelector('.remove-character')?.dataset.id;if(!id)return;let tag=el.querySelector('.character-group-tag');if(!tag){const cls=el.querySelector('.class');tag=document.createElement('div');tag.className='character-group-tag';tag.textContent='Main Group';cls?.after(tag)}let actions=el.querySelector('.character-head .candidate-card-actions');if(!actions){actions=document.createElement('div');actions.className='candidate-card-actions';const rem=el.querySelector('.remove-character');if(rem)actions.appendChild(rem);const b=document.createElement('button');b.type='button';b.className='candidate-hide';b.dataset.id=id;actions.appendChild(b);el.querySelector('.character-head')?.appendChild(actions)}const b=actions.querySelector('.candidate-hide');if(b){b.textContent=hs.has(id)?'Show':'Hide';b.onclick=()=>toggleHidden(id)}el.classList.toggle('candidate-hidden',hs.has(id))})}
+function patchMain(){const roster=$('#roster');if(!roster)return;const hs=hidden();roster.querySelectorAll('.character:not(.candidate-character)').forEach(el=>{const id=el.querySelector('.remove-character')?.dataset.id;if(!id)return;let tag=el.querySelector('.character-group-tag');if(!tag){const cls=el.querySelector('.class');tag=document.createElement('div');tag.className='character-group-tag';tag.textContent='Main Group';cls?.after(tag)}let actions=el.querySelector('.character-head .candidate-card-actions');if(!actions){actions=document.createElement('div');actions.className='candidate-card-actions';const rem=el.querySelector('.remove-character');if(rem)actions.appendChild(rem);const b=document.createElement('button');b.type='button';b.className='candidate-hide';b.dataset.id=id;actions.appendChild(b);el.querySelector('.character-head')?.appendChild(actions)}const b=actions.querySelector('.candidate-hide');if(b){const label=hs.has(id)?'Show':'Hide';/* an identical assignment still fires a mutation record */if(b.textContent!==label)b.textContent=label;b.onclick=()=>toggleHidden(id)}el.classList.toggle('candidate-hidden',hs.has(id))})}
 function allCharacters(){return [...(mainState().characters||[]),...normalizeNew()].filter(c=>c&&c.id)}
 function eligibleCharacters(){const hs=hidden();return allCharacters().filter(c=>!hs.has(c.id))}
 function expose(){window.LostArkCandidateRoster={getAll:allCharacters,getEligible:eligibleCharacters,isHidden:id=>hidden().has(id),getNew:newChars,MAX_NEW:MAX}}
@@ -81,17 +81,25 @@ async function refreshCandidates(){
     so a profile fetched minutes ago is not worth re-fetching. */
  const FRESH_MS=60*1000;
  const fresh=c=>{const t=Date.parse(c?.profile?.retrievedAt||'');return c?.profile&&Number.isFinite(t)&&(Date.now()-t)<FRESH_MS};
+ const due=list.filter(c=>c?.url&&(window.__lostarkForceRefresh||!fresh(c))).length;let done=0;
+ const statusEl=()=>document.getElementById('status');
+ /* The Main Group summary is on screen when this starts; the progress lines
+    below overwrite it, so keep it and restore it with our own result appended. */
+ const base=statusEl()?.textContent||'';
  for(const c of list){
   if(!c?.url)continue;
   if(!window.__lostarkForceRefresh&&fresh(c)){skipped++;continue}
+  /* Same reason as the Main Group pass: this is serial, so tell the user where
+     it is instead of leaving the status frozen for a minute. */
+  done++;const s=statusEl();if(s)s.textContent=`Fetching New Addition ${done} of ${due} — one at a time; more characters means a longer refresh.`;
   try{const p=await window.fetchCharacter(c);
    if(p){p.class=canonicalClass({...c,profile:p});p.classIcon=classIcon(p.class,p);p.spec=specialization({...c,profile:p});c.profile=p;delete c.profileError;ok++}
   }catch(e){c.profileError=String(e?.message||e);failed++}
  }
  write(NEW_KEY,list);renderNew();applyHiddenState();
  candidateRefreshRunning=false;
- const status=document.getElementById('status');
- if(status)status.textContent=`${status.textContent} New Additions: refreshed ${ok}${failed?`, ${failed} failed`:''}${skipped?`, ${skipped} already up to date`:''}.`;
+ const s=statusEl();
+ if(s)s.textContent=`${base} New Additions: refreshed ${ok}${failed?`, ${failed} failed`:''}${skipped?`, ${skipped} already up to date`:''}.`;
 }
 function wireCandidateRefresh(){const btn=document.getElementById('refreshBtn');if(!btn||btn.dataset.candidateRefresh)return;btn.dataset.candidateRefresh='1';
  btn.addEventListener('click',()=>{
@@ -101,6 +109,16 @@ function wireCandidateRefresh(){const btn=document.getElementById('refreshBtn');
   setTimeout(poll,500);
  });
 }
-function init(){styles();expose();prepareControls();renderNew();patchMain();updateHeaderCount();refreshCandidateBuilds();wireCandidateRefresh()}
+/* A refresh rebuilds #roster from scratch, which throws away the Main Group tag
+   and the Hide button, and patchMain only ran at init or on a toggle -- so they
+   stayed missing until something else happened to call it. Re-patch whenever the
+   roster is rewritten, ignoring the elements patchMain itself adds so it cannot
+   feed its own observer. */
+let patching=false,patchTimer=0;
+function schedulePatch(){clearTimeout(patchTimer);patchTimer=setTimeout(()=>{patching=true;try{patchMain()}finally{setTimeout(()=>{patching=false},0)}},50)}
+function watchMain(){const roster=$('#roster');if(!roster)return;
+ const own=r=>{const el=r.target?.nodeType===1?r.target:r.target?.parentElement;return !!el?.closest?.('.candidate-card-actions,.character-group-tag')};
+ new MutationObserver(recs=>{if(patching||recs.every(own))return;schedulePatch()}).observe(roster,{childList:true,subtree:true})}
+function init(){styles();expose();prepareControls();renderNew();patchMain();watchMain();updateHeaderCount();refreshCandidateBuilds();wireCandidateRefresh()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();

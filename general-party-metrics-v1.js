@@ -26,7 +26,13 @@ function metric(m){const t=clean(m.querySelector('.character-hover-breakdown')?.
 function calc(z){const a=members(z).map(metric).filter(Boolean),d=a.filter(x=>!x.support);if(!d.length)return null;const base=d.reduce((n,x)=>n+x.cp,0),sy=d.reduce((n,x)=>n+x.cp*x.sy/100,0),su=d.reduce((n,x)=>n+x.cp*x.su/100,0);return{base,sy:base?sy/base*100:0,su:base?su/base*100:0}}
 /* One party is a legitimate layout (4-player content in either mode). */
 function all(){const z=zones(),m=z.map(calc);return z.length&&m.every(Boolean)?m:null}
-function rosterNames(){try{const x=JSON.parse(localStorage.getItem('lostark-hideout-private-v3')||localStorage.getItem('lostark-hideout-private-v2')||'null');return new Map((x?.characters||[]).map(c=>[String(c.id),clean(c.profile?.name||c.name||c.id)]))}catch{return new Map()}}
+/* New Additions can hold a seat, so a swap can involve one. Reading the Main
+   Group key alone left their id unresolved and the tooltip printed a raw uuid. */
+function rosterNames(){const m=new Map();const add=list=>{for(const c of list||[])if(c?.id)m.set(String(c.id),clean(c.profile?.name||c.name||c.id))};
+ try{add(window.LostArkCandidateRoster?.getAll?.())}catch{}
+ if(!m.size){try{const x=JSON.parse(localStorage.getItem('lostark-hideout-private-v3')||localStorage.getItem('lostark-hideout-private-v2')||'null');add(x?.characters)}catch{}
+  try{add(JSON.parse(localStorage.getItem('lostark-hideout-new-additions-v1')||'null'))}catch{}}
+ return m}
 function swapNames(before,after){if(!before||!after)return'Manual party swap';const out=[];for(const p of ['party1','party2']){const a=new Set(before.state[p]),b=new Set(after.state[p]);for(const id of a)if(!b.has(id))out.push(id)}if(out.length!==2)return'Manual party swap';const n=rosterNames();return`${n.get(String(out[0]))||out[0]} swapped with ${n.get(String(out[1]))||out[1]}`}
 function snapshot(){const m=all();return{state:domState(),metrics:m?m.map(x=>({base:x.base,sy:x.sy,su:x.su})):[]}}
 function change(current,before,key,title){if(!before)return'';const d=current[key]-before[key];if(Math.abs(d)<.005)return'';const up=d>0,label=key==='base'?Math.abs(Math.round(d)).toLocaleString():Math.abs(d).toFixed(2)+' pts';return` <span class="general-swap-arrow ${up?'general-swap-up':'general-swap-down'}" data-swap-title="${esc(title)}" aria-label="${esc(title)}">${up?'▲':'▼'} ${label}</span>`}
@@ -63,13 +69,20 @@ function css(){
 function arm(){swapBefore=null;try{localStorage.setItem(STORE,JSON.stringify({metrics:all(),state:domState(),sig:sig()}))}catch{}render()}
 function onOptimize(){swapBefore=null;setTimeout(render,50);setTimeout(render,150);setTimeout(render,300);setTimeout(render,600);setTimeout(arm,1200)}
 function captureBefore(){if(!active()||swapBefore)return;const s=snapshot();if(s.metrics.length)swapBefore=s}
-function captureAfter(){if(!active()||!swapBefore)return;const beforeSig=sig(swapBefore.state);setTimeout(()=>{if(!active()||!swapBefore)return;if(sig()!==beforeSig)render()},100)}
+/* Runs from a document-level capture listener, so the optimizer has not rewritten
+   the parties yet: the first pass has to be a macrotask later. The ladder covers
+   layers that rewrite the hover afterwards without waiting on the slowest one. */
+function captureAfter(){if(!active()||!swapBefore)return;const beforeSig=sig(swapBefore.state);[0,60,150,400].forEach(ms=>setTimeout(()=>{if(!active()||!swapBefore)return;if(sig()!==beforeSig)render()},ms))}
 function start(){
  css();
  const root=document.getElementById('suggestedParties')||document.body;
  root.addEventListener('pointerdown',e=>{if(e.target.closest?.('.authoritative-member'))captureBefore()},true);
  root.addEventListener('dragstart',e=>{if(e.target.closest?.('.authoritative-member'))captureBefore()},true);
- root.addEventListener('drop',()=>captureAfter(),true);
+ /* The optimizer's own drop handler is a capture listener on this same root and
+    calls stopImmediatePropagation(), so a listener here never ran: the arrows
+    only caught up through the observer's debounce, which is the lag after a
+    manual swap. document-level capture runs before any listener on the root. */
+ document.addEventListener('drop',()=>captureAfter(),true);
  document.getElementById('optimizeBtn')?.addEventListener('click',onOptimize,true);
  /* This observer used to re-render on any mutation under #suggestedParties, but
     render() writes .general-metrics-block inside that same root, so every render

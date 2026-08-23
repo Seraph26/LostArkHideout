@@ -15,7 +15,16 @@ function specFor(p,b){
 function positionFor(p,b){const cls=norm(className(p,b));if(['bard','artist','paladin','valkyrie'].includes(cls))return'N/A';const explicit=clean(b?.positional||p?.positional||'');if(explicit&&!/^unknown$/i.test(explicit))return explicit;const t=norm([b?.text,p?.engravings,p?.arkGrid,p?.arkPassive,p?.tripods].flat().join(' '));if(/ambush master|back attack|entropy/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(cls==='berserker'&&/mayhem|berserker'?s technique|berserker technique/.test(t))return'Back Attack';if(cls==='summoner'&&/master summoner|communication overflow|ancient spear/.test(t))return'Hit Master';if(cls==='souleater'&&/full moon harvester|night.?s edge/.test(t))return'Hit Master';return'Unknown'}
 function icon(cls){try{return window.LostArkHideoutClassData?.iconUrl?.(cls)||''}catch{return''}}
 function getBuild(url){const cache=load(BUILD);return url&&cache[url]||null}
-function stateProfiles(){const s=load(KEY),m=new Map();for(const c of s.characters||[]){const p=c?.profile||{};const url=c?.url||'';const name=norm(p.name||c.name);if(name)m.set(name,{p,url,b:getBuild(url)})}return m}
+/* New Additions can hold party seats, but this map was built from the Main Group
+   key alone, so their party cards were never repaired: the spec label fell back
+   to the raw class name and the position stayed Unknown even though the same
+   character reads correctly on their New Addition card. Take the whole eligible
+   roster instead. */
+function rosterCharacters(){try{const all=window.LostArkCandidateRoster?.getAll?.();if(Array.isArray(all)&&all.length)return all}catch{}
+ const out=[...(load(KEY).characters||[])];
+ try{const extra=JSON.parse(localStorage.getItem('lostark-hideout-new-additions-v1')||'null');if(Array.isArray(extra))out.push(...extra)}catch{}
+ return out}
+function stateProfiles(){const m=new Map();for(const c of rosterCharacters()){const p=c?.profile||{};const url=c?.url||'';const name=norm(p.name||c.name);if(name&&!m.has(name))m.set(name,{p,url,b:getBuild(url)})}return m}
 function makeInline(img){img.style.display='inline-block';img.style.width='22px';img.style.height='22px';img.style.objectFit='contain';img.style.verticalAlign='middle';img.style.margin='0 7px 0 0';img.style.flex='0 0 22px';img.style.position='static'}
 function applyIcon(container,cls){if(!container||!cls)return;const src=icon(cls);if(!src)return;let img=container.querySelector(':scope > img.class-icon');if(!img){img=document.createElement('img');img.className='class-icon';container.insertBefore(img,container.firstChild)}img.src=src;img.alt=cls;img.removeAttribute('srcset');makeInline(img);container.style.display='inline-flex';container.style.alignItems='center';container.style.flexWrap='nowrap'}
 function repairTop(profiles){document.querySelectorAll('#roster .character').forEach(card=>{const link=card.querySelector('.character-bible-link'),key=norm(link?.textContent),x=profiles.get(key);if(!x)return;const base=className(x.p,x.b),spec=specFor(x.p,x.b),title=card.querySelector('.character-title');if(title)applyIcon(title,base);card.querySelectorAll('.class').forEach(e=>e.textContent=spec||base)})}

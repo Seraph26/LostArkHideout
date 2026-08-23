@@ -84,7 +84,22 @@ function renderSuggestions(){const complete=state.characters.filter(c=>c.profile
 const FRESH_MS=60*1000;
 window.__lostarkForceRefresh=false;
 const isFresh=c=>{const t=Date.parse(c?.profile?.retrievedAt||'');return c?.profile&&Number.isFinite(t)&&(Date.now()-t)<FRESH_MS};
-async function refreshProfiles(){if(!state.characters.length)return setStatus('Add at least one character first.');setStatus('Refreshing character profiles…');let ok=0,failed=0,skipped=0;for(const c of state.characters){if(!window.__lostarkForceRefresh&&isFresh(c)){skipped++;continue}try{c.profile=await fetchCharacter(c);delete c.profileError;ok++}catch(e){c.profileError=e.message;failed++}}saveState();render();window.__lostarkForceRefresh=false;const skipNote=skipped?` ${skipped} already up to date.`:'';setStatus(failed?`Refreshed ${ok}; ${failed} failed.${skipNote}`:`Refreshed ${ok} profile${ok===1?'':'s'} from Bible.${skipNote}`)}
+/* Bible is fetched one character at a time on purpose -- concurrent calls trip
+   its rate limit and end up slower -- so refresh time scales with the number of
+   characters. Say so, and count down, rather than leaving a silent minute.
+   Roughly 3s per character measured against the connector, New Additions
+   included, since they queue behind this pass. The opening line must keep the
+   "Refreshing character profiles" prefix: bible-fetch-retry keys its failure
+   diagnostics off it, so the progress lines below deliberately differ. */
+function refreshEta(n){const s=Math.round(n*3);return s<60?`about ${s}s`:`about ${Math.floor(s/60)} min ${s%60?`${s%60}s`:''}`.trim()}
+async function refreshProfiles(){if(!state.characters.length)return setStatus('Add at least one character first.');
+ let pending=0;try{pending=(window.LostArkCandidateRoster?.getNew?.()||[]).length}catch{}
+ const due=state.characters.filter(c=>window.__lostarkForceRefresh||!isFresh(c)).length;
+ const total=due+pending;
+ setStatus(`Refreshing character profiles… ${total} to fetch, one at a time — ${refreshEta(total)}. The more characters loaded, the longer a refresh takes.`);
+ let ok=0,failed=0,skipped=0,done=0;for(const c of state.characters){if(!window.__lostarkForceRefresh&&isFresh(c)){skipped++;continue}
+ done++;setStatus(`Fetching profile ${done} of ${total} — one at a time; more characters means a longer refresh.`);
+ try{c.profile=await fetchCharacter(c);delete c.profileError;ok++}catch(e){c.profileError=e.message;failed++}}saveState();render();window.__lostarkForceRefresh=false;const skipNote=skipped?` ${skipped} already up to date.`:'';setStatus(failed?`Refreshed ${ok}; ${failed} failed.${skipNote}`:`Refreshed ${ok} profile${ok===1?'':'s'} from Bible.${skipNote}`)}
 function removeCharacter(id){const c=state.characters.find(x=>x.id===id);if(!c)return;if(localStorage.getItem(REMOVE_CONFIRM_KEY)==='1')return performRemove(c);const o=document.createElement('div');o.className='remove-modal';o.innerHTML=`<div class="remove-modal-card"><h2>Remove character?</h2><p>Are you sure you want to remove <strong>${escapeHtml(c.name)}</strong>?</p><div class="remove-modal-actions"><button class="remove-cancel">Cancel</button><button class="remove-confirm">Remove Character</button></div></div>`;document.body.appendChild(o);o.querySelector('.remove-cancel').onclick=()=>o.remove();o.querySelector('.remove-confirm').onclick=()=>{o.remove();performRemove(c)}}function performRemove(c){state.characters=state.characters.filter(x=>x.id!==c.id);saveState();render()}
 function init(){const add=$('#addCharacterBtn');if(add)add.onclick=()=>{if(state.characters.length>=MAX_CHARACTERS)return setStatus(`Maximum of ${MAX_CHARACTERS} characters reached.`);const p=parseBibleUrl($('#characterUrl').value.trim());if(!p)return setStatus('Enter a valid lostark.bible character URL.');if(state.characters.some(c=>c.url.toLowerCase()===p.url.toLowerCase()))return setStatus('That character is already loaded.');const c={id:`${p.region}-${p.name}`.toLowerCase(),url:p.url,region:p.region,name:p.name};state.characters.push(c);saveState();render();fetchCharacter(c).then(profile=>{c.profile=profile;delete c.profileError;saveState();render();setStatus(`${profile.name} loaded.`)}).catch(e=>{c.profileError=e.message;saveState();render();setStatus(e.message)})};const refresh=$("#refreshBtn");if(refresh)refresh.onclick=e=>{window.__lostarkForceRefresh=!!(e&&e.shiftKey);refreshProfiles()};render()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
