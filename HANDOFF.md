@@ -5,6 +5,14 @@ Paste this whole file into a new chat to pick up where we left off.
 ## Basics
 
 - Repo `Seraph26/LostArkParty`, live at https://seraph26.github.io/LostArkParty/ (GitHub Pages from `main`; push = deploy, ~30–60s).
+- **Renamed from `LostArkHideout` on 2026-08-23.** The old Pages URL now 404s — GitHub does not
+  redirect project Pages, so any link made before that date is dead. Two things were checked
+  after the rename and both held: Cloudflare **Workers Builds followed it** (the GitHub app
+  tracks repository ids, not names — verified by a version bump reaching `/health` 60s after a
+  push), and profile fetching was unaffected because an `Origin` header is scheme+host only, so
+  the path never appears in `ALLOWED_ORIGINS`. Rosters also survived: `localStorage` is keyed by
+  origin, not path. If the site is ever moved to a *different host* — a custom domain, Cloudflare
+  Pages — none of that holds, and `ALLOWED_ORIGINS` must be updated or every profile fetch 403s.
 - Local clone: `C:\Users\<user>\Desktop\ClaudeLA`. Working tree should be clean and in sync.
 - **Two things keep the old "Hideout" name on purpose.** `localStorage` keys are all
   `lostark-hideout-*` (21 of them) — renaming those would orphan every existing user's roster,
