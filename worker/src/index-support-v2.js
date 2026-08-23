@@ -1,4 +1,4 @@
-const WORKER_VERSION = "2026-08-23-lostarkparty";
+const WORKER_VERSION = "2026-08-23-post-rename";
 const BIBLE_HOST = "lostark.bible";
 const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
 /* Counting changed from "every page load" to "once per browser session", and the
