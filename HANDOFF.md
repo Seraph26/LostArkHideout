@@ -30,8 +30,18 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
 
 ## Data / Bible facts (hard-won)
 
-- WebFetch gets 403 on lostark.bible. The in-app browser loads it fine. The app's own connector works from any origin:
+- WebFetch gets 403 on lostark.bible. The in-app browser loads it fine. The app's own connector:
   `https://lostark-bible-connector.seraph0226.workers.dev/character?url=<encoded bible url>`
+- **The connector is origin-locked.** `/character`, `/raid-stats` and `/visits` answer only
+  `https://seraph26.github.io` and `http://localhost:8777`; anything else gets 403 and the app
+  reports a failed refresh. `127.0.0.1:8777` is a *different origin* and is refused — test on
+  `localhost`. If the site URL ever changes (repo/account rename, custom domain, Cloudflare
+  Pages), add it to `ALLOWED_ORIGINS` in `worker/src/index-support-v2.js` **and redeploy the
+  worker**, or profile fetching silently stops. `/health` stays open.
+- **The worker does not deploy with the site.** `git push` deploys Pages only. The worker is
+  deployed by hand: Cloudflare dashboard → Workers & Pages → `lostark-bible-connector` → Edit
+  code → paste `worker/src/index-support-v2.js` → Save and deploy. There is no `node`/`wrangler`
+  on this machine.
 - **CP** = the right-hand Combat Power panel, priority *Estimated Raid Loadout → Current Loadout (Raid)*, never Chaos Dungeon. In the payload that is `combatPower:{id:N,score:X}`. The header `≈` figure is `maxCombatPower`/`estimatedMaxCombatPower` = **best ever**, and the **roster tab shows that max too** — do not source CP from it (Mattnx: panel 5434.14 vs roster/header 5755.2).
 - **Class** comes from the class chip Bible renders in the header (a short `<p>`). The `classId` map is hand-maintained and has drifted twice: `holyknight_female` = Valkyrie (not Paladin), `alchemist` = Wildsoul (not Alchemist), `dragon_knight` = Guardianknight.
 - **Specialization** = an Ark Passive **Enlightenment** node name. Its tier position varies by class (Seraphh T1, Diamarté T2, Hetawl T5), so store all node names and match them against the spec rules. `parseProfile` stores `enlightenment` for this.
