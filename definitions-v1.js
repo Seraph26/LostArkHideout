@@ -79,7 +79,8 @@ const SECTIONS=[
    <p><strong>Combined estimated potential</strong> at the top is both parties added together. That single number is what the optimizer is trying to make as large as possible.</p>`],
 
  ['Encounter Favorability (Raid Specific only)',
-  `<p>On the hover card in Raid Specific mode. <strong>How much the selected fight suits that character</strong> — nothing to do with how strong they are.</p>
+  `<p>The percentage in the top right of each card in Raid Specific mode. <strong>How much the selected fight suits that character</strong> — nothing to do with how strong they are.</p>
+   <p><strong>Green means this fight suits them more than the rest of your lineup; red, less.</strong> The colour compares them against the average of the eight characters currently seated, not against a fixed number — on a punishing raid everyone's figure is low, and what matters is who copes best. Grey means they are within a third of a point of that average. The percentage itself is absolute, so it is still comparable to the numbers below.</p>
    <p><strong>100% is neutral, not perfect.</strong> Above 100% the fight plays to their kit; below it, the fight costs them uptime they would have had in a plain tank-and-spank. The scale is capped at <strong>60% to 115%</strong>, so it is a nudge, never a verdict.</p>
    <p>It is built by multiplying together, for that fight:</p>
    <ul>

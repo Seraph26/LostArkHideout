@@ -24,7 +24,11 @@ const stated=String(p.role||'').trim();const role=(stated==='Support'||stated===
 /* Per-character and independent of party composition, but called once per member
    of every candidate arrangement -- memoise it, keyed by encounter. */
 const valueCache=new Map();
-function charValue(c){const k=String(window.LostArkOptimizerMode?.raid||'')+'|'+String(c.id);if(valueCache.has(k))return valueCache.get(k);const r=window.LostArkEncounterScoring.characterScore(c);const v=Math.max(.75,Math.min(1.15,num(r.score)||1));valueCache.set(k,v);return v}
+/* characterScore() already clamps. Re-clamping at .75 here re-imposed the floor
+   the scorer just moved to .60, so two supports that now score differently were
+   flattened back to an identical value for party selection -- the display would
+   separate them while the optimizer still could not. */
+function charValue(c){const k=String(window.LostArkOptimizerMode?.raid||'')+'|'+String(c.id);if(valueCache.has(k))return valueCache.get(k);const r=window.LostArkEncounterScoring.characterScore(c);const v=num(r.score)||1;valueCache.set(k,v);return v}
 function scoreParty(p){if(p.length!==4)return-1;const dps=p.filter(c=>info(c).role==='DPS'),supports=p.filter(c=>info(c).role==='Support');if(dps.length!==3||supports.length!==1)return-1;const dpsValue=dps.reduce((s,c)=>s+info(c).cp*charValue(c),0),supportFactor=charValue(supports[0]);return dpsValue*supportFactor}
 /* Horizon Cathedral and Serca are single-party (4-player) content; everything
    else fields two full parties. The manifest carries this per encounter. */
@@ -59,19 +63,6 @@ function parameterText(p){const parts=[];const pos=[['Hit Master',num(p.hitmaste
    is encounter-aware -- and it means one hover format rather than two. */
 function generalScore(p){try{return window.LostArkGeneralModel?.score?.(p)||null}catch{return null}}
 function generalHover(c,s,p){try{return window.LostArkGeneralModel?.hoverHtml?.(c,s,p)||''}catch{return''}}
-/* Encounter Favorability: characterScore() is a multiplicative uptime/fit factor
-   clamped to 0.75-1.15, so 100% is neutral, not perfect -- which the Definitions
-   panel explains, so the row itself stays a bare figure. hover-summary-v6 owns
-   the final hover layout and calls this while building the encounter block, so
-   the row lands directly under "Support compatibility uses encounter data."
-   The card element is all that layer has, so a character id is accepted too. */
-window.LostArkHoverExtras=function(x){
- if(!active())return'';
- const c=typeof x==='string'?pool().find(p=>String(p.id)===x):x;
- if(!c)return'';
- let r;try{r=window.LostArkEncounterScoring?.characterScore?.(c)}catch{return''}
- if(!r||!Number.isFinite(r.score))return'';
- return `<div class="chb-encounter-favorability">Encounter Favorability ${(r.score*100).toFixed(1)}%</div>`};
 function specLabel(c,fallback){try{const a=window.LostArkSpecAuthority;if(a?.specFor){const s=a.specFor(c.profile||{},build(c));if(s)return s}}catch{}return fallback}
 /* The Raid Specific character card IS the General card: the General model renders
    it, so name, spec, role, position and CP come out identical and the shared
@@ -80,12 +71,26 @@ function specLabel(c,fallback){try{const a=window.LostArkSpecAuthority;if(a?.spe
    why it showed a smaller card and "unknown" where General shows Back Attack.
    The .slot class rides along only because the drag handlers and layout key
    off it. */
-function slotHtml(c,gs,p){const g=window.LostArkGeneralModel;if(g?.member)return g.member(c,gs,p,'slot');const i=info(c),roleClass=i.role==='Support'?'support':'dps';return `<div class="slot party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><a class="party-character-link" href="${esc(i.url||'')}" target="_blank" rel="noopener noreferrer">${esc(i.name)}</a><span class="party-class-label">${esc(specLabel(c,i.cls))}</span><span class="party-role-label ${roleClass}">${esc(i.role)}</span><span class="party-stat-label">CP ${Math.round(i.cp).toLocaleString()}</span>${generalHover(c,gs,p)||'<div class="character-hover-breakdown"><strong>'+esc(i.name)+'</strong><div>CP '+Math.round(i.cp).toLocaleString()+'</div></div>'}</div>`}
-function renderParty(title,p,score,opts){const solo=!!(opts&&opts.solo),key=(opts&&opts.key)||'party1';const fit=(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1);const gs=generalScore(p);return `<article class="party encounter-optimized-party${solo?' solo-encounter-party':''}"><h3>${esc(title)}</h3><div class="score">Encounter score ${Math.round(score).toLocaleString()} · Fit ${fit}%</div><div class="slots" data-enc-party="${key}">${p.map(c=>slotHtml(c,gs,p)).join('')}</div></article>`}
-function render(best){const root=document.getElementById('suggestedParties');if(!root)return;const model=window.LostArkEncounterScoring.profile();const params=parameterText(model);/* Single-party content renders Party 1 only: there is no second party to show,
+/* Encounter Favorability sits on the card, top right, rather than in the hover.
+   100% is neutral in the model, but on real encounters nearly every character
+   sits below it, so colouring against 100 would paint every card red and say
+   nothing. Colour against this lineup's own average instead: green means the
+   fight suits them more than the rest of the group, red less, grey within a
+   third of a point either way. The figure itself is unchanged and absolute. */
+function favourability(c){try{const r=window.LostArkEncounterScoring?.characterScore?.(c);return Number.isFinite(r?.score)?r.score*100:null}catch{return null}}
+function favBadge(c,mean){const v=favourability(c);if(v===null)return'';
+ const d=Number.isFinite(mean)?v-mean:0,cls=d>=.3?'fav-good':d<=-.3?'fav-bad':'fav-even';
+ const note=Number.isFinite(mean)?`Encounter Favorability ${v.toFixed(1)}% — this lineup averages ${mean.toFixed(1)}%. 100% is neutral; see Definitions.`:`Encounter Favorability ${v.toFixed(1)}%`;
+ return `<span class="encounter-fav ${cls}" title="${esc(note)}">${v.toFixed(1)}%</span>`}
+function slotHtml(c,gs,p,mean){const g=window.LostArkGeneralModel;if(g?.member)return g.member(c,gs,p,'slot').replace(/^(<div[^>]*>)/,`$1${favBadge(c,mean)}`);const i=info(c),roleClass=i.role==='Support'?'support':'dps';return `<div class="slot party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><a class="party-character-link" href="${esc(i.url||'')}" target="_blank" rel="noopener noreferrer">${esc(i.name)}</a><span class="party-class-label">${esc(specLabel(c,i.cls))}</span><span class="party-role-label ${roleClass}">${esc(i.role)}</span><span class="party-stat-label">CP ${Math.round(i.cp).toLocaleString()}</span>${generalHover(c,gs,p)||'<div class="character-hover-breakdown"><strong>'+esc(i.name)+'</strong><div>CP '+Math.round(i.cp).toLocaleString()+'</div></div>'}</div>`}
+function renderParty(title,p,score,opts){const solo=!!(opts&&opts.solo),key=(opts&&opts.key)||'party1';const fit=(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1);const gs=generalScore(p);return `<article class="party encounter-optimized-party${solo?' solo-encounter-party':''}"><h3>${esc(title)}</h3><div class="score">Encounter score ${Math.round(score).toLocaleString()} · Fit ${fit}%</div><div class="slots" data-enc-party="${key}">${p.map(c=>slotHtml(c,gs,p,opts&&opts.mean)).join('')}</div></article>`}
+function render(best){const root=document.getElementById('suggestedParties');if(!root)return;const model=window.LostArkEncounterScoring.profile();const params=parameterText(model);
+/* The colour baseline for the favorability badges: everyone actually seated. */
+const seated=[...(best.a||[]),...(best.b||[])].map(favourability).filter(v=>v!==null);
+const mean=seated.length?seated.reduce((s,v)=>s+v,0)/seated.length:null;/* Single-party content renders Party 1 only: there is no second party to show,
    and no party-to-party swap to analyse. */
 const solo=!best.b||!best.b.length;
-root.innerHTML=`<div class="authoritative-summary"><strong>${solo?'Estimated potential':'Combined estimated potential'}: ${Math.round(best.score).toLocaleString()}</strong><span> — ${esc(model.name)} · ${esc(model.confidence)} · ${solo?'4-player content, one party. ':''}<span class="encounter-parameters">${esc(params)}</span> · actual CP unchanged.</span></div>${renderParty('Party 1',best.a,best.s1,{solo,key:'party1'})}${solo?'':renderParty('Party 2',best.b,best.s2,{key:'party2'})}<div class="encounter-optimization-note">${esc(model.name)} · ${esc(model.confidence)} · DPS uptime and support encounter fit are scored separately. Actual CP is unchanged.</div>`}
+root.innerHTML=`<div class="authoritative-summary"><strong>${solo?'Estimated potential':'Combined estimated potential'}: ${Math.round(best.score).toLocaleString()}</strong><span> — ${esc(model.name)} · ${esc(model.confidence)} · ${solo?'4-player content, one party. ':''}<span class="encounter-parameters">${esc(params)}</span> · actual CP unchanged.</span></div>${renderParty('Party 1',best.a,best.s1,{solo,key:'party1',mean})}${solo?'':renderParty('Party 2',best.b,best.s2,{key:'party2',mean})}<div class="encounter-optimization-note">${esc(model.name)} · ${esc(model.confidence)} · DPS uptime and support encounter fit are scored separately. Actual CP is unchanged.</div>`}
 /* Same eligible pool the General optimizer uses: Main Group plus any New
    Addition that is not hidden, so an outside character can displace a current
    member here too. Requiring exactly 8 stored characters previously disabled
