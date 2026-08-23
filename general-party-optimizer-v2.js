@@ -195,6 +195,8 @@ h.addEventListener('dragstart',e=>{if(!active())return;const m=e.target.closest(
    consults the selected encounter, so these numbers are encounter-aware. */
 /* member() and pos() are exported so Raid Specific can render the exact same
    character card rather than maintaining a second, drifting copy of it. */
-window.LostArkGeneralModel={score,hoverHtml,info,role,resolve,member,pos};
+/* partySynergyLabels is exported for the same reason as member(): Raid Specific
+   shows the same Synergies line rather than deriving its own. */
+window.LostArkGeneralModel={score,hoverHtml,info,role,resolve,member,pos,partySynergyLabels};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();

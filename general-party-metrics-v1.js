@@ -49,7 +49,12 @@ function render(){
  z.forEach((zone,i)=>{
    const parent=host(zone);
    let box=parent.querySelector('.general-metrics-block');
-   if(!box){box=document.createElement('div');box.className='general-metrics-block';const a=parent.querySelector('.party-synergies');if(a)a.insertAdjacentElement('afterend',box);else if(parent!==zone)zone.insertAdjacentElement('afterend',box);else parent.appendChild(box)}
+   /* Raid: straight after the slot grid, which puts the block above the Synergies
+      line exactly as it sits in General (where the zone is the dropzone and the
+      Synergies line is its sibling). */
+   if(!box){box=document.createElement('div');box.className='general-metrics-block';
+    if(parent!==zone)zone.insertAdjacentElement('afterend',box);
+    else{const a=parent.querySelector('.party-synergies');if(a)a.insertAdjacentElement('afterend',box);else parent.appendChild(box)}}
    const c={base:m[i].base,sy:m[i].sy,su:m[i].su},o=changed?before?.[i]:null;
    /* Compare against the exact html last written, not against tag-stripped text:
       stripping inserts spaces the rendered textContent does not have, so with a
