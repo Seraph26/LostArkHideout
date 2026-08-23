@@ -53,24 +53,39 @@ function partitions(chars){const sup=strongest(chars.filter(c=>info(c).role==='S
  }
  return out.sort((x,y)=>y.score-x.score)}
 function saveAssignments(a,b){localStorage.setItem(PARTY,JSON.stringify({party1:a.map(c=>c.id),party2:b.map(c=>c.id)}))}
-function swapAnalysis(p1,p2){const total=scoreParty(p1)+scoreParty(p2),rows=[];for(let i=0;i<p1.length;i++)for(let j=0;j<p2.length;j++){const a=p1.slice(),b=p2.slice();[a[i],b[j]]=[b[j],a[i]];const next=scoreParty(a)+scoreParty(b);if(next<0)continue;rows.push({a:p1[i],b:p2[j],next,pct:total?((next-total)/total)*100:0})}return rows.sort((a,b)=>b.pct-a.pct)}
-function impactHtml(p1,p2){const rows=swapAnalysis(p1,p2);if(!rows.length)return'';const best=rows[0],worst=rows[rows.length-1];
- /* Encounter party score is the DPS sum times the support's own fit, so when both
-    supports score the same the total cannot move at all and every swap reports
-    +0.00%. Showing "best available swap" then is worse than showing nothing. */
- if(Math.abs(best.pct)<0.01&&Math.abs(worst.pct)<0.01)return'';const fmt=(r,label)=>{const cls=r.pct>0.005?'positive':r.pct<-0.005?'negative':'neutral',arrow=r.pct>0.005?'↑':r.pct<-0.005?'↓':'→';return `<div class="swap-impact ${cls}"><strong>${label}: ${esc(info(r.a).name)} ↔ ${esc(info(r.b).name)}</strong><div class="swap-impact-number">${arrow} ${r.pct>=0?'+':''}${r.pct.toFixed(2)}%</div><span class="swap-reason">Combined encounter potential would be ${Math.round(r.next).toLocaleString()}.</span></div>`};return fmt(best,'Best available swap')+fmt(worst,'Worst available swap')}
 function parameterText(p){const parts=[];const pos=[['Hit Master',num(p.hitmaster)],['Front Attack',num(p.front)],['Back Attack',num(p.back)]].sort((a,b)=>b[1]-a[1]);if(pos[0][1]>0&&pos[0][1]!==pos[pos.length-1][1])parts.push(`${pos[0][0]} favored`);const range=num(p.ranged),melee=num(p.melee);if(range>melee)parts.push('Ranged favored');else if(melee>range)parts.push('Melee favored');if(num(p.burst)>1)parts.push('Burst windows favored');const mv=p.mechanics?.movement;if(mv&&mv!=='low')parts.push(`${String(mv).replace(/-/g,' ')} mobility pressure`);const fp=p.mechanics?.forcedPositioning;if(fp&&fp!=='low')parts.push(`${String(fp).replace(/-/g,' ')} forced positioning`);if(p.mechanics?.stagger==='high')parts.push('High stagger demand');if(p.mechanics?.destruction==='high')parts.push('High destruction demand');return parts.join(' · ')||'Standard encounter parameters'}
 /* Present the same figures the Main Group does. The General model's contribution
    already consults the selected encounter for support uptime, so reusing it here
    is encounter-aware -- and it means one hover format rather than two. */
 function generalScore(p){try{return window.LostArkGeneralModel?.score?.(p)||null}catch{return null}}
 function generalHover(c,s,p){try{return window.LostArkGeneralModel?.hoverHtml?.(c,s,p)||''}catch{return''}}
+/* Encounter Favorability: characterScore() is a multiplicative uptime/fit factor
+   clamped to 0.75-1.15, so 100% is neutral, not perfect -- which the Definitions
+   panel explains, so the row itself stays a bare figure. hover-summary-v6 owns
+   the final hover layout and calls this while building the encounter block, so
+   the row lands directly under "Support compatibility uses encounter data."
+   The card element is all that layer has, so a character id is accepted too. */
+window.LostArkHoverExtras=function(x){
+ if(!active())return'';
+ const c=typeof x==='string'?pool().find(p=>String(p.id)===x):x;
+ if(!c)return'';
+ let r;try{r=window.LostArkEncounterScoring?.characterScore?.(c)}catch{return''}
+ if(!r||!Number.isFinite(r.score))return'';
+ return `<div class="chb-encounter-favorability">Encounter Favorability ${(r.score*100).toFixed(1)}%</div>`};
 function specLabel(c,fallback){try{const a=window.LostArkSpecAuthority;if(a?.specFor){const s=a.specFor(c.profile||{},build(c));if(s)return s}}catch{}return fallback}
-function renderParty(title,p,score,opts){const solo=!!(opts&&opts.solo),key=(opts&&opts.key)||'party1';const model=window.LostArkEncounterScoring.profile();const fit=(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1);const gs=generalScore(p);return `<article class="party encounter-optimized-party${solo?' solo-encounter-party':''}"><h3>${esc(title)}</h3><div class="score">Encounter score ${Math.round(score).toLocaleString()} · Fit ${fit}%</div><div class="slots" data-enc-party="${key}">${p.map(c=>{const i=info(c),t=window.LostArkEncounterScoring.traits(c),r=window.LostArkEncounterScoring.characterScore(c),roleClass=i.role==='Support'?'support':'dps';return `<div class="slot party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><h4 class="party-character-title">${esc(i.name)}</h4><small>${esc(specLabel(c,i.cls))} · <span class="party-role-label ${roleClass}">${esc(i.role)}</span> · CP ${Math.round(i.cp).toLocaleString()} · ${esc(t.positionLabel)} · Encounter ${Math.round(r.score*100)}%</small>${generalHover(c,gs,p)||'<div class="character-hover-breakdown"><strong>'+esc(i.name)+'</strong><div>CP '+Math.round(i.cp).toLocaleString()+'</div></div>'}</div>`}).join('')}</div></article>`}
+/* The Raid Specific character card IS the General card: the General model renders
+   it, so name, spec, role, position and CP come out identical and the shared
+   repair layer (ui-fixes-clean repairBottom) decorates both the same way. Raid's
+   own markup used <h4>/<small> with the position baked into the text, which is
+   why it showed a smaller card and "unknown" where General shows Back Attack.
+   The .slot class rides along only because the drag handlers and layout key
+   off it. */
+function slotHtml(c,gs,p){const g=window.LostArkGeneralModel;if(g?.member)return g.member(c,gs,p,'slot');const i=info(c),roleClass=i.role==='Support'?'support':'dps';return `<div class="slot party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><a class="party-character-link" href="${esc(i.url||'')}" target="_blank" rel="noopener noreferrer">${esc(i.name)}</a><span class="party-class-label">${esc(specLabel(c,i.cls))}</span><span class="party-role-label ${roleClass}">${esc(i.role)}</span><span class="party-stat-label">CP ${Math.round(i.cp).toLocaleString()}</span>${generalHover(c,gs,p)||'<div class="character-hover-breakdown"><strong>'+esc(i.name)+'</strong><div>CP '+Math.round(i.cp).toLocaleString()+'</div></div>'}</div>`}
+function renderParty(title,p,score,opts){const solo=!!(opts&&opts.solo),key=(opts&&opts.key)||'party1';const fit=(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1);const gs=generalScore(p);return `<article class="party encounter-optimized-party${solo?' solo-encounter-party':''}"><h3>${esc(title)}</h3><div class="score">Encounter score ${Math.round(score).toLocaleString()} · Fit ${fit}%</div><div class="slots" data-enc-party="${key}">${p.map(c=>slotHtml(c,gs,p)).join('')}</div></article>`}
 function render(best){const root=document.getElementById('suggestedParties');if(!root)return;const model=window.LostArkEncounterScoring.profile();const params=parameterText(model);/* Single-party content renders Party 1 only: there is no second party to show,
    and no party-to-party swap to analyse. */
 const solo=!best.b||!best.b.length;
-root.innerHTML=`<div class="authoritative-summary"><strong>${solo?'Estimated potential':'Combined estimated potential'}: ${Math.round(best.score).toLocaleString()}</strong><span> — ${esc(model.name)} · ${esc(model.confidence)} · ${solo?'4-player content, one party. ':''}<span class="encounter-parameters">${esc(params)}</span> · actual CP unchanged.</span></div>${renderParty('Party 1',best.a,best.s1,{solo,key:'party1'})}${solo?'':renderParty('Party 2',best.b,best.s2,{key:'party2'})}${solo?'':impactHtml(best.a,best.b)}<div class="encounter-optimization-note">${esc(model.name)} · ${esc(model.confidence)} · DPS uptime and support encounter fit are scored separately. Actual CP is unchanged.</div>`}
+root.innerHTML=`<div class="authoritative-summary"><strong>${solo?'Estimated potential':'Combined estimated potential'}: ${Math.round(best.score).toLocaleString()}</strong><span> — ${esc(model.name)} · ${esc(model.confidence)} · ${solo?'4-player content, one party. ':''}<span class="encounter-parameters">${esc(params)}</span> · actual CP unchanged.</span></div>${renderParty('Party 1',best.a,best.s1,{solo,key:'party1'})}${solo?'':renderParty('Party 2',best.b,best.s2,{key:'party2'})}<div class="encounter-optimization-note">${esc(model.name)} · ${esc(model.confidence)} · DPS uptime and support encounter fit are scored separately. Actual CP is unchanged.</div>`}
 /* Same eligible pool the General optimizer uses: Main Group plus any New
    Addition that is not hidden, so an outside character can displace a current
    member here too. Requiring exactly 8 stored characters previously disabled

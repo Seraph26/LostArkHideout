@@ -78,6 +78,21 @@ const SECTIONS=[
   `<p><strong>Estimated potential</strong> on a party is its three DPS contributions added together.</p>
    <p><strong>Combined estimated potential</strong> at the top is both parties added together. That single number is what the optimizer is trying to make as large as possible.</p>`],
 
+ ['Encounter Favorability (Raid Specific only)',
+  `<p>On the hover card in Raid Specific mode. <strong>How much the selected fight suits that character</strong> — nothing to do with how strong they are.</p>
+   <p><strong>100% is neutral, not perfect.</strong> Above 100% the fight plays to their kit; below it, the fight costs them uptime they would have had in a plain tank-and-spank. The scale is capped at <strong>75% to 115%</strong>, so it is a nudge, never a verdict.</p>
+   <p>It is built by multiplying together, for that fight:</p>
+   <ul>
+    <li><strong>Position</strong> — how reliably a Back Attack, Front Attack or Hit Master character can hold their spot. A character whose position could not be determined skips this entirely.</li>
+    <li><strong>Range</strong> — whether the fight rewards ranged or melee.</li>
+    <li><strong>Burst windows</strong> — whether the fight has them, and whether the build needs them.</li>
+    <li><strong>Mobility</strong> — the build's movement against how much the fight makes you move.</li>
+    <li><strong>Push resilience</strong> — against forced repositioning and stagger checks.</li>
+    <li><strong>Support fit</strong> — supports only: placement sensitivity, and their measured support uptime.</li>
+   </ul>
+   <p>The <strong>Fit %</strong> next to a party's encounter score is simply the average of its four characters' Encounter Favorability.</p>
+   <p>Compare it across characters in the same fight, never across fights. It says which raid suits a character, not which character is better.</p>`],
+
  ['What the optimizer is actually doing',
   `<p>It builds every legal arrangement, scores each one, and keeps the best. The rules it cannot break:</p>
    <ul>

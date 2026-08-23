@@ -20,7 +20,11 @@ function names(){try{const x=JSON.parse(localStorage.getItem('lostark-hideout-pr
 function swapNames(before,after){if(!before||!after)return'Manual party swap';const out=[];for(const party of ['party1','party2']){const a=new Set(before.state[party]||[]),b=new Set(after.state[party]||[]);for(const id of a)if(!b.has(id))out.push(id)}if(out.length!==2)return'Manual party swap';const n=names();return`${n.get(String(out[0]))||out[0]} swapped with ${n.get(String(out[1]))||out[1]}`}
 function arrow(delta,base,title){if(Math.abs(delta)<.005)return'';const up=delta>0,value=Math.abs(Math.round(delta)).toLocaleString(),pct=base?Math.abs(delta/base*100).toFixed(2):'0.00';return` <span class="general-top-swap-arrow ${up?'general-swap-up':'general-swap-down'}" data-swap-title="${esc(title)}" aria-label="${esc(title)}">${up?'▲':'▼'} ${value} (${up?'+':'-'}${pct}%)</span>`}
 function clear(){root()?.querySelectorAll('.general-top-swap-arrow').forEach(e=>e.remove())}
-function place(item,html){if(!item||!html)return;item.e.querySelector('.general-top-swap-arrow')?.remove();const strong=item.strong;if(strong)strong.insertAdjacentHTML('afterend',html);else item.e.insertAdjacentHTML('beforeend',html)}
+/* Removing and re-inserting an identical arrow still fires mutation records, and
+   this module's own observer reacts to them, so after any manual swap the party
+   totals were being rewritten continuously (~1,000 mutations/sec). Write only
+   when the arrow actually differs. */
+function place(item,html){if(!item||!html)return;const cur=item.e.querySelector('.general-top-swap-arrow');if(cur&&cur.outerHTML===html.trim())return;cur?.remove();const strong=item.strong;if(strong)strong.insertAdjacentHTML('afterend',html);else item.e.insertAdjacentHTML('beforeend',html)}
 function render(){if(!general()||optimizing||!swapBefore)return;const now=potentials();if(!now)return;const title=swapNames(swapBefore,{state:domState()});place(now.p[0],arrow(now.p[0].v-swapBefore.p[0],swapBefore.p[0],title));place(now.p[1],arrow(now.p[1].v-swapBefore.p[1],swapBefore.p[1],title));place(now.c,arrow(now.c.v-swapBefore.c,swapBefore.c,title))}
 function schedule(){[80,180,350,600,1000].forEach(ms=>setTimeout(()=>{if(!general()||optimizing||!swapBefore)return;if(sig()!==sig(swapBefore.state))render()},ms))}
 function arm(){if(!general())return;optimizing=false;swapBefore=null;const p=potentials();if(!p)return;/* The optimized values are the persistent baseline. */}

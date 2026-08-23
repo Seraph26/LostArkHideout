@@ -6,35 +6,51 @@ const BASE_TITLE='Base DPS Power is the combined CP of the DPS characters in thi
 const SYNERGY_TITLE='Estimated increase to this party’s modeled potential from offensive synergies supplied by the other DPS characters in the party. This is a model contribution, not a direct in-game damage percentage.';
 const SUPPORT_TITLE='Estimated increase to this party’s modeled potential from the party support. This is a model contribution, not a direct in-game damage percentage.';
 let swapBefore=null;
+const lastHtml=new WeakMap();
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=s=>{const n=Number(String(s??'').replace(/[^0-9.+-]/g,''));return Number.isFinite(n)?n:0};
 function general(){return !!document.getElementById('generalOptimization')?.checked&&!(document.getElementById('raidSpecificSelect')?.value||'')}
-function zones(){return [...document.querySelectorAll('#suggestedParties .authoritative-dropzone')].slice(0,2)}
+/* Raid Specific renders .encounter-optimized-party > .slots > .slot instead of
+   General's .authoritative-dropzone > .authoritative-member, but the raid slots
+   carry the same .authoritative-member class and the same canonical hover, so
+   one selector covers both modes and the metrics below are mode-agnostic. */
+function zones(){return [...document.querySelectorAll('#suggestedParties .authoritative-dropzone,#suggestedParties .encounter-optimized-party .slots')].slice(0,2)}
+function active(){return zones().length>0}
+/* The metrics block belongs beside the party, not inside the slot grid. */
+function host(z){return z.classList.contains('slots')?(z.parentElement||z):z}
 function members(z){return z?[...z.querySelectorAll('.authoritative-member[data-character-id]')]:[]}
 function domState(){const z=zones();return{party1:members(z[0]).map(x=>x.dataset.characterId),party2:members(z[1]).map(x=>x.dataset.characterId)}}
 function sig(s=domState()){return `1:${s.party1.join(',')}|2:${s.party2.join(',')}`}
 function metric(m){const t=clean(m.querySelector('.character-hover-breakdown')?.textContent||'');const cp=num((t.match(/CP\s*([\d,.]+)/i)||[])[1]);if(!cp)return null;return{cp,sy:num((t.match(/Party Synergy\s*\+?([\d.]+)%/i)||[])[1]),su:num((t.match(/Support Impact\s*\+?([\d.]+)%/i)||[])[1]),support:/Support Impact/i.test(t)&&/Support compatibility/i.test(t)&&!/Party Synergy\s+\+?[1-9]/i.test(t)}}
 function calc(z){const a=members(z).map(metric).filter(Boolean),d=a.filter(x=>!x.support);if(!d.length)return null;const base=d.reduce((n,x)=>n+x.cp,0),sy=d.reduce((n,x)=>n+x.cp*x.sy/100,0),su=d.reduce((n,x)=>n+x.cp*x.su/100,0);return{base,sy:base?sy/base*100:0,su:base?su/base*100:0}}
-function all(){const z=zones(),m=z.map(calc);return z.length===2&&m.every(Boolean)?m:null}
+/* One party is a legitimate layout (4-player content in either mode). */
+function all(){const z=zones(),m=z.map(calc);return z.length&&m.every(Boolean)?m:null}
 function rosterNames(){try{const x=JSON.parse(localStorage.getItem('lostark-hideout-private-v3')||localStorage.getItem('lostark-hideout-private-v2')||'null');return new Map((x?.characters||[]).map(c=>[String(c.id),clean(c.profile?.name||c.name||c.id)]))}catch{return new Map()}}
 function swapNames(before,after){if(!before||!after)return'Manual party swap';const out=[];for(const p of ['party1','party2']){const a=new Set(before.state[p]),b=new Set(after.state[p]);for(const id of a)if(!b.has(id))out.push(id)}if(out.length!==2)return'Manual party swap';const n=rosterNames();return`${n.get(String(out[0]))||out[0]} swapped with ${n.get(String(out[1]))||out[1]}`}
 function snapshot(){const m=all();return{state:domState(),metrics:m?m.map(x=>({base:x.base,sy:x.sy,su:x.su})):[]}}
 function change(current,before,key,title){if(!before)return'';const d=current[key]-before[key];if(Math.abs(d)<.005)return'';const up=d>0,label=key==='base'?Math.abs(Math.round(d)).toLocaleString():Math.abs(d).toFixed(2)+' pts';return` <span class="general-swap-arrow ${up?'general-swap-up':'general-swap-down'}" data-swap-title="${esc(title)}" aria-label="${esc(title)}">${up?'▲':'▼'} ${label}</span>`}
-function removeLegacy(){if(!general())return;document.querySelectorAll('#suggestedParties .swap-impact,#suggestedParties .manual-party-change,#suggestedParties .party-manual-summary').forEach(e=>e.remove());document.querySelectorAll('#suggestedParties *').forEach(e=>{if(e.classList.contains('general-metrics-block'))return;const t=clean(e.textContent);if(/^Manual party change\s+Best available swap:/i.test(t)&&e.children.length<8)e.remove()})}
+/* The best/worst available swap panels are gone from both optimizers. This sweep
+   stays as a net for anything a stale cached script still paints, and now runs
+   in Raid Specific too, where those panels also used to appear. */
+function removeLegacy(){if(!active())return;document.querySelectorAll('#suggestedParties .swap-impact,#suggestedParties .manual-party-change,#suggestedParties .party-manual-summary').forEach(e=>e.remove());document.querySelectorAll('#suggestedParties *').forEach(e=>{if(e.classList.contains('general-metrics-block'))return;const t=clean(e.textContent);if(/^Manual party change\s+Best available swap:/i.test(t)&&e.children.length<8)e.remove()})}
 function render(){
- if(!general())return;
+ if(!active())return;
  removeLegacy();
  const z=zones(),m=all();
  if(!m)return;
  const before=swapBefore?.metrics||null,changed=!!swapBefore&&sig()!==sig(swapBefore.state),title=changed?swapNames(swapBefore,{state:domState()}):'';
  z.forEach((zone,i)=>{
-   let box=zone.querySelector('.general-metrics-block');
-   if(!box){box=document.createElement('div');box.className='general-metrics-block';const a=zone.querySelector('.party-synergies');if(a)a.insertAdjacentElement('afterend',box);else zone.appendChild(box)}
+   const parent=host(zone);
+   let box=parent.querySelector('.general-metrics-block');
+   if(!box){box=document.createElement('div');box.className='general-metrics-block';const a=parent.querySelector('.party-synergies');if(a)a.insertAdjacentElement('afterend',box);else if(parent!==zone)zone.insertAdjacentElement('afterend',box);else parent.appendChild(box)}
    const c={base:m[i].base,sy:m[i].sy,su:m[i].su},o=changed?before?.[i]:null;
-   const existing=box.querySelectorAll('.general-metric');
+   /* Compare against the exact html last written, not against tag-stripped text:
+      stripping inserts spaces the rendered textContent does not have, so with a
+      swap arrow present the two never matched and every pass rewrote the block.
+      Idle churn is what made the page crawl, so this has to be an exact test. */
    const html=`<div class="general-metric"><span class="general-metric-label" data-metric-title="${esc(BASE_TITLE)}" aria-label="${esc(BASE_TITLE)}">Base DPS Power</span> <strong>${Math.round(c.base).toLocaleString()}</strong>${changed?change(c,o,'base',title):''}</div><div class="general-metric"><span class="general-metric-label" data-metric-title="${esc(SYNERGY_TITLE)}" aria-label="${esc(SYNERGY_TITLE)}">Party Synergy</span> <strong>+${c.sy.toFixed(2)}%</strong>${changed?change(c,o,'sy',title):''}</div><div class="general-metric"><span class="general-metric-label" data-metric-title="${esc(SUPPORT_TITLE)}" aria-label="${esc(SUPPORT_TITLE)}">Support Impact</span> <strong>+${c.su.toFixed(2)}%</strong>${changed?change(c,o,'su',title):''}</div>`;
-   if(existing.length!==3||clean(box.textContent)!==clean(html.replace(/<[^>]+>/g,' ')))box.innerHTML=html;
+   if(box.children.length!==3||lastHtml.get(box)!==html){box.innerHTML=html;lastHtml.set(box,html)}
  });
 }
 function css(){
@@ -45,9 +61,9 @@ function css(){
  document.head.appendChild(s);
 }
 function arm(){swapBefore=null;try{localStorage.setItem(STORE,JSON.stringify({metrics:all(),state:domState(),sig:sig()}))}catch{}render()}
-function onOptimize(){if(!general())return;swapBefore=null;setTimeout(render,50);setTimeout(render,150);setTimeout(render,300);setTimeout(render,600);setTimeout(arm,1200)}
-function captureBefore(){if(!general()||swapBefore)return;const s=snapshot();if(s.metrics.length===2)swapBefore=s}
-function captureAfter(){if(!general()||!swapBefore)return;const beforeSig=sig(swapBefore.state);setTimeout(()=>{if(!general()||!swapBefore)return;if(sig()!==beforeSig)render()},100)}
+function onOptimize(){swapBefore=null;setTimeout(render,50);setTimeout(render,150);setTimeout(render,300);setTimeout(render,600);setTimeout(arm,1200)}
+function captureBefore(){if(!active()||swapBefore)return;const s=snapshot();if(s.metrics.length)swapBefore=s}
+function captureAfter(){if(!active()||!swapBefore)return;const beforeSig=sig(swapBefore.state);setTimeout(()=>{if(!active()||!swapBefore)return;if(sig()!==beforeSig)render()},100)}
 function start(){
  css();
  const root=document.getElementById('suggestedParties')||document.body;
@@ -65,7 +81,7 @@ function start(){
     membership or potentials, but rewriting them used to retrigger a recompute. */
  const ownOutput=r=>{const el=r.target&&(r.target.nodeType===1?r.target:r.target.parentElement);return !!el?.closest?.('.general-metrics-block,.character-hover-breakdown')};
  const observer=new MutationObserver(recs=>{
-  if(rendering||!general())return;
+  if(rendering||!active())return;
   if(recs.every(ownOutput))return;
   removeLegacy();
   clearTimeout(pending);
@@ -73,6 +89,11 @@ function start(){
  });
  observer.observe(root,{childList:true,subtree:true,characterData:true});
  [50,150,300,600,1000,2000].forEach(ms=>setTimeout(render,ms));
+ /* Self-heal: if any other layer repaints #suggestedParties at a moment the
+    observer has suppressed (or its debounce is mid-flight), the block would stay
+    missing until the next interaction. render() writes only when a value
+    actually differs, so a settled page still measures 0 idle mutations. */
+ setInterval(()=>{if(!rendering)render()},1000);
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
