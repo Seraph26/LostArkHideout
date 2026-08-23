@@ -36,20 +36,27 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
   `https://seraph26.github.io` and `http://localhost:8777`; anything else gets 403 and the app
   reports a failed refresh. `127.0.0.1:8777` is a *different origin* and is refused — test on
   `localhost`. If the site URL ever changes (repo/account rename, custom domain, Cloudflare
-  Pages), add it to `ALLOWED_ORIGINS` in `worker/src/index-support-v2.js` **and redeploy the
-  worker**, or profile fetching silently stops. `/health` stays open.
-- **The worker does not deploy with the site.** `git push` deploys Pages only. The worker is
-  deployed by hand: Cloudflare dashboard → Workers & Pages → `lostark-bible-connector` → Edit
-  code → paste `worker/src/index-support-v2.js` → Save and deploy. There is no `node`/`wrangler`
-  on this machine.
+  Pages), add it to `ALLOWED_ORIGINS` in `worker/src/index-support-v2.js` and push, or profile
+  fetching silently stops. `/health` stays open.
+- **`git push` deploys the worker too — no manual paste needed.** Cloudflare Workers Builds is
+  connected to the repo and deploys `worker/src/index-support-v2.js` (per the root
+  `wrangler.toml`) on every push to `main`. **Measured: live ~80 seconds after the push**, with a
+  matching "Workers Builds: lostark-bible-connector" check-run on the commit in GitHub. An
+  earlier version of this file claimed deploys were manual — that was an assumption from there
+  being no `node`/`wrangler` locally, and it was wrong; the build runs on Cloudflare's side.
+  Check what is actually live with `curl -s <worker>/health`, which reports `WORKER_VERSION` —
+  bump that constant whenever the file changes. Note the consequence: a bad worker commit is in
+  production in about a minute, with no review step.
+- Bindings (`VISITS`, `SHARES`) live on the Worker, not in the deployed code, and **survive an
+  auto-deploy** — verified after one. They are configured in the Worker's **Bindings** tab (a
+  sibling of Settings, not inside it). `worker/wrangler.jsonc` points at a different entry file
+  (`src/index.js`) than the root `wrangler.toml` — the root file is the one that governs.
 - **Short share links.** A full roster's `#s=` link runs past 2,000 characters, which Discord's
   message limit rejects, so the worker also offers `POST /share` (store the encoded snapshot in
   KV, 30-day TTL, binding `SHARES`, id `3d2236be086d46fbb4e2cdb70c7d8ae8`) and `GET /share/:id`.
   `copyShare()` in `share-and-reset-v1.js` tries this first and silently falls back to the long
-  `#s=` link on any failure, so nothing breaks if the worker is out of date. **The KV binding is
-  not in the pasted worker code** — after pasting a new worker version, also confirm in
-  the Worker's **Bindings** tab (a sibling of Settings, not inside it) that `SHARES` is still bound to that namespace, or `/share`
-  fails with a 500 even though the code is correct. This is the one deliberate exception to
+  `#s=` link on any failure, so nothing breaks if the worker is out of date. `SHARES` must stay bound in the
+  Worker's **Bindings** tab or `/share` fails with a 500 even though the code is correct. This is the one deliberate exception to
   "nothing ever reaches a server": an `#id=` link's snapshot sits in Cloudflare KV for 30 days,
   never logged, never tied to an account. Old `#s=` links are unaffected.
 - **The visit counter counts browser sessions, not page loads and not people.** `visits.js` gates
