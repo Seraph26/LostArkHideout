@@ -2,19 +2,42 @@ const BIBLE_HOST = "lostark.bible";
 const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
 const VISIT_KEY = "page_visits";
 
-function corsHeaders() {
+/* The connector used to answer any caller with Access-Control-Allow-Origin: *,
+   which made it a free public proxy for Bible: anyone could point their own site
+   or a script at it, spending this account's request quota and risking Bible
+   rate-limiting or blocking the worker for everyone using the dashboard.
+   Requests are now answered only for the origins that are actually the app.
+   Add a line here when the dashboard moves or gains a domain -- for example a
+   *.pages.dev or a custom domain. Note the limits: Origin is set by the browser
+   and cannot be spoofed by a page, so this does stop another website from using
+   the connector, but a direct client can send whatever Origin it likes. Rate
+   limiting is the answer to that, and it needs a custom domain (see README). */
+const ALLOWED_ORIGINS = new Set([
+  "https://seraph26.github.io",
+  "http://localhost:8777",
+]);
+
+function allowedOrigin(request) {
+  const origin = request.headers.get("Origin");
+  return origin && ALLOWED_ORIGINS.has(origin) ? origin : null;
+}
+
+function corsHeaders(origin) {
   return {
-    "Access-Control-Allow-Origin": "*",
+    /* Never "*" again: echo the one origin that asked, and Vary so a cached
+       response for one origin is not handed to another. */
+    "Access-Control-Allow-Origin": origin || "https://seraph26.github.io",
+    "Vary": "Origin",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Accept",
     "Cache-Control": "no-store",
   };
 }
 
-function json(data, status = 200) {
+function json(data, status = 200, origin = null) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders(), "Content-Type": "application/json; charset=utf-8" },
+    headers: { ...corsHeaders(origin), "Content-Type": "application/json; charset=utf-8" },
   });
 }
 
@@ -30,26 +53,32 @@ function validBibleUrl(value) {
 
 export default {
   async fetch(request, env) {
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders() });
-    if (request.method !== "GET") return json({ ok: false, error: "Only GET requests are supported." }, 405);
+    const origin = allowedOrigin(request);
+    if (request.method === "OPTIONS") return new Response(null, { status: origin ? 204 : 403, headers: corsHeaders(origin) });
+    if (request.method !== "GET") return json({ ok: false, error: "Only GET requests are supported." }, 405, origin);
     const u = new URL(request.url);
 
+    /* Left open: it touches nothing, and it lets an uptime check or a blocked
+       caller tell the difference between "refused" and "down". */
     if (u.pathname === "/health") return json({ ok: true, service: "lostark-bible-connector" });
+
+    /* Everything past here either spends a Bible request or writes to KV. */
+    if (!origin) return json({ ok: false, error: "This connector only serves the Lost Ark Hideout dashboard." }, 403);
 
     if (u.pathname === "/visits") {
       try {
         const visits = Number.parseInt(await env.VISITS.get(VISIT_KEY) || "0", 10) + 1;
         await env.VISITS.put(VISIT_KEY, String(visits));
-        return json({ ok: true, visits });
+        return json({ ok: true, visits }, 200, origin);
       } catch {
-        return json({ ok: false, error: "Unable to update visit counter." }, 500);
+        return json({ ok: false, error: "Unable to update visit counter." }, 500, origin);
       }
     }
 
     if (u.pathname === "/raid-stats") {
       const payload = u.searchParams.get("payload");
-      if (!payload) return json({ ok: false, error: "Missing raidStatsSearch payload." }, 400);
-      if (payload.length > 20000) return json({ ok: false, error: "Raid stats payload is too large." }, 400);
+      if (!payload) return json({ ok: false, error: "Missing raidStatsSearch payload." }, 400, origin);
+      if (payload.length > 20000) return json({ ok: false, error: "Raid stats payload is too large." }, 400, origin);
       try {
         const response = await fetch(`${BIBLE_REMOTE}?payload=${encodeURIComponent(payload)}`, {
           headers: {
@@ -61,17 +90,17 @@ export default {
         const body = await response.text();
         return new Response(body, {
           status: response.status,
-          headers: { ...corsHeaders(), "Content-Type": response.headers.get("content-type") || "application/json; charset=utf-8" },
+          headers: { ...corsHeaders(origin), "Content-Type": response.headers.get("content-type") || "application/json; charset=utf-8" },
         });
       } catch {
-        return json({ ok: false, error: "Unable to retrieve Bible raid statistics." }, 502);
+        return json({ ok: false, error: "Unable to retrieve Bible raid statistics." }, 502, origin);
       }
     }
 
-    if (u.pathname !== "/character") return json({ ok: false, error: "Use /character?url=https://lostark.bible/character/REGION/NAME or /raid-stats?payload=..." }, 404);
+    if (u.pathname !== "/character") return json({ ok: false, error: "Use /character?url=https://lostark.bible/character/REGION/NAME or /raid-stats?payload=..." }, 404, origin);
     const bibleUrl = u.searchParams.get("url");
-    if (!bibleUrl) return json({ ok: false, error: "Missing character URL." }, 400);
-    if (!validBibleUrl(bibleUrl)) return json({ ok: false, error: "Invalid Bible character URL." }, 400);
+    if (!bibleUrl) return json({ ok: false, error: "Missing character URL." }, 400, origin);
+    if (!validBibleUrl(bibleUrl)) return json({ ok: false, error: "Invalid Bible character URL." }, 400, origin);
     const parts = new URL(bibleUrl).pathname.split("/").filter(Boolean);
     const character = decodeURIComponent(parts.slice(2).join("/"));
     const region = decodeURIComponent(parts[1]);
@@ -83,14 +112,14 @@ export default {
         },
         cf: { cacheTtl: 0, cacheEverything: false },
       });
-      if (!response.ok) return json({ ok: false, error: `Bible returned HTTP ${response.status}.`, character, region }, 502);
+      if (!response.ok) return json({ ok: false, error: `Bible returned HTTP ${response.status}.`, character, region }, 502, origin);
       const html = await response.text();
       return new Response(JSON.stringify({ ok: true, character, region, source: bibleUrl, html }), {
         status: 200,
-        headers: { ...corsHeaders(), "Content-Type": "application/json; charset=utf-8" },
+        headers: { ...corsHeaders(origin), "Content-Type": "application/json; charset=utf-8" },
       });
     } catch {
-      return json({ ok: false, error: "Unable to retrieve the Bible character page.", character, region }, 502);
+      return json({ ok: false, error: "Unable to retrieve the Bible character page.", character, region }, 502, origin);
     }
   },
 };
