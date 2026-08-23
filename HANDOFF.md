@@ -48,10 +48,16 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
   `copyShare()` in `share-and-reset-v1.js` tries this first and silently falls back to the long
   `#s=` link on any failure, so nothing breaks if the worker is out of date. **The KV binding is
   not in the pasted worker code** — after pasting a new worker version, also confirm in
-  Settings → Variables and Bindings that `SHARES` is still bound to that namespace, or `/share`
+  the Worker's **Bindings** tab (a sibling of Settings, not inside it) that `SHARES` is still bound to that namespace, or `/share`
   fails with a 500 even though the code is correct. This is the one deliberate exception to
   "nothing ever reaches a server": an `#id=` link's snapshot sits in Cloudflare KV for 30 days,
   never logged, never tied to an account. Old `#s=` links are unaffected.
+- **The visit counter counts browser sessions, not page loads and not people.** `visits.js` gates
+  the counting call behind `sessionStorage`, so a refresh does not increment; later loads in the
+  same session call `/visits?peek=1`, which reads without writing. Two tabs open at once count
+  twice, and a private window always counts as new. The tally restarted under the KV key
+  `unique_visits_v1` when the rule changed; the old page-load figure (763, nearly all testing) is
+  still under `page_visits`.
 - **CP** = the right-hand Combat Power panel, priority *Estimated Raid Loadout → Current Loadout (Raid)*, never Chaos Dungeon. In the payload that is `combatPower:{id:N,score:X}`. The header `≈` figure is `maxCombatPower`/`estimatedMaxCombatPower` = **best ever**, and the **roster tab shows that max too** — do not source CP from it (Mattnx: panel 5434.14 vs roster/header 5755.2).
 - **Class** comes from the class chip Bible renders in the header (a short `<p>`). The `classId` map is hand-maintained and has drifted twice: `holyknight_female` = Valkyrie (not Paladin), `alchemist` = Wildsoul (not Alchemist), `dragon_knight` = Guardianknight.
 - **Specialization** = an Ark Passive **Enlightenment** node name. Its tier position varies by class (Seraphh T1, Diamarté T2, Hetawl T5), so store all node names and match them against the spec rules. `parseProfile` stores `enlightenment` for this.
@@ -66,7 +72,9 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
   Capture-phase listeners on the button run before bubble ones — General's shield used to `stopImmediatePropagation()` unconditionally and swallowed everything.
 - **Eligible pool** = Main Group + un-hidden New Additions, via `window.LostArkCandidateRoster.getEligible()`. Both optimizers use it. Hidden = excluded.
 - **Shared model** (added so raid stops maintaining a second one):
-  - `window.LostArkGeneralModel = {score, hoverHtml, info, role, resolve}` from `general-party-optimizer-v2.js`
+  - `window.LostArkGeneralModel = {score, hoverHtml, info, role, resolve, member, pos, partySynergyLabels}` from `general-party-optimizer-v2.js`.
+    `member(c,s,p,extraClass)` renders the character card — **Raid Specific renders through it**, so the two
+    modes cannot drift apart. Do not reintroduce a raid-side card template.
   - `window.LostArkSpecAuthority = {specFor, className}` from `ui-fixes-clean.js`
   Raid uses both for its card labels and hovers. The General model's support uptime already consults the selected encounter, so its numbers are encounter-aware.
 - **Party size**: `raid-encounters.json` carries `players` (4 or 8). Horizon Cathedral and Serca are 4-player. General has its own `#generalFormatSelect` (8-player / 4-player), hidden while Raid Specific is selected, persisted in `lostark-hideout-general-format-v1`.
@@ -120,11 +128,18 @@ Supports score 0 contribution individually by design — their value is inside t
 3. **Best/Worst available swap panels removed from both optimizers** by user
    decision, along with the raid manual-swap panel before them. Do not add
    "what if you swapped X" panels back.
-4. **Encounter Favorability** is the old per-card "Encounter N%", renamed, on the
-   hover under the compatibility line. It is injected by `hover-summary-v6`'s
-   encounter block via the `window.LostArkHoverExtras` hook that
-   `encounter-optimizer-v1.js` registers — not by the card markup, because
-   hover-summary rebuilds the card afterwards.
+4. **Encounter Favorability** is the old per-card "Encounter N%", renamed. It
+   lived briefly on the hover (via a `window.LostArkHoverExtras` hook, since
+   removed) and now sits **on the card, top right**, rendered by `favBadge()` in
+   `encounter-optimizer-v1.js` and injected into the General card markup. It
+   carries **no `title`** — a native tooltip stacked a second popup on top of the
+   card's own hover. **Its colour is relative to the lineup average, not to
+   100%**: nearly every character sits below 100 on a real encounter, so an
+   absolute rule painted every card red. Green = suits them more than the rest of
+   the eight, red = less, grey = within a third of a point. The party header
+   figure was renamed from "Fit" to **Average Party Encounter Favorability** and
+   is wrapped in `<strong class="party-fit">` so the swap-arrow layer can anchor
+   to it; its arrow reads in **points**, since the figure is already a percentage.
 5. **Support encounter fit was flattened by the clamp.** Every support hit the
    old `.75` floor on extreme content and displayed an identical 75%. The floor
    is now `.60`, and `supportFactor` scales placement (flexible vs
@@ -152,3 +167,29 @@ Supports score 0 contribution individually by design — their value is inside t
     `players`, plus an encounter scoring profile.
 11. If more than 8 New Additions are stored, the counter reads e.g. "10/8" until
     some are removed; the cap only blocks adding.
+12. **Specialization has one authority: `LostArkSpecAuthority.specFor`, which keys
+    its rules by class.** `candidate-roster-v1.js` and `class-render-fix-v2.js`
+    each also carry a flat first-match rule list scanned against the whole
+    profile blob, where a common word beats the right answer — `\bcontrol\b` (a
+    Glaivier spec) labelled a Gunlancer "Control" on its New Addition card while
+    the party card correctly read "Lone Knight". Both now consult the authority
+    **before** the stored `p.spec`, so `normalizeNew()` heals values the old scan
+    had already written to storage. Do not add another rule list.
+13. **Watch for double-clamping between the scorer and the optimizer.**
+    `encounter-scoring-v2.characterScore()` clamps to `.60–1.15`;
+    `encounter-optimizer-v1.charValue()` used to re-clamp at `.75`, which silently
+    undid the support-fit change — the display separated two supports while party
+    selection still could not. Fixed, but the shape of the bug is worth
+    remembering: a second clamp downstream makes a scoring change look applied
+    when it is not.
+14. **The repair path is hot.** `ui-fixes-clean.repair()` runs on every mutation
+    of `document.body`, and `stateProfiles()` used to rebuild its map each time
+    with `getBuild()` re-parsing the entire build cache **per character** — with a
+    big roster that turned a swap into tens of seconds. It now reads each store
+    once and rebuilds only when the underlying localStorage actually changed.
+    Never put per-character `JSON.parse`/`JSON.stringify` on that path, and do not
+    call `CandidateRoster.getAll()` from it (it normalises and can write).
+15. **Worker has a GitHub repo connected** (visible under Settings → Build). Build
+    and deploy commands looked empty, so it appears inert and every worker change
+    so far has been a manual paste — but this was never confirmed. Worth checking
+    before assuming a future worker edit needs the manual step.
