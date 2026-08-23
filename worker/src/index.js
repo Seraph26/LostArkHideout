@@ -57,7 +57,7 @@ export default {
         const response = await fetch(`${BIBLE_REMOTE}?payload=${encodeURIComponent(payload)}`, {
           headers: {
             Accept: "application/json,text/plain,*/*",
-            "User-Agent": "Mozilla/5.0 (compatible; LostArkHideout/1.0; +https://github.com/Seraph26/LostArkHideout)",
+            "User-Agent": "Mozilla/5.0 (compatible; LostArkParty/1.0; +https://github.com/Seraph26/LostArkParty)",
           },
           cf: { cacheTtl: 300, cacheEverything: false },
         });
@@ -87,7 +87,7 @@ export default {
       const response = await fetch(bibleUrl, {
         headers: {
           Accept: "text/html,application/xhtml+xml",
-          "User-Agent": "Mozilla/5.0 (compatible; LostArkHideout/1.0; +https://github.com/Seraph26/LostArkHideout)",
+          "User-Agent": "Mozilla/5.0 (compatible; LostArkParty/1.0; +https://github.com/Seraph26/LostArkParty)",
         },
         cf: { cacheTtl: 0, cacheEverything: false },
       });

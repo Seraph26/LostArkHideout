@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — optimizer v17: Bible-derived support uptime medians */
+/* Lost Ark Party — optimizer v17: Bible-derived support uptime medians */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3',PARTY='lostark-hideout-party-assignments-v2',SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);

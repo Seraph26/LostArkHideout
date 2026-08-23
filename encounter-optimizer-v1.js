@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — encounter-aware optimizer integration v5 */
+/* Lost Ark Party — encounter-aware optimizer integration v5 */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3',PARTY='lostark-hideout-party-assignments-v2';

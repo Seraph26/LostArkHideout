@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — Upgrade Potential v8
+/* Lost Ark Party — Upgrade Potential v8
  * Informational only. Never contributes to party scoring or optimization.
  * Only reports explicitly detectable future progression paths.
  */

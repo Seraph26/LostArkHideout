@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — final class/spec/icon/position display authority */
+/* Lost Ark Party — final class/spec/icon/position display authority */
 (()=>{
 'use strict';
 const KEY='lostark-hideout-private-v3', BUILD='lostark-hideout-build-profiles-v3';

@@ -1,4 +1,4 @@
-const WORKER_VERSION = "2026-08-23-git-test";
+const WORKER_VERSION = "2026-08-23-lostarkparty";
 const BIBLE_HOST = "lostark.bible";
 const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
 /* Counting changed from "every page load" to "once per browser session", and the
@@ -92,7 +92,7 @@ export default {
     if (u.pathname === "/health") return json({ ok: true, service: "lostark-bible-connector", version: WORKER_VERSION });
 
     /* Everything past here either spends a Bible request or writes to KV. */
-    if (!origin) return json({ ok: false, error: "This connector only serves the Lost Ark Hideout dashboard." }, 403);
+    if (!origin) return json({ ok: false, error: "This connector only serves the Lost Ark Party dashboard." }, 403);
 
     if (u.pathname === "/share" && request.method === "POST") {
       let body;
@@ -146,7 +146,7 @@ export default {
         const response = await fetch(`${BIBLE_REMOTE}?payload=${encodeURIComponent(payload)}`, {
           headers: {
             Accept: "application/json,text/plain,*/*",
-            "User-Agent": "Mozilla/5.0 (compatible; LostArkHideout/1.0; +https://github.com/Seraph26/LostArkHideout)",
+            "User-Agent": "Mozilla/5.0 (compatible; LostArkParty/1.0; +https://github.com/Seraph26/LostArkParty)",
           },
           cf: { cacheTtl: 300, cacheEverything: false },
         });
@@ -171,7 +171,7 @@ export default {
       const response = await fetch(bibleUrl, {
         headers: {
           Accept: "text/html,application/xhtml+xml",
-          "User-Agent": "Mozilla/5.0 (compatible; LostArkHideout/1.0; +https://github.com/Seraph26/LostArkHideout)",
+          "User-Agent": "Mozilla/5.0 (compatible; LostArkParty/1.0; +https://github.com/Seraph26/LostArkParty)",
         },
         cf: { cacheTtl: 0, cacheEverything: false },
       });

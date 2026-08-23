@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — metric change explanations v6 */
+/* Lost Ark Party — metric change explanations v6 */
 (()=>{'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim(),STORE='lostark-hideout-metric-snapshot-v6';
 let active=null,hideTimer=0;

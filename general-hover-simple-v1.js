@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization hover bridge
+/* Lost Ark Party — General Optimization hover bridge
  *
  * The canonical hover-summary-v6.js renderer is the single hover formatter for
  * both Raid Specific and General Optimization. General Optimization already

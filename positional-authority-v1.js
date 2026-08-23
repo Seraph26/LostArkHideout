@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — positional build authority v5 */
+/* Lost Ark Party — positional build authority v5 */
 (()=>{
 'use strict';
 const V3='lostark-hideout-build-profiles-v3',V2='lostark-hideout-build-profiles-v2';

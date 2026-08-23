@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid-focused build profile cache v2 */
+/* Lost Ark Party — raid-focused build profile cache v2 */
 (()=>{
 'use strict';
 const KEY='lostark-hideout-build-profiles-v2';

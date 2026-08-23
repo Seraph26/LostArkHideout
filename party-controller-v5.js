@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — Suggested Party Setup */
+/* Lost Ark Party — Suggested Party Setup */
 (()=>{
 const KEYS=['lostark-hideout-private-v3','lostark-hideout-private-v2'];
 const PK='lostark-hideout-party-assignments-v2';

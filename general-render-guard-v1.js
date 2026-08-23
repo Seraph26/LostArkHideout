@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization top-potential swap indicators
+/* Lost Ark Party — General Optimization top-potential swap indicators
  * Uses the same interaction lifecycle as general-party-metrics-v1:
  * optimize establishes the baseline; pointerdown on an authoritative member
  * captures the pre-swap state; drop/mutation observes the committed swap.

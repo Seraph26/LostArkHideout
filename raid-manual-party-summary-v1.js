@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — Raid-Specific manual party-change summary. */
+/* Lost Ark Party — Raid-Specific manual party-change summary. */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3';

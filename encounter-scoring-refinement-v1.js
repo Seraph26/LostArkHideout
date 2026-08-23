@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — encounter scoring refinement v1 */
+/* Lost Ark Party — encounter scoring refinement v1 */
 (()=>{
 'use strict';
 

@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — build-aware party optimizer v11. */
+/* Lost Ark Party — build-aware party optimizer v11. */
 (()=>{
 const STORAGE='lostark-hideout-private-v3', PARTY='lostark-hideout-party-assignments-v2';
 const CONNECTOR='https://lostark-bible-connector.seraph0226.workers.dev/character';

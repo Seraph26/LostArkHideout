@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization hover authority retired */
+/* Lost Ark Party — General Optimization hover authority retired */
 (()=>{
 'use strict';
 /*

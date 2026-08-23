@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — preserve General Optimization labels after profile refresh */
+/* Lost Ark Party — preserve General Optimization labels after profile refresh */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3', PARTY='lostark-hideout-party-assignments-v2';

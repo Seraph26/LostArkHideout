@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — build profile authority bridge */
+/* Lost Ark Party — build profile authority bridge */
 (()=>{
 'use strict';
 function merge(url){

@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid selector manifest integration v5 */
+/* Lost Ark Party — raid selector manifest integration v5 */
 (()=>{
 'use strict';
 const MANIFEST='raid-encounters.json';

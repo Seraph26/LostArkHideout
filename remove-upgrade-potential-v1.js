@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — permanently remove the retired Upgrade Potential UI. */
+/* Lost Ark Party — permanently remove the retired Upgrade Potential UI. */
 (()=>{
 'use strict';
 function clean(){

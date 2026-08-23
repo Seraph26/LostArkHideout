@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — encounter model compatibility layer v3 */
+/* Lost Ark Party — encounter model compatibility layer v3 */
 (()=>{
 'use strict';
 /*

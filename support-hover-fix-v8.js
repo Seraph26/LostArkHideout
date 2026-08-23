@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover data bridge v8 */
+/* Lost Ark Party — support hover data bridge v8 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();

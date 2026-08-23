@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — encounter scoring bridge v3 */
+/* Lost Ark Party — encounter scoring bridge v3 */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3';

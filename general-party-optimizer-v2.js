@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization v3 */
+/* Lost Ark Party — General Optimization v3 */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3',PARTY='lostark-hideout-party-assignments-v2',BASELINE='lostark-hideout-general-baseline-v1',SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);

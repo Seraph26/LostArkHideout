@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid-specific support hover renderer
+/* Lost Ark Party — raid-specific support hover renderer
  * Raid support cards intentionally mirror the General Optimization support format.
  * The contribution values come from the already-rendered DPS cards; no Bible lookup
  * is required to construct this hover.

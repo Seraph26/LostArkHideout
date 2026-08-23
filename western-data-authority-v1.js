@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — Western game-data authority v1 */
+/* Lost Ark Party — Western game-data authority v1 */
 (()=>{
 'use strict';
 

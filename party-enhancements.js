@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — party optimizer / drag-and-drop enhancement layer
+/* Lost Ark Party — party optimizer / drag-and-drop enhancement layer
  *
  * This layer intentionally works from the locally stored character profiles.
  * It does not query roster/account data or add another external service.

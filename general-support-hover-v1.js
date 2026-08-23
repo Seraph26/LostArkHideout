@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization support hover authority */
+/* Lost Ark Party — General Optimization support hover authority */
 (()=>{
 'use strict';
 const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);

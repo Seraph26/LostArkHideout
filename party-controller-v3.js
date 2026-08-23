@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — authoritative party UI controller. */
+/* Lost Ark Party — authoritative party UI controller. */
 (() => {
   const STATE_KEYS = ['lostark-hideout-private-v3', 'lostark-hideout-private-v2'];
   const PARTY_KEY = 'lostark-hideout-party-assignments-v2';

@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — Bible build profile cache */
+/* Lost Ark Party — Bible build profile cache */
 (()=>{
 const KEY='lostark-hideout-build-profiles-v1';
 const STATE='lostark-hideout-private-v3';

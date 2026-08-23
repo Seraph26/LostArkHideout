@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — permanently retired Upgrade Potential UI */
+/* Lost Ark Party — permanently retired Upgrade Potential UI */
 (()=>{'use strict';
 function clean(){const root=document.getElementById('suggestedParties');if(!root)return;
  root.querySelectorAll('.party-metric').forEach(el=>{const label=(el.querySelector('.optimizer-definition-label')?.textContent||'').trim();if(label.toLowerCase()==='upgrade potential')el.remove()});

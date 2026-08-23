@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — character hover explanations v11 */
+/* Lost Ark Party — character hover explanations v11 */
 (()=>{'use strict';
 const LABELS={crit:'Critical Rate',critDamage:'Critical Damage',attackSpeed:'Attack Speed',attackPower:'Attack Power',supportAmplification:'Support Amplification',mana:'Mana',identity:'Identity',damage:'Damage',defenceReduction:'Defense Reduction',defenseReduction:'Defense Reduction',moveSpeed:'Move Speed',movementSpeed:'Move Speed',positional:'Positional Damage',brand:'Brand',ha:'H.A. Skill',ap:'Attack Power'};
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();

@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — Support Uptime party-summary authority only. */
+/* Lost Ark Party — Support Uptime party-summary authority only. */
 (()=>{
 'use strict';
 const tooltipText='Party synergies available from the current party. Support uptime is an optimizer estimate based on support class type and party composition, including party positioning compatibility.';

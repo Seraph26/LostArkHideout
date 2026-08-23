@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization hover finalizer
+/* Lost Ark Party — General Optimization hover finalizer
    UI-only authority for General Optimization DPS hover metrics.
    Support uptime calculations remain in general-party-optimizer-v2.js untouched.
 */

@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — raid-specific support hover authority v28 */
+/* Lost Ark Party — raid-specific support hover authority v28 */
 (()=>{
 'use strict';
 const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);

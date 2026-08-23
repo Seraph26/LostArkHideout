@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — single authoritative party controller. */
+/* Lost Ark Party — single authoritative party controller. */
 (()=>{
 'use strict';
 const STATE_KEYS=['lostark-hideout-private-v3','lostark-hideout-private-v2'],PARTY_KEY='lostark-hideout-party-assignments-v2',MAX_PER_PARTY=4,SUPPORTS=new Set(['Bard','Paladin','Artist']),CLASS_OVERRIDES={ryohaku:'Glavier'},$=s=>document.querySelector(s);

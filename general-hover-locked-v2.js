@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization hover lock v3
+/* Lost Ark Party — General Optimization hover lock v3
  * UI-only. General cards use the same canonical content/layout as the frozen
  * Raid Specific hover implementation, but retain the values already produced
  * by the General Optimization model.

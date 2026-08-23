@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — metric change explanations v9 */
+/* Lost Ark Party — metric change explanations v9 */
 (()=>{'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();
 let before=null;

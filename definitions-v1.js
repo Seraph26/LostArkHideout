@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — Definitions panel.
+/* Lost Ark Party — Definitions panel.
  *
  * Plain-language explanation of every number the Optimized Party Setup shows and
  * what the optimizer is actually maximising. The worked example is built from

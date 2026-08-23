@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — encounter scoring engine v5 */
+/* Lost Ark Party — encounter scoring engine v5 */
 (()=>{
 'use strict';
 const CLASS_RANGED=new Set(['Sorceress','Sharpshooter','Artillerist','Machinist','Scouter','Summoner','Aeromancer','Gunslinger','Deadeye','Arcana','Arcanist']);

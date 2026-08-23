@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — Western party-synergy authority v1 */
+/* Lost Ark Party — Western party-synergy authority v1 */
 (()=>{
 'use strict';
 /* Game-mechanic data only. Recipient value is calculated by the optimizer. */

@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — build specialization display v4 */
+/* Lost Ark Party — build specialization display v4 */
 (()=>{
 'use strict';
 const KEY='lostark-hideout-build-profiles-v3';

@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — compact hover summary authority v10 */
+/* Lost Ark Party — compact hover summary authority v10 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();

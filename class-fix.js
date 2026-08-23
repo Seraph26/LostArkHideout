@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — class correction layer
+/* Lost Ark Party — class correction layer
  *
  * Bible's rendered HTML can contain other class names in skills, engravings,
  * or historical/profile text. The previous parser could therefore choose the

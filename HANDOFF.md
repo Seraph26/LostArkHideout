@@ -1,11 +1,16 @@
-# LostArkHideout — handoff
+# LostArkParty — handoff
 
 Paste this whole file into a new chat to pick up where we left off.
 
 ## Basics
 
-- Repo `Seraph26/LostArkHideout`, live at https://seraph26.github.io/LostArkHideout/ (GitHub Pages from `main`; push = deploy, ~30–60s).
+- Repo `Seraph26/LostArkParty`, live at https://seraph26.github.io/LostArkParty/ (GitHub Pages from `main`; push = deploy, ~30–60s).
 - Local clone: `C:\Users\<user>\Desktop\ClaudeLA`. Working tree should be clean and in sync.
+- **Two things keep the old "Hideout" name on purpose.** `localStorage` keys are all
+  `lostark-hideout-*` (21 of them) — renaming those would orphan every existing user's roster,
+  so they stay forever. `window.LostArkHideoutClassData` / `LostArkHideoutClassAuthority` are
+  cross-module globals; renaming them is a refactor with no user-visible benefit. Neither is a
+  leftover to "finish".
 - Every script is loaded from `index.html` with a `?v=` cache-bust. **Bump the version whenever you edit a file** or the change will not reach the browser. Two scripts (`candidate-roster-v1.js`, and others) are loaded dynamically from `visits.js` — bump there.
 
 ## Working style that matters here

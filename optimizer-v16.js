@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — optimizer v16: practical party value + informational Upgrade Potential */
+/* Lost Ark Party — optimizer v16: practical party value + informational Upgrade Potential */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3',PARTY='lostark-hideout-party-assignments-v2',SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);

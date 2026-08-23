@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — share snapshot + clear all.
+/* Lost Ark Party — share snapshot + clear all.
  *
  * The share button had no handler at all: copyShareLink lives in app.js, which
  * index.html does not load. This provides both the share link and a clear-all

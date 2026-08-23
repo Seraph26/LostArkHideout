@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — build-aware, roster-independent optimizer v6 */
+/* Lost Ark Party — build-aware, roster-independent optimizer v6 */
 (()=>{
 const STORAGE='lostark-hideout-private-v3';
 const PARTY='lostark-hideout-party-assignments-v2';

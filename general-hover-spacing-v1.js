@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization hover spacing + synergy explanation v5 */
+/* Lost Ark Party — General Optimization hover spacing + synergy explanation v5 */
 (()=>{
 'use strict';
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();

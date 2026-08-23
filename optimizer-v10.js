@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — optimizer v15 + consistent swap accounting */
+/* Lost Ark Party — optimizer v15 + consistent swap accounting */
 (()=>{
 'use strict';
 const STORE='lostark-hideout-private-v3',PARTY='lostark-hideout-party-assignments-v2';

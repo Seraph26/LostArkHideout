@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — build-aware party optimizer v1 */
+/* Lost Ark Party — build-aware party optimizer v1 */
 (()=>{
 const STATE='lostark-hideout-private-v3', ASSIGN='lostark-hideout-party-assignments-v2', BUILD='lostark-hideout-build-profiles-v1';
 const SUPPORT=new Set(['Bard','Paladin','Artist','Valkyrie']);

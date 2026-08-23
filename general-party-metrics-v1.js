@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization metrics: persistent Raid-style swap hover */
+/* Lost Ark Party — General Optimization metrics: persistent Raid-style swap hover */
 (()=>{
 'use strict';
 const STORE='lostark-general-optimization-baseline-v7';

@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — General Optimization canonical DPS hover bridge v1 */
+/* Lost Ark Party — General Optimization canonical DPS hover bridge v1 */
 (()=>{'use strict';
 const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);
 const clean=s=>String(s??'').replace(/\s+/g,' ').trim();

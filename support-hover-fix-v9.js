@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — support hover data bridge v9 */
+/* Lost Ark Party — support hover data bridge v9 */
 (()=>{
 'use strict';
 const SUPPORTS=new Set(['Bard','Artist','Paladin','Valkyrie']);

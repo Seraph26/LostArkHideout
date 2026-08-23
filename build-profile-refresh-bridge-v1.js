@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — refresh V3 build authority whenever profiles are refreshed */
+/* Lost Ark Party — refresh V3 build authority whenever profiles are refreshed */
 (()=>{
 'use strict';
 function install(){

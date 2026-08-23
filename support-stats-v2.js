@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — dynamic Bible support uptime data v14 */
+/* Lost Ark Party — dynamic Bible support uptime data v14 */
 (()=>{
 'use strict';
 if(window.LostArkSupportStats)return;

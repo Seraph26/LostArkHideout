@@ -1,4 +1,4 @@
-/* Lost Ark Hideout — party optimization v2 */
+/* Lost Ark Party — party optimization v2 */
 (()=>{
 'use strict';
 const S=window.LostArkEncounterScoring;
