@@ -1,6 +1,25 @@
 const BIBLE_HOST = "lostark.bible";
 const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
 const VISIT_KEY = "page_visits";
+/* Share links used to carry the whole compressed roster snapshot in the URL
+   fragment, so nothing ever touched a server -- deliberate, and true of every
+   other endpoint here except this one. A full roster's snapshot runs past 2,000
+   characters once encoded, which is Discord's message limit, so the link could
+   not be pasted there. This endpoint is the one exception: the snapshot is
+   stored in KV for 30 days under a short id, and the link becomes
+   #id=<8 chars>. It is still never logged, never tied to an account, and never
+   readable by anyone without the id, but it does now exist on Cloudflare's
+   servers for that window rather than nowhere at all. */
+const SHARE_TTL_SECONDS = 30 * 24 * 60 * 60;
+const SHARE_MAX_BYTES = 60000;
+const SHARE_ID_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ"; /* no 0/O/1/l/i */
+function shareId() {
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  let id = "";
+  for (const b of bytes) id += SHARE_ID_ALPHABET[b % SHARE_ID_ALPHABET.length];
+  return id;
+}
 
 /* The connector used to answer any caller with Access-Control-Allow-Origin: *,
    which made it a free public proxy for Bible: anyone could point their own site
@@ -28,7 +47,7 @@ function corsHeaders(origin) {
        response for one origin is not handed to another. */
     "Access-Control-Allow-Origin": origin || "https://seraph26.github.io",
     "Vary": "Origin",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Accept",
     "Cache-Control": "no-store",
   };
@@ -55,8 +74,10 @@ export default {
   async fetch(request, env) {
     const origin = allowedOrigin(request);
     if (request.method === "OPTIONS") return new Response(null, { status: origin ? 204 : 403, headers: corsHeaders(origin) });
-    if (request.method !== "GET") return json({ ok: false, error: "Only GET requests are supported." }, 405, origin);
     const u = new URL(request.url);
+    /* Only POST /share creates anything; every other route stays GET-only. */
+    if (request.method !== "GET" && !(request.method === "POST" && u.pathname === "/share"))
+      return json({ ok: false, error: "Only GET requests are supported (POST /share is the one exception)." }, 405, origin);
 
     /* Left open: it touches nothing, and it lets an uptime check or a blocked
        caller tell the difference between "refused" and "down". */
@@ -64,6 +85,33 @@ export default {
 
     /* Everything past here either spends a Bible request or writes to KV. */
     if (!origin) return json({ ok: false, error: "This connector only serves the Lost Ark Hideout dashboard." }, 403);
+
+    if (u.pathname === "/share" && request.method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json({ ok: false, error: "Expected JSON body." }, 400, origin); }
+      const s = typeof body?.s === "string" ? body.s : "";
+      if (!s) return json({ ok: false, error: "Missing snapshot." }, 400, origin);
+      if (s.length > SHARE_MAX_BYTES) return json({ ok: false, error: "Snapshot is too large to share." }, 400, origin);
+      const id = shareId();
+      try {
+        await env.SHARES.put(id, s, { expirationTtl: SHARE_TTL_SECONDS });
+        return json({ ok: true, id }, 200, origin);
+      } catch {
+        return json({ ok: false, error: "Unable to store the share link." }, 500, origin);
+      }
+    }
+
+    if (u.pathname.startsWith("/share/") && request.method === "GET") {
+      const id = u.pathname.slice("/share/".length);
+      if (!/^[0-9a-zA-Z]{4,32}$/.test(id)) return json({ ok: false, error: "Invalid share id." }, 400, origin);
+      try {
+        const s = await env.SHARES.get(id);
+        if (s === null) return json({ ok: false, error: "This share link has expired or does not exist." }, 404, origin);
+        return json({ ok: true, s }, 200, origin);
+      } catch {
+        return json({ ok: false, error: "Unable to retrieve the share link." }, 500, origin);
+      }
+    }
 
     if (u.pathname === "/visits") {
       try {

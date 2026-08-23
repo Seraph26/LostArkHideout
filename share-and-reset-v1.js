@@ -28,6 +28,14 @@ const status=m=>{const e=document.getElementById('status');if(e)e.textContent=m}
      Refresh Profiles skip everything as already fresh */
 const BIBLE_PREFIX='https://lostark.bible/character/';
 const SHURDI_ID='20160';
+/* Full rosters push the #s= link past 2,000 characters, which Discord's message
+   limit will not accept, so it could not be pasted there. The worker now stores
+   the encoded snapshot for 30 days under a short id (#id=<8 chars>) as the one
+   exception to "nothing ever reaches a server" -- see the comment on the worker
+   itself. If that store call fails for any reason (offline, old worker not yet
+   redeployed, KV outage) copyShare() falls back to the original long link, so
+   sharing still works, just not shortened. */
+const SHARE_ENDPOINT='https://lostark-bible-connector.seraph0226.workers.dev/share';
 /* The spec as actually displayed, so the node list it was derived from can go. */
 function shownSpec(c){
  const url=c?.url||'';
@@ -92,14 +100,30 @@ async function decode(str){
  return JSON.parse(new TextDecoder().decode(data));
 }
 
+/* Ask the worker to store the encoded snapshot and hand back a short id.
+   Returns null on any failure so the caller can fall back to the long link. */
+async function shorten(encoded){
+ try{
+  const res=await fetch(SHARE_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({s:encoded})});
+  if(!res.ok)return null;
+  const data=await res.json();
+  return data?.ok&&data.id?data.id:null;
+ }catch{return null}
+}
+
 async function copyShare(){
  const snap=snapshot();
  if(!snap.main.length&&!snap.adds.length)return status('Nothing to share yet. Add characters first.');
- let link;
- try{link=`${location.origin}${location.pathname}#s=${await encode(snap)}`}
+ let encoded;
+ try{encoded=await encode(snap)}
  catch(e){return status('Could not build the share link.')}
+ const longLink=`${location.origin}${location.pathname}#s=${encoded}`;
  const chars=snap.main.length+snap.adds.length;
- try{await navigator.clipboard.writeText(link);status(`Share link copied — ${chars} character${chars===1?'':'s'}, ${Math.round(link.length/1024)}KB.`)}
+ let link=longLink,shortened=false;
+ const id=await shorten(encoded);
+ if(id){link=`${location.origin}${location.pathname}#id=${id}`;shortened=true}
+ const sizeNote=shortened?'expires in 30 days':`${Math.round(longLink.length/1024)}KB`;
+ try{await navigator.clipboard.writeText(link);status(`Share link copied — ${chars} character${chars===1?'':'s'}, ${sizeNote}.`)}
  catch{
   /* Clipboard can be blocked; show the link so it can be copied by hand. */
   const box=document.createElement('textarea');
@@ -174,11 +198,29 @@ function clearAll(){
 
 /* Import runs before the rest of the app reads storage, then reloads cleanly so
    every module picks the data up through its normal path. */
+/* A #id= link never carried the snapshot itself -- only the lookup key -- so it
+   has to be fetched from the worker before it can be decoded. Old #s= links
+   still work unchanged; this is purely additive. */
+async function resolveHash(){
+ const h=location.hash||'';
+ const direct=h.match(/^#s=(.+)$/);
+ if(direct)return direct[1];
+ const idm=h.match(/^#id=([0-9a-zA-Z]{4,32})$/);
+ if(!idm)return null;
+ const res=await fetch(`${SHARE_ENDPOINT}/${idm[1]}`);
+ const data=await res.json().catch(()=>null);
+ if(!data?.ok)throw new Error(data?.error||'Share link not found.');
+ return data.s;
+}
 async function importFromHash(){
- const m=(location.hash||'').match(/^#s=(.+)$/);
- if(!m)return;
+ const h=location.hash||'';
+ if(!/^#(s|id)=/.test(h))return;
+ let encoded;
+ try{encoded=await resolveHash()}
+ catch(e){history.replaceState(null,'',location.pathname);return status(String(e?.message||'That share link could not be read.'))}
+ if(!encoded)return;
  let snap;
- try{snap=await decode(m[1])}catch{history.replaceState(null,'',location.pathname);return status('That share link could not be read.')}
+ try{snap=await decode(encoded)}catch{history.replaceState(null,'',location.pathname);return status('That share link could not be read.')}
  if(!snap||snap.v!==1)return status('That share link is from a different version.');
  const existing=(read(MAIN,{characters:[]}).characters||[]).length+(read(ADDS,[])||[]).length;
  if(existing&&!confirm(`This link contains ${snap.main.length+snap.adds.length} characters.\n\nLoading it will replace the ${existing} already on this dashboard. Continue?`)){

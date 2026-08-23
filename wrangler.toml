@@ -5,3 +5,7 @@ compatibility_date = "2026-08-17"
 [[kv_namespaces]]
 binding = "VISITS"
 id = "cc913d05a0bb4cee8e72aee63f635ebb"
+
+[[kv_namespaces]]
+binding = "SHARES"
+id = "3d2236be086d46fbb4e2cdb70c7d8ae8"
