@@ -30,7 +30,7 @@ const BIBLE_PREFIX='https://lostark.bible/character/';
 const SHURDI_ID='20160';
 /* Full rosters push the #s= link past 2,000 characters, which Discord's message
    limit will not accept, so it could not be pasted there. The worker now stores
-   the encoded snapshot for 30 days under a short id (#id=<8 chars>) as the one
+   the encoded snapshot for 30 days under a short id (#id=<10 chars>) as the one
    exception to "nothing ever reaches a server" -- see the comment on the worker
    itself. If that store call fails for any reason (offline, old worker not yet
    redeployed, KV outage) copyShare() falls back to the original long link, so

@@ -7,7 +7,7 @@ const VISIT_KEY = "page_visits";
    characters once encoded, which is Discord's message limit, so the link could
    not be pasted there. This endpoint is the one exception: the snapshot is
    stored in KV for 30 days under a short id, and the link becomes
-   #id=<8 chars>. It is still never logged, never tied to an account, and never
+   #id=<10 chars>. It is still never logged, never tied to an account, and never
    readable by anyone without the id, but it does now exist on Cloudflare's
    servers for that window rather than nowhere at all. */
 const SHARE_TTL_SECONDS = 30 * 24 * 60 * 60;
