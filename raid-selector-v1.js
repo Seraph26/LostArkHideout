@@ -23,7 +23,6 @@ function fallback(){return{updatedAt:null,source:'fallback',raids:[
 {id:'armoche-g1',label:'Armoche — Gate 1',boss:'Armoche Gate 1',kind:'optional',players:8},
 {id:'armoche-g2',label:'Armoche — Gate 2',boss:'Armoche Gate 2',kind:'optional',players:8}
 ],events:[
-{id:'extreme-aegir-g2',label:'[EXTREME] Aegir — Gate 2',boss:'Extreme Aegir Gate 2',kind:'event',schema:'extreme',players:8},
 {id:'extreme-brelshaza-g2',label:'[EXTREME] Brelshaza — Gate 2',boss:'Extreme Brelshaza Gate 2',kind:'event',schema:'extreme',players:8}
 ]}}
 async function start(){const c=controls();if(!c.select||!c.general)return;let data;try{data=await loadManifest()}catch{data=fallback()}c.select.innerHTML='<option value="">Select Raid</option>';addGroup(c.select,'Current Active Raids',data.raids||[]);addGroup(c.select,'Optional Active Content',data.optional||[]);addGroup(c.select,'[EXTREME] Raids',data.events||[]);let s=state();const available=[...(data.raids||[]),...(data.optional||[]),...(data.events||[])];if(!available.some(x=>x.id===s.raid)){s={general:true,raid:''};save(s)}if(s.general)s.raid='';apply(s);c.general.addEventListener('change',()=>{const n={general:c.general.checked,raid:c.general.checked?'':c.select.value};save(n);apply(n)});c.select.addEventListener('change',()=>{const n={general:false,raid:c.select.value};save(n);apply(n);window.LostArkOptimizerMode={...n,encounter:encounterFromOption(c.select.selectedOptions[0])}});const o=c.select.selectedOptions[0];if(!s.general&&o)window.LostArkOptimizerMode={...s,encounter:encounterFromOption(o)}}
