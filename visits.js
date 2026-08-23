@@ -1,13 +1,27 @@
 const VISIT_COUNTER = 'https://lostark-bible-connector.seraph0226.workers.dev/visits';
+/* Count once per browser session rather than once per page load. sessionStorage
+   survives a refresh and clears when the browser closes, which is exactly the
+   intent: one person reloading stays at one, the same person returning later in
+   a fresh browser counts again. Two caveats worth knowing when reading the
+   number: sessionStorage is per-tab, so two tabs open at once count twice, and
+   a private window or cleared storage always counts as new. This measures
+   browser sessions, not people. */
+const VISIT_SESSION_KEY = 'lostark-hideout-visit-counted-v1';
 
 async function loadVisitCounter() {
   const counter = document.getElementById('visitCounter');
   if (!counter) return;
+  let counted = false;
+  try { counted = sessionStorage.getItem(VISIT_SESSION_KEY) === '1'; } catch {}
+  const url = counted ? `${VISIT_COUNTER}?peek=1` : VISIT_COUNTER;
   try {
-    const response = await fetch(VISIT_COUNTER, { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json' } });
+    const response = await fetch(url, { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json' } });
     if (!response.ok) { counter.innerHTML = 'Page visits: <b>—</b>'; return; }
     const data = await response.json();
     const count = Number(data?.visits);
+    /* Only mark the session once the count actually landed, so a failed request
+       does not silently skip this visitor for the rest of their session. */
+    if (!counted && data?.ok) { try { sessionStorage.setItem(VISIT_SESSION_KEY, '1'); } catch {} }
     counter.innerHTML = Number.isFinite(count) ? `Page visits: <b>${count.toLocaleString()}</b>` : 'Page visits: <b>—</b>';
   } catch { counter.innerHTML = 'Page visits: <b>—</b>'; }
 }

@@ -1,6 +1,10 @@
 const BIBLE_HOST = "lostark.bible";
 const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
-const VISIT_KEY = "page_visits";
+/* Counting changed from "every page load" to "once per browser session", and the
+   old total was almost entirely our own testing, so it restarts under a new key
+   rather than being zeroed by hand in the dashboard. The old page-load figure is
+   still under "page_visits" if it is ever wanted. */
+const VISIT_KEY = "unique_visits_v1";
 /* Share links used to carry the whole compressed roster snapshot in the URL
    fragment, so nothing ever touched a server -- deliberate, and true of every
    other endpoint here except this one. A full roster's snapshot runs past 2,000
@@ -114,8 +118,15 @@ export default {
     }
 
     if (u.pathname === "/visits") {
+      /* ?peek=1 reads the figure without counting. The dashboard counts once per
+         browser session and only peeks on later loads in that session, so a
+         refresh no longer inflates the number -- and it saves a KV write, which
+         matters against the free tier's daily write allowance. */
+      const peek = u.searchParams.get("peek") === "1";
       try {
-        const visits = Number.parseInt(await env.VISITS.get(VISIT_KEY) || "0", 10) + 1;
+        const current = Number.parseInt(await env.VISITS.get(VISIT_KEY) || "0", 10);
+        if (peek) return json({ ok: true, visits: current }, 200, origin);
+        const visits = current + 1;
         await env.VISITS.put(VISIT_KEY, String(visits));
         return json({ ok: true, visits }, 200, origin);
       } catch {
