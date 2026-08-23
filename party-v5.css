@@ -6,9 +6,12 @@
 .encounter-optimized-party .slots{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .encounter-optimized-party .slot{border:1px solid #252b39;background:#111620;border-radius:14px;padding:16px;min-width:0;min-height:96px;display:block}
 /* Encounter Favorability badge, top right of a Raid Specific card. Colour is
-   relative to the lineup average, not to 100%: see encounter-optimizer-v1. */
-.encounter-fav{position:absolute;top:10px;right:12px;font-size:12px;font-weight:700;letter-spacing:.01em;line-height:1;cursor:help}
-.encounter-fav.fav-good{color:#65c878}
-.encounter-fav.fav-bad{color:#ef6b6b}
-.encounter-fav.fav-even{color:#8994ab}
-.encounter-optimized-party .slot .party-character-link{padding-right:52px}
+   relative to the lineup average, not to 100%: see encounter-optimizer-v1. The
+   label matches .party-stat-label, one point smaller. */
+.encounter-fav{position:absolute;top:10px;right:12px;display:flex;flex-direction:column;align-items:flex-end;line-height:1.3;text-align:right}
+.encounter-fav-label{font-size:11px;font-weight:400;color:#8994ab;white-space:nowrap}
+.encounter-fav-value{font-size:12px;font-weight:700;letter-spacing:.01em}
+.encounter-fav.fav-good .encounter-fav-value{color:#65c878}
+.encounter-fav.fav-bad .encounter-fav-value{color:#ef6b6b}
+.encounter-fav.fav-even .encounter-fav-value{color:#8994ab}
+.encounter-optimized-party .slot .party-character-link{padding-right:124px}

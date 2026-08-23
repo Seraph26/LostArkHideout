@@ -91,7 +91,7 @@ const SECTIONS=[
     <li><strong>Push resilience</strong> — against forced repositioning and stagger checks.</li>
     <li><strong>Support fit</strong> — supports only. An area-style, flexible support (Valkyrie, Paladin) keeps buffs on a party the fight has forced apart; a placement-sensitive one (Bard, Artist) needs the party to come to the buff and loses uptime when the fight will not allow it. The gap grows with how much the fight moves people around, and their own measured support uptime is folded in on top.</li>
    </ul>
-   <p>The <strong>Fit %</strong> next to a party's encounter score is simply the average of its four characters' Encounter Favorability.</p>
+   <p><strong>Average Party Encounter Favorability</strong>, next to a party's encounter score, is exactly that — the average of its four characters' figures.</p>
    <p>Compare it across characters in the same fight, never across fights. It says which raid suits a character, not which character is better.</p>`],
 
  ['What the optimizer is actually doing',

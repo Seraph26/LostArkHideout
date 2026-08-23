@@ -78,12 +78,14 @@ function specLabel(c,fallback){try{const a=window.LostArkSpecAuthority;if(a?.spe
    fight suits them more than the rest of the group, red less, grey within a
    third of a point either way. The figure itself is unchanged and absolute. */
 function favourability(c){try{const r=window.LostArkEncounterScoring?.characterScore?.(c);return Number.isFinite(r?.score)?r.score*100:null}catch{return null}}
+/* No title attribute: the card already has its own hover, and a native tooltip
+   on top of it put two popups on screen at once. The label carries the meaning
+   instead, and Definitions carries the detail. */
 function favBadge(c,mean){const v=favourability(c);if(v===null)return'';
  const d=Number.isFinite(mean)?v-mean:0,cls=d>=.3?'fav-good':d<=-.3?'fav-bad':'fav-even';
- const note=Number.isFinite(mean)?`Encounter Favorability ${v.toFixed(1)}% — this lineup averages ${mean.toFixed(1)}%. 100% is neutral; see Definitions.`:`Encounter Favorability ${v.toFixed(1)}%`;
- return `<span class="encounter-fav ${cls}" title="${esc(note)}">${v.toFixed(1)}%</span>`}
+ return `<span class="encounter-fav ${cls}"><span class="encounter-fav-label">Encounter Favorability</span><span class="encounter-fav-value">${v.toFixed(1)}%</span></span>`}
 function slotHtml(c,gs,p,mean){const g=window.LostArkGeneralModel;if(g?.member)return g.member(c,gs,p,'slot').replace(/^(<div[^>]*>)/,`$1${favBadge(c,mean)}`);const i=info(c),roleClass=i.role==='Support'?'support':'dps';return `<div class="slot party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><a class="party-character-link" href="${esc(i.url||'')}" target="_blank" rel="noopener noreferrer">${esc(i.name)}</a><span class="party-class-label">${esc(specLabel(c,i.cls))}</span><span class="party-role-label ${roleClass}">${esc(i.role)}</span><span class="party-stat-label">CP ${Math.round(i.cp).toLocaleString()}</span>${generalHover(c,gs,p)||'<div class="character-hover-breakdown"><strong>'+esc(i.name)+'</strong><div>CP '+Math.round(i.cp).toLocaleString()+'</div></div>'}</div>`}
-function renderParty(title,p,score,opts){const solo=!!(opts&&opts.solo),key=(opts&&opts.key)||'party1';const fit=(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1);const gs=generalScore(p);return `<article class="party encounter-optimized-party${solo?' solo-encounter-party':''}"><h3>${esc(title)}</h3><div class="score">Encounter score ${Math.round(score).toLocaleString()} · Fit ${fit}%</div><div class="slots" data-enc-party="${key}">${p.map(c=>slotHtml(c,gs,p,opts&&opts.mean)).join('')}</div></article>`}
+function renderParty(title,p,score,opts){const solo=!!(opts&&opts.solo),key=(opts&&opts.key)||'party1';const fit=(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1);const gs=generalScore(p);return `<article class="party encounter-optimized-party${solo?' solo-encounter-party':''}"><h3>${esc(title)}</h3><div class="score">Encounter score ${Math.round(score).toLocaleString()} · Average Party Encounter Favorability ${fit}%</div><div class="slots" data-enc-party="${key}">${p.map(c=>slotHtml(c,gs,p,opts&&opts.mean)).join('')}</div></article>`}
 function render(best){const root=document.getElementById('suggestedParties');if(!root)return;const model=window.LostArkEncounterScoring.profile();const params=parameterText(model);
 /* The colour baseline for the favorability badges: everyone actually seated. */
 const seated=[...(best.a||[]),...(best.b||[])].map(favourability).filter(v=>v!==null);
