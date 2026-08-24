@@ -32,3 +32,20 @@
   .optimizer-toolbar .raid-specific-control select,
   .optimizer-toolbar .general-format-control select{min-width:0;width:100%;flex:1 1 auto}
 }
+/* Tagline under the topbar heading. Muted and at body size so the sentence is
+   fully readable without competing with the product name -- as a 26px headline
+   it ran to three lines on desktop and six on a phone. */
+.topbar-tagline{margin:6px 0 0;max-width:465px;font-size:13px;line-height:1.5;color:#8994ab}
+@media(max-width:700px){.topbar-tagline{font-size:12px;max-width:none}}
+/* The desktop break after "boss fight" is produced by width, not a <br>.
+   Measured at this font: the first line needs 452px and adding the next word
+   needs 477px, so a max-width between them breaks there on its own. A forced
+   <br> did the same on a wide window but left an orphan on anything narrower --
+   phones and narrow desktop windows alike -- because the first line no longer
+   fitted. This way a narrow window just wraps normally. */
+/* Direct link to Bible beside the two "paste a character URL" prompts, since
+   that is where the URL has to come from. Opens in a new tab so a half-filled
+   dashboard is never lost. Sized to sit inside the caption line rather than
+   read as a primary action -- the real actions here are Add Character. */
+.bible-link-btn{display:inline-block;margin-left:8px;padding:2px 8px;border:1px solid #46516a;border-radius:6px;background:#1a2230;color:#cfd8ea;font-size:11px;line-height:1.7;text-decoration:none;vertical-align:middle;white-space:nowrap}
+.bible-link-btn:hover,.bible-link-btn:focus-visible{background:#222c3d;border-color:#6d5dfc;color:#fff}
