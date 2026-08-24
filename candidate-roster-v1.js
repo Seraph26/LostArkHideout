@@ -6,7 +6,9 @@ const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'
 const fmt=v=>v==null||v===''?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
 const newChars=()=>read(NEW_KEY,[]).filter(c=>c&&c.id),hidden=()=>new Set(read(HIDDEN_KEY,[]));
 const setHidden=s=>write(HIDDEN_KEY,[...s]);
-function canonicalClass(c){const p=c?.profile||{},raw=String(p.class||p.className||'').trim(),name=String(p.name||c?.name||'').trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();if(name==='kittyjam')return'Guardianknight';try{return window.LostArkHideoutClassData?.canonical?.(raw)||raw||'Unknown'}catch{return raw||'Unknown'}}
+/* A kittyjam -> Guardianknight special case lived here; verified redundant on
+   2026-08-23, Bible reports Guardianknight for that character on its own. */
+function canonicalClass(c){const p=c?.profile||{},raw=String(p.class||p.className||'').trim();try{return window.LostArkHideoutClassData?.canonical?.(raw)||raw||'Unknown'}catch{return raw||'Unknown'}}
 function classIcon(cls,p){
   /* Bible's extracted SVG is authoritative. It is the same icon source used by the main-group importer and must win over Fandom/class-data fallbacks. */
   if(p?.classIcon)return p.classIcon;

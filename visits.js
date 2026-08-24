@@ -33,7 +33,7 @@ newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
 const candidateRosterScript = document.createElement('script');
-candidateRosterScript.src = 'candidate-roster-v1.js?v=20260823candidate17';
+candidateRosterScript.src = 'candidate-roster-v1.js?v=20260823candidate18';
 candidateRosterScript.async = false;
 document.head.appendChild(candidateRosterScript);
 
@@ -44,7 +44,7 @@ document.head.appendChild(newAdditionsFinalAuthorityScript);
 
 // Identity/spec/icon display only. No optimizer, hover, arrow, scoring, or swap logic.
 const classRenderFixScript = document.createElement('script');
-classRenderFixScript.src = 'class-render-fix-v2.js?v=20260821newadditions2';
+classRenderFixScript.src = 'class-render-fix-v2.js?v=20260823newadditions3';
 classRenderFixScript.async = false;
 document.head.appendChild(classRenderFixScript);
 
