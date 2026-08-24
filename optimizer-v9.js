@@ -1,2 +1,0 @@
-/* Loader for the current build-aware optimizer engine. */
-(async()=>{try{const r=await fetch('./optimizer-v8.js?v=20260818v10');if(!r.ok)throw Error('optimizer engine unavailable');(0,eval)(await r.text())}catch(e){console.error('Lost Ark Party optimizer load error',e)}})();
