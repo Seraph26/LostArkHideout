@@ -14,6 +14,13 @@ Paste this whole file into a new chat to pick up where we left off.
   origin, not path. If the site is ever moved to a *different host* — a custom domain, Cloudflare
   Pages — none of that holds, and `ALLOWED_ORIGINS` must be updated or every profile fetch 403s.
 - Local clone: `C:\Users\<user>\Desktop\ClaudeLA`. Working tree should be clean and in sync.
+- **Never borrow the Main Group key as scratch space.** `refreshCandidateBuilds()` used to
+  overwrite `lostark-hideout-private-v3` with the New Additions so the build refresher — which
+  only read that key — would fetch their builds, then restore it. Any interruption in that
+  window (reload, closed tab, rejected promise) left the Main Group permanently replaced by the
+  candidates, and importing a share link triggered it every time. Fixed on 2026-08-23 by giving
+  `BuildProfilesV3.refresh(list)` an optional character list. If you need builds for some other
+  set, pass a list; do not touch stored state.
 - **Two things keep the old "Hideout" name on purpose.** `localStorage` keys are all
   `lostark-hideout-*` (21 of them) — renaming those would orphan every existing user's roster,
   so they stay forever. `window.LostArkHideoutClassData` / `LostArkHideoutClassAuthority` are
@@ -174,11 +181,23 @@ Supports score 0 contribution individually by design — their value is inside t
 7. **The optimizer's `drop` handler calls `stopImmediatePropagation()`** as a
    capture listener on `#suggestedParties`. Anything that needs the drop must
    listen on `document` — a listener on that root never fires.
-8. **Ihzanami / Bard spec.** Bible reports her Ark Passive as *True Courage* (a
-   DPS spec) though she is geared as a support. Left as-is by user decision. A
-   per-character override was built and **rolled back** — the user disliked it.
-   If revisited, something narrower than free text (e.g. a "treat as support"
-   toggle).
+8. **Ihzanami / Bard spec — resolved, and deliberately not hardcoded.** Bible used to
+   report her Ark Passive as *True Courage* (a DPS spec) though she is geared as a
+   support. It now reports her correctly and the app reads it with no special case:
+   class Bard, *Desperate Salvation* among the Enlightenment nodes, CP 6020.25 from
+   Current Loadout (Raid), ally-enhancement rolls present. Verified against the live
+   profile on 2026-08-23. A per-character override was built earlier and **rolled
+   back** — do not reintroduce one.
+   Instead `app-fixed.js` exposes `window.LostArkProfileGuard.keepKnownSupportProfile
+   (previous, incoming)`: a refresh that would turn a support-shaped profile into a
+   DPS-shaped one is **refused**, keeping the last good profile, on both refresh paths,
+   with the status line saying which character was kept. Support-shaped = explicit
+   Support role, **or** the class's support spec among the Enlightenment nodes
+   (Desperate Salvation / Blessed Aura / Full Bloom / Liberator), **or**
+   ally-enhancement rolls. It engages only for the four support classes and only when
+   the *previous* profile was support-shaped, so a bugged first import is never locked
+   in and a bugged → good refresh always heals. The one false positive is a genuine
+   respec on a support class: Remove and re-add forces it through.
 9. **New classes** (e.g. Warpweaver): the class *name* resolves automatically
    from the Bible header chip, but icon, support/DPS role, spec rules and synergy
    table are hardcoded lists needing manual entries.
