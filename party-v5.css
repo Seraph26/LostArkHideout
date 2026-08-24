@@ -15,3 +15,20 @@
 .encounter-fav.fav-bad .encounter-fav-value{color:#ef6b6b}
 .encounter-fav.fav-even .encounter-fav-value{color:#8994ab}
 .encounter-optimized-party .slot .party-character-link{padding-right:124px}
+
+/* Phones. Share links get pasted into Discord and opened on phones constantly,
+   so this is a normal way in, not an edge case. Two real breakages here:
+   the raid slot grid stayed two columns at every width, and the favorability
+   badge reserves 124px of the name's line -- at 375px that left the character
+   name exactly zero pixels and it rendered empty. General Optimization already
+   collapsed to one column and was unaffected. The toolbar select and the topbar
+   buttons also forced ~80px of horizontal scrolling in both modes. */
+@media(max-width:700px){
+  .encounter-optimized-party .slots{grid-template-columns:1fr}
+  .topbar .actions{flex-wrap:wrap;justify-content:flex-start}
+  .optimizer-toolbar .optimizer-mode-controls{width:100%}
+  .optimizer-toolbar .raid-specific-control,
+  .optimizer-toolbar .general-format-control{width:100%}
+  .optimizer-toolbar .raid-specific-control select,
+  .optimizer-toolbar .general-format-control select{min-width:0;width:100%;flex:1 1 auto}
+}
