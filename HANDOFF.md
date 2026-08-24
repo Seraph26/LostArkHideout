@@ -130,6 +130,26 @@ Also: `text()`/`build()` in the General optimizer and `build()`/`info()` in the 
 - **Clear All**, **Save Dashboard** (survives Clear All, restore panel on the right).
 - **Definitions** panel (`definitions-v1.js`) — plain-language explanation; its worked example is read live from the rendered hover cards, so it follows the current roster.
 
+## Header and copy (index.html + `party-v5.css`)
+
+- The topbar is `<h1>Lost Ark Party</h1>` followed by `<p class="topbar-tagline">`. There is no
+  longer an `.eyebrow` above the title — that small-caps "RAID OPTIMIZER" line was removed on
+  2026-08-23 and its words moved into the tagline.
+- **The tagline's two-line break is done with width, not a `<br>`.** At 13px Inter the first
+  line ("…knowing both the boss fight") measures 452px and adding the next word needs 477px, so
+  `.topbar-tagline{max-width:465px}` makes the browser break there by itself. A forced `<br>`
+  was tried first and looked right on a wide window, but left an orphan on phones **and on
+  narrow desktop windows**, because the first line stopped fitting once the buttons took their
+  share of the topbar. Do not reintroduce one. If the sentence is reworded, re-measure: the
+  usable range is (width of intended line 1) to (that width + the next word).
+- Below 700px the tagline drops to 12px and `max-width:none`, wrapping naturally to three lines.
+- Both "paste a character URL" captions carry an `Open Bible ↗` link
+  (`.bible-link-btn`, `target="_blank"`, `rel="noopener noreferrer"` — keep the rel, or the
+  opened tab gets a `window.opener` handle back into the dashboard).
+- `index.html` is **not** cache-busted the way the scripts are, so a copy change needs a hard
+  refresh to show up. Edit it with `sed`/`perl` only, and check for mojibake afterwards —
+  `grep -c "Â\|â€" index.html` should be 0. The `↗` glyph is the thing most likely to break.
+
 ## Measured model proportions (used in Definitions)
 
 Own CP ~60%, party synergy ~30%, support impact ~10%, build completeness <1%.
