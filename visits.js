@@ -33,7 +33,7 @@ newAdditionsAuthorityScript.async = false;
 document.head.appendChild(newAdditionsAuthorityScript);
 
 const candidateRosterScript = document.createElement('script');
-candidateRosterScript.src = 'candidate-roster-v1.js?v=20260823candidate19';
+candidateRosterScript.src = 'candidate-roster-v1.js?v=20260823candidate20';
 candidateRosterScript.async = false;
 document.head.appendChild(candidateRosterScript);
 

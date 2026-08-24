@@ -94,7 +94,7 @@ async function refreshCandidates(){
  if(candidateRefreshRunning||typeof window.fetchCharacter!=='function')return;
  const list=newChars();if(!list.length)return;
  candidateRefreshRunning=true;
- let ok=0,failed=0,skipped=0;
+ let ok=0,failed=0,skipped=0;const keptSupport=[];
  /* Same freshness rule as the Main Group: Bible is slow and rate-limits bursts,
     so a profile fetched minutes ago is not worth re-fetching. */
  const FRESH_MS=60*1000;
@@ -111,13 +111,19 @@ async function refreshCandidates(){
      it is instead of leaving the status frozen for a minute. */
   done++;const s=statusEl();if(s)s.textContent=`Fetching New Addition ${done} of ${due} — one at a time; more characters means a longer refresh.`;
   try{const p=await window.fetchCharacter(c);
-   if(p){p.class=canonicalClass({...c,profile:p});p.classIcon=classIcon(p.class,p);p.spec=specialization({...c,profile:p});c.profile=p;delete c.profileError;ok++}
+   if(p){p.class=canonicalClass({...c,profile:p});p.classIcon=classIcon(p.class,p);p.spec=specialization({...c,profile:p});
+    /* Same guard the Main Group uses: refuse a refresh that would turn a
+       support-shaped profile into a DPS-shaped one, and keep the last good one. */
+    const guard=window.LostArkProfileGuard?.keepKnownSupportProfile?.(c.profile,p);
+    c.profile=guard?guard.profile:p;if(guard?.kept)keptSupport.push(c.profile?.name||c.name);
+    delete c.profileError;ok++}
   }catch(e){c.profileError=String(e?.message||e);failed++}
  }
  write(NEW_KEY,list);renderNew();applyHiddenState();
  candidateRefreshRunning=false;
  const s=statusEl();
- if(s)s.textContent=`${base} New Additions: refreshed ${ok}${failed?`, ${failed} failed`:''}${skipped?`, ${skipped} already up to date`:''}.`;
+ const keptNote=keptSupport.length?` Kept the previous profile for ${keptSupport.join(', ')} — Bible reported them as DPS.`:'';
+ if(s)s.textContent=`${base} New Additions: refreshed ${ok}${failed?`, ${failed} failed`:''}${skipped?`, ${skipped} already up to date`:''}.${keptNote}`;
 }
 function wireCandidateRefresh(){const btn=document.getElementById('refreshBtn');if(!btn||btn.dataset.candidateRefresh)return;btn.dataset.candidateRefresh='1';
  btn.addEventListener('click',()=>{

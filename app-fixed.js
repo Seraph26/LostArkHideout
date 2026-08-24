@@ -72,6 +72,36 @@ async function fetchCharacter(c){let r;try{r=await fetch(`${BIBLE_CONNECTOR}?url
    The map below is an older duplicate kept only as a fallback; it has no entry for
    Valkyrie, Wildsoul or Guardianknight, which is why those rendered no icon. */
 function classIconUrl(cls){try{const shared=window.LostArkHideoutClassData?.iconUrl?.(cls);if(shared)return shared}catch{}const map={Berserker:'ClassIcon-Warrior-Berserker.png',Destroyer:'ClassIcon-Warrior-Destroyer.png',Gunlancer:'ClassIcon-Warrior-Gunlancer.png',Paladin:'ClassIcon-Warrior-Paladin.png',Slayer:'ClassIcon-Warrior-Slayer.png',Arcanist:'ClassIcon-Mage-Arcanist.png',Arcana:'ClassIcon-Mage-Arcanist.png',Summoner:'ClassIcon-Mage-Summoner.png',Sorceress:'ClassIcon-Mage-Sorceress.png',Bard:'ClassIcon-Mage-Bard.png',Gunslinger:'ClassIcon-Gunner-Gunslinger.png',Deadeye:'ClassIcon-Gunner-Deadeye.png',Sharpshooter:'ClassIcon-Gunner-Sharpshooter.png',Artillerist:'ClassIcon-Gunner-Artillerist.png',Machinist:'ClassIcon-Gunner-Artillerist.png',Striker:'ClassIcon-Martial Artist-Striker.png',Wardancer:'ClassIcon-Martial Artist-Wardancer.png',Scrapper:'ClassIcon-Martial Artist-Scrapper.png',Soulfist:'ClassIcon-Martial Artist-Soulfist.png',Glavier:'ClassIcon-Martial Artist-Glaivier.png',Glaivier:'ClassIcon-Martial Artist-Glaivier.png',Deathblade:'ClassIcon-Assassin-Deathblade.png',Shadowhunter:'ClassIcon-Assassin-Shadowhunter.png',Reaper:'ClassIcon-Assassin-Reaper.png','Soul Eater':'Icon Soul Eater.jpg',Souleater:'Icon Soul Eater.jpg',Artist:'ClassIcon-Specialist-Artist.png',Aeromancer:'ClassIcon-Specialist-Aeromancer.png'};return map[cls]?`https://lostark.fandom.com/wiki/Special:Redirect/file/${encodeURIComponent(map[cls])}`:''}
+/* Bible occasionally reports a support's profile as a DPS build -- a Bard read
+   as True Courage rather than Desperate Salvation, with the CP and ranking that
+   go with it. Accepting that overwrites a good profile with a bad one and
+   changes how the optimizer scores them. So a refresh that would turn a
+   support-shaped profile into a DPS-shaped one is refused, and the last profile
+   in which they read as a support is kept instead.
+   Deliberately narrow: only the four support classes, only when the PREVIOUS
+   profile was itself support-shaped, and never for a genuine respec into a DPS
+   build on a non-support class. A real respec on a support class is the one
+   false positive -- the user can Remove and re-add the character to force it. */
+const SUPPORT_SPECS={bard:'desperate salvation',paladin:'blessed aura',artist:'full bloom',valkyrie:'liberator'};
+function supportClassOf(p){return SUPPORT_SPECS[String(p?.class||p?.className||'').trim().toLowerCase()]||null}
+function supportShaped(p){
+ if(!p)return false;
+ if(String(p.role||'')==='Support')return true;
+ const want=supportClassOf(p);
+ if(!want)return false;
+ const text=[...(p.enlightenment||[]),p.spec,p.specialization].filter(Boolean).join(' ').toLowerCase();
+ if(text.includes(want))return true;
+ const ally=p.allyEffects||{};
+ return Number(ally.allyDamage)>0||Number(ally.allyAtkPower)>0;
+}
+function keepKnownSupportProfile(previous,incoming){
+ if(!previous||!incoming)return{profile:incoming,kept:false};
+ if(!supportClassOf(previous)&&!supportClassOf(incoming))return{profile:incoming,kept:false};
+ if(supportShaped(previous)&&!supportShaped(incoming))return{profile:previous,kept:true};
+ return{profile:incoming,kept:false};
+}
+window.LostArkProfileGuard={keepKnownSupportProfile,supportShaped};
+
 /* These two used to special-case the character named "diamarte" into Souleater.
    Verified redundant on 2026-08-23: Bible reports Souleater for that character
    through classFromHtml, so the override only restated the profile. Matching on
@@ -102,9 +132,9 @@ async function refreshProfiles(){if(!state.characters.length)return setStatus('A
  const due=state.characters.filter(c=>window.__lostarkForceRefresh||!isFresh(c)).length;
  const total=due+pending;
  setStatus(`Refreshing character profiles… ${total} to fetch, one at a time — ${refreshEta(total)}. The more characters loaded, the longer a refresh takes.`);
- let ok=0,failed=0,skipped=0,done=0;for(const c of state.characters){if(!window.__lostarkForceRefresh&&isFresh(c)){skipped++;continue}
+ let ok=0,failed=0,skipped=0,done=0;const keptSupport=[];for(const c of state.characters){if(!window.__lostarkForceRefresh&&isFresh(c)){skipped++;continue}
  done++;setStatus(`Fetching profile ${done} of ${total} — one at a time; more characters means a longer refresh.`);
- try{c.profile=await fetchCharacter(c);delete c.profileError;ok++}catch(e){c.profileError=e.message;failed++}}saveState();render();window.__lostarkForceRefresh=false;const skipNote=skipped?` ${skipped} already up to date.`:'';setStatus(failed?`Refreshed ${ok}; ${failed} failed.${skipNote}`:`Refreshed ${ok} profile${ok===1?'':'s'} from Bible.${skipNote}`)}
+ try{const fresh=await fetchCharacter(c);const guard=keepKnownSupportProfile(c.profile,fresh);c.profile=guard.profile;if(guard.kept)keptSupport.push(c.profile?.name||c.name);delete c.profileError;ok++}catch(e){c.profileError=e.message;failed++}}saveState();render();window.__lostarkForceRefresh=false;const skipNote=skipped?` ${skipped} already up to date.`:'';const keptNote=keptSupport.length?` Kept the previous profile for ${keptSupport.join(', ')} — Bible reported them as DPS.`:'';setStatus(failed?`Refreshed ${ok}; ${failed} failed.${skipNote}${keptNote}`:`Refreshed ${ok} profile${ok===1?'':'s'} from Bible.${skipNote}${keptNote}`)}
 function removeCharacter(id){const c=state.characters.find(x=>x.id===id);if(!c)return;if(localStorage.getItem(REMOVE_CONFIRM_KEY)==='1')return performRemove(c);const o=document.createElement('div');o.className='remove-modal';o.innerHTML=`<div class="remove-modal-card"><h2>Remove character?</h2><p>Are you sure you want to remove <strong>${escapeHtml(c.name)}</strong>?</p><div class="remove-modal-actions"><button class="remove-cancel">Cancel</button><button class="remove-confirm">Remove Character</button></div></div>`;document.body.appendChild(o);o.querySelector('.remove-cancel').onclick=()=>o.remove();o.querySelector('.remove-confirm').onclick=()=>{o.remove();performRemove(c)}}function performRemove(c){state.characters=state.characters.filter(x=>x.id!==c.id);saveState();render()}
 function init(){const add=$('#addCharacterBtn');if(add)add.onclick=()=>{if(state.characters.length>=MAX_CHARACTERS)return setStatus(`Maximum of ${MAX_CHARACTERS} characters reached.`);const p=parseBibleUrl($('#characterUrl').value.trim());if(!p)return setStatus('Enter a valid lostark.bible character URL.');if(state.characters.some(c=>c.url.toLowerCase()===p.url.toLowerCase()))return setStatus('That character is already loaded.');const c={id:`${p.region}-${p.name}`.toLowerCase(),url:p.url,region:p.region,name:p.name};state.characters.push(c);saveState();render();fetchCharacter(c).then(profile=>{c.profile=profile;delete c.profileError;saveState();render();setStatus(`${profile.name} loaded.`)}).catch(e=>{c.profileError=e.message;saveState();render();setStatus(e.message)})};const refresh=$("#refreshBtn");if(refresh)refresh.onclick=e=>{window.__lostarkForceRefresh=!!(e&&e.shiftKey);refreshProfiles()};render()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
