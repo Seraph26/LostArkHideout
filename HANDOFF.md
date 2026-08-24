@@ -83,8 +83,10 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
   the counting call behind `sessionStorage`, so a refresh does not increment; later loads in the
   same session call `/visits?peek=1`, which reads without writing. Two tabs open at once count
   twice, and a private window always counts as new. The tally restarted under the KV key
-  `unique_visits_v1` when the rule changed; the old page-load figure (763, nearly all testing) is
-  still under `page_visits`.
+  `unique_visits_live_v1`. Two dead keys remain in the namespace and can be deleted whenever:
+  `page_visits` (the old page-load tally, 763, nearly all testing) and `unique_visits_v1` (the
+  first session-based tally, reset on 2026-08-23 to drop our own test hits). Resetting is done
+  by pointing `VISIT_KEY` at a fresh key and pushing, since there is no per-key write tool.
 - **CP** = the right-hand Combat Power panel, priority *Estimated Raid Loadout → Current Loadout (Raid)*, never Chaos Dungeon. In the payload that is `combatPower:{id:N,score:X}`. The header `≈` figure is `maxCombatPower`/`estimatedMaxCombatPower` = **best ever**, and the **roster tab shows that max too** — do not source CP from it (Mattnx: panel 5434.14 vs roster/header 5755.2).
 - **Class** comes from the class chip Bible renders in the header (a short `<p>`). The `classId` map is hand-maintained and has drifted twice: `holyknight_female` = Valkyrie (not Paladin), `alchemist` = Wildsoul (not Alchemist), `dragon_knight` = Guardianknight.
 - **Specialization** = an Ark Passive **Enlightenment** node name. Its tier position varies by class (Seraphh T1, Diamarté T2, Hetawl T5), so store all node names and match them against the spec rules. `parseProfile` stores `enlightenment` for this.

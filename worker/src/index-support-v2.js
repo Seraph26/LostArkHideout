@@ -1,11 +1,14 @@
-const WORKER_VERSION = "2026-08-23-post-rename";
+const WORKER_VERSION = "2026-08-23-counter-reset";
 const BIBLE_HOST = "lostark.bible";
 const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
 /* Counting changed from "every page load" to "once per browser session", and the
    old total was almost entirely our own testing, so it restarts under a new key
    rather than being zeroed by hand in the dashboard. The old page-load figure is
-   still under "page_visits" if it is ever wanted. */
-const VISIT_KEY = "unique_visits_v1";
+   still under "page_visits" if it is ever wanted. Reset again on 2026-08-23 to
+   drop the handful of hits from our own testing, by moving to this key rather
+   than editing a value by hand; "unique_visits_v1" holds that old count. This
+   is a reset, not a change of meaning -- it still counts browser sessions. */
+const VISIT_KEY = "unique_visits_live_v1";
 /* Share links used to carry the whole compressed roster snapshot in the URL
    fragment, so nothing ever touched a server -- deliberate, and true of every
    other endpoint here except this one. A full roster's snapshot runs past 2,000
