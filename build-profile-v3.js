@@ -29,6 +29,15 @@ function parse(html){const d=new DOMParser().parseFromString(html,'text/html'),t
  for(let i=0;i<ls.length;i++){const label=ls[i].replace(/[:：]$/,'');const known=sectionLabels.find(x=>x.toLowerCase()===label.toLowerCase());if(!known)continue;const rows=[];for(let j=i+1;j<ls.length&&rows.length<80;j++){const v=ls[j];if(sectionLabels.some(x=>x.toLowerCase()===v.replace(/[:：]$/,'').toLowerCase()))break;rows.push(v)}sections[known]=rows}
  return{className,engravings:engr,grid,arkPassive,tripods,stats,positional,burst,behavior,text:buildText,raidText:t,raidLines:ls,sections,retrievedAt:new Date().toISOString()}}
 async function fetchBuild(c){const r=await fetch(`${CONNECTOR}?url=${encodeURIComponent(c.url)}`,{cache:'no-store',headers:{Accept:'application/json'}});const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw Error('Bible connector returned non-JSON data')}if(!r.ok||data.ok===false)throw Error(data.error||`HTTP ${r.status}`);return parse(data.html||data.characterHtml||data.content||data.page)}
-async function refresh(){let state;try{state=JSON.parse(localStorage.getItem(STATE)||'null')}catch{return}if(!Array.isArray(state?.characters))return;const cache=load();for(const c of state.characters){if(!c?.url)continue;try{cache[c.url]=await fetchBuild(c)}catch(e){if(!cache[c.url])cache[c.url]={error:e.message}}}save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-v3-ready'))}
+/* Accepts an explicit character list. Without it, the only way to refresh builds
+   for anyone other than the Main Group was to overwrite the Main Group key in
+   localStorage, call this, and put it back afterwards -- a window in which the
+   stored roster was wrong, and a permanent loss of the Main Group if the tab was
+   closed or reloaded inside it. Callers pass their own list now; omitting it
+   still reads the Main Group, so existing behaviour is unchanged. */
+async function refresh(list){let chars;
+ if(Array.isArray(list))chars=list;
+ else{let state;try{state=JSON.parse(localStorage.getItem(STATE)||'null')}catch{return}chars=state?.characters}
+ if(!Array.isArray(chars))return;const cache=load();for(const c of chars){if(!c?.url)continue;try{cache[c.url]=await fetchBuild(c)}catch(e){if(!cache[c.url])cache[c.url]={error:e.message}}}save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-v3-ready'))}
 window.LostArkBuildProfilesV3={get:url=>load()[url]||null,refresh};
 })();
