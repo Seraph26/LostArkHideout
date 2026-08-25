@@ -17,6 +17,16 @@ function specFor(p,b){
     Lv. 1" as a T1 Enlightenment node). The class's other specs are unverified
     and guessing at them is how this file got reverted once already. */
  guardianknight:[['dreadful roar','Dreadful Roar']]};
+ /* Look in the Ark Passive Enlightenment nodes first, because that is where a
+    specialization actually lives. Searching the whole flattened page instead
+    produces false positives: Bible embeds a payload naming every spec a class
+    can take, so Haylebrella -- whose nodes read "T1 Drizzle" and whose rendered
+    page never says "Wind Fury" at all -- was labelled Wind Fury purely because
+    the string existed in the markup. Checked against seven characters: this
+    picks the right spec for all seven, where the flat search got one wrong.
+    Falls back to the old behaviour when a profile has no nodes parsed. */
+ const nodes=norm((b?.enlightenment||[]).join(' '));
+ if(nodes)for(const [needle,label] of(rules[cls]||[]))if(nodes.includes(needle))return label;
  for(const [needle,label] of(rules[cls]||[]))if(t.includes(needle))return label;return clean(p?.specialization||b?.specialization||'')||'';
 }
 function positionFor(p,b){const cls=norm(className(p,b));if(['bard','artist','paladin','valkyrie'].includes(cls))return'N/A';const explicit=clean(b?.positional||p?.positional||'');if(explicit&&!/^unknown$/i.test(explicit))return explicit;const t=norm([b?.text,p?.engravings,p?.arkGrid,p?.arkPassive,p?.tripods].flat().join(' '));if(/ambush master|back attack|entropy/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(cls==='berserker'&&/mayhem|berserker'?s technique|berserker technique/.test(t))return'Back Attack';if(cls==='summoner'&&/master summoner|communication overflow|ancient spear/.test(t))return'Hit Master';if(cls==='souleater'&&/full moon harvester|night.?s edge/.test(t))return'Hit Master';
