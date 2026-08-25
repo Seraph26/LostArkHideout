@@ -110,12 +110,36 @@
   /* Serial on purpose. The connector paces Bible calls ~650ms apart; three
      concurrent was tried previously and was far worse (Bible rate-limits the
      burst: 10 characters took 107s against ~21s serial). */
+  /* Slots were resolved strictly one after another, and each one is a full
+     Bible page through the connector, so a full lobby cost the *sum* of eight
+     round trips -- tens of seconds sitting on "Resolving 3 of 8".
+
+     They are independent, so run a few at once. Four is a deliberate middle:
+     enough to hide most of the latency, few enough to stay polite to Bible.
+     The number of requests is unchanged -- only their timing -- so this does
+     not touch the "no added Bible volume" constraint.
+
+     Progress now counts completions rather than starts, because with workers
+     in flight "starting number 5" no longer means four are finished. */
+  const RESOLVE_LIMIT = 4;
+
   async function resolveAll(slots, region, io, onProgress) {
-    const results = [];
-    for (let i = 0; i < slots.length; i++) {
-      if (onProgress) onProgress({ index: i, total: slots.length, slot: slots[i] });
-      results.push(await resolveSlot(slots[i], region, io));
+    const results = new Array(slots.length);
+    let next = 0, done = 0;
+
+    async function worker() {
+      for (;;) {
+        const i = next++;
+        if (i >= slots.length) return;
+        results[i] = await resolveSlot(slots[i], region, io);
+        done++;
+        if (onProgress) onProgress({ index: done - 1, total: slots.length, slot: slots[i], completed: done });
+      }
     }
+
+    const workers = [];
+    for (let i = 0; i < Math.min(RESOLVE_LIMIT, slots.length); i++) workers.push(worker());
+    await Promise.all(workers);
     return results;
   }
 

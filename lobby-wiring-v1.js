@@ -75,7 +75,7 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = 'Back to Main Group';
-    btn.addEventListener('click', () => { G.clear(); apply(); });
+    btn.addEventListener('click', () => { G.clear(); apply({ force: true }); });
     bar.appendChild(btn);
     host.parentNode.insertBefore(bar, host);
   }
@@ -191,18 +191,28 @@
     missing.forEach(c => attempted.add(flat(c.url)));
 
     buildsRunning = true;
-    Promise.resolve(refresh(missing)).then(() => {
-      buildsRunning = false;
-      /* refresh() fires lostark-build-profiles-v3-ready itself, which is what
-         the spec label listens for; this redraws the cards behind it. */
-      if (window.LostArkDashboard) window.LostArkDashboard.render();
-    }).catch(() => { buildsRunning = false; });
+    Promise.resolve(refresh(missing)).then(() => { buildsRunning = false; })
+      .catch(() => { buildsRunning = false; });
+    /* Deliberately no render() here. refresh() fires
+       lostark-build-profiles-v3-ready, and the repair layers listen for it and
+       rewrite the labels in place, so a redraw was never needed for them --
+       while render() *clears* #suggestedParties. Because these fetches land
+       tens of seconds after the import, that wiped whatever the user had just
+       optimised, which reads exactly like "I clicked Optimize and nothing
+       happened". */
   }
 
   /* In live mode the Main Group sections are replaced rather than added to,
      which is the whole point of the toggle. */
-  function apply() {
+  /* `force` means a person changed the roster -- toggled source, or imported a
+     lobby -- so the cards must be redrawn. Everything else calling apply() is a
+     background event (class data arriving, build profiles finishing), and those
+     must NOT redraw over optimizer output: render() clears #suggestedParties,
+     and the build fetches land seconds *after* an import, so an automatic redraw
+     silently deleted the parties the user had just optimised. */
+  function apply(opts) {
     if (!$('#sourceMainBtn')) return;
+    const force = !!(opts && opts.force);
     const live = G.isLive();
     $('#sourceMainBtn').classList.toggle('is-active', !live);
     $('#sourceLiveBtn').classList.toggle('is-active', live);
@@ -231,7 +241,9 @@
     const firstCard = document.querySelector('.summary-grid .card span');
     if (firstCard) firstCard.textContent = live ? 'Live Lobby' : 'Main Group';
 
-    if (window.LostArkDashboard) window.LostArkDashboard.render();
+    const parties = $('#suggestedParties');
+    const showingParties = !!(parties && parties.querySelector('[data-character-id]'));
+    if (window.LostArkDashboard && (force || !showingParties)) window.LostArkDashboard.render();
 
     const note = $('#rosterSourceNote');
     if (note) note.textContent = live
@@ -249,11 +261,11 @@
     fetch('raid-encounters.json?v=1').then(r => r.json()).then(manifest => {
       window.LostArkLobbyPanel.create($('#lobbyImportHost'), {
         manifest, io,
-        onImport: () => { apply(); autoSelectEncounter(G.meta()); }
+        onImport: () => { apply({ force: true }); autoSelectEncounter(G.meta()); }
       });
     });
-    $('#sourceMainBtn').addEventListener('click', () => { G.setSource('main'); apply(); });
-    $('#sourceLiveBtn').addEventListener('click', () => { G.setSource('live'); apply(); });
+    $('#sourceMainBtn').addEventListener('click', () => { G.setSource('main'); apply({ force: true }); });
+    $('#sourceLiveBtn').addEventListener('click', () => { G.setSource('live'); apply({ force: true }); });
 
     wireBusyState();
     apply();

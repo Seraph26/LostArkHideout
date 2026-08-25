@@ -39,6 +39,10 @@ function icon(cls){try{return window.LostArkHideoutClassData?.iconUrl?.(cls)||''
    something on the repair path. */
 const NEW_KEY='lostark-hideout-new-additions-v1';
 const LIVE_KEY='lostark-hideout-live-group-v1', SOURCE_KEY='lostark-hideout-roster-source-v1', LIVE_SOURCE='live';
+/* The source is stored JSON-encoded, so the raw value is "live" *with* quotes.
+   Comparing the raw string to 'live' silently never matches. */
+function sourceIsLive(){const raw=localStorage.getItem(SOURCE_KEY);
+ try{return JSON.parse(raw||'null')===LIVE_SOURCE}catch{return raw===LIVE_SOURCE}}
 /* Still deliberately not CandidateRoster.getAll(), for the reason above. But an
    imported lobby has to be visible here too, or its cards keep the raw class
    name where the specialization belongs -- the same shape of miss item 6 in
@@ -74,7 +78,7 @@ function stateProfiles(){
     module finally loads, so the wrong map would be pinned for the life of the
     page. Only cache once the source can actually be resolved; repair() runs on
     every body mutation, so the next pass rebuilds. */
- if(localStorage.getItem(SOURCE_KEY)===LIVE_SOURCE&&!window.LostArkLiveGroup)return m;
+ if(sourceIsLive()&&!window.LostArkLiveGroup)return m;
  profileSig=sig;profileCache=m;return m}
 function makeInline(img){img.style.display='inline-block';img.style.width='22px';img.style.height='22px';img.style.objectFit='contain';img.style.verticalAlign='middle';img.style.margin='0 7px 0 0';img.style.flex='0 0 22px';img.style.position='static'}
 function applyIcon(container,cls){if(!container||!cls)return;const src=icon(cls);if(!src)return;let img=container.querySelector(':scope > img.class-icon');if(!img){img=document.createElement('img');img.className='class-icon';container.insertBefore(img,container.firstChild)}img.src=src;img.alt=cls;img.removeAttribute('srcset');makeInline(img);container.style.display='inline-flex';container.style.alignItems='center';container.style.flexWrap='nowrap'}

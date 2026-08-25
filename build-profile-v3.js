@@ -38,6 +38,15 @@ async function fetchBuild(c){const r=await fetch(`${CONNECTOR}?url=${encodeURICo
 async function refresh(list){let chars;
  if(Array.isArray(list))chars=list;
  else{let state;try{state=JSON.parse(localStorage.getItem(STATE)||'null')}catch{return}chars=state?.characters}
- if(!Array.isArray(chars))return;const cache=load();for(const c of chars){if(!c?.url)continue;try{cache[c.url]=await fetchBuild(c)}catch(e){if(!cache[c.url])cache[c.url]={error:e.message}}}save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-v3-ready'))}
+ if(!Array.isArray(chars))return;const cache=load();
+ /* Same reasoning as resolveAll in lobby-resolve-v1.js: these are independent
+    pages and were fetched strictly one after another, so a full lobby paid the
+    sum of eight round trips. Same request count, fewer seconds. */
+ const pending=chars.filter(c=>c?.url),LIMIT=4;let next=0;
+ async function worker(){for(;;){const i=next++;if(i>=pending.length)return;const c=pending[i];
+  try{cache[c.url]=await fetchBuild(c)}catch(e){if(!cache[c.url])cache[c.url]={error:e.message}}}}
+ const running=[];for(let i=0;i<Math.min(LIMIT,pending.length);i++)running.push(worker());
+ await Promise.all(running);
+ save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-v3-ready'))}
 window.LostArkBuildProfilesV3={get:url=>load()[url]||null,refresh};
 })();
