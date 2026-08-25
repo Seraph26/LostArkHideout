@@ -264,6 +264,17 @@
        inert rather than throwing and taking the rest of the scripts with it. */
     if (!$('#sourceMainBtn') || !$('#sourceLiveBtn') || !$('#lobbyImportHost')) return;
 
+    /* Land on the Main Group after a reload, always. The imported lobby is kept
+       -- Live Lobby brings it straight back -- but it no longer presents itself
+       as current on open. Nothing records when a lobby was captured, so one from
+       days ago reads exactly like one from a minute ago, and the party it
+       describes has usually long since formed and gone. User's call, 2026-08-25.
+
+       setSource() rather than writing the key: returning to main restores the
+       Main Group's parked party arrangement, which is the entire reason that
+       parking exists. */
+    if (G.isLive()) G.setSource('main');
+
     fetch('raid-encounters.json?v=1').then(r => r.json()).then(manifest => {
       window.LostArkLobbyPanel.create($('#lobbyImportHost'), {
         manifest, io,

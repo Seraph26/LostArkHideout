@@ -226,26 +226,26 @@ account-wide data.
    kept** — they are committed, they pass (50/50, 27/27, 19/19), and they are
    the only regression cover for the pure logic and the resolution rules.
 
-## Open decision: how long an imported lobby should live
+## How long an imported lobby lives — decided
 
-An imported lobby persists in `lostark-hideout-live-group-v1` until it is
-replaced by another import or cleared with **Back to Main Group**. Nothing
-expires it and **no timestamp is stored**, so switching back to Live days later
-restores that same lobby — noticed by the user on 2026-08-25.
+**The dashboard always opens on the Main Group** (user's call, 2026-08-25).
+`lobby-wiring-v1.js` `start()` calls `G.setSource('main')` when the stored source
+is live, before the first `apply()`.
 
-That is what the code does, and it is defensible: reloading while inspecting one
-lobby keeps your place. The risk is a stale party read as current — item levels
-move, and the lobby itself is long gone. The banner names the lobby but cannot
-say how old it is, because nothing records that.
+The lobby itself is **kept**: `lostark-hideout-live-group-v1` is untouched, so
+clicking Live Lobby brings the same lobby straight back, banner and all. What
+changes is that it no longer presents itself as current the moment the page
+opens. Nothing records *when* a lobby was captured, so one from days ago reads
+exactly like one from a minute ago, and the party it describes has usually
+formed and gone.
 
-Options, none taken yet:
-1. Leave it. Persist until replaced or cleared.
-2. Add `importedAt` at `replace()` and clear on load past some age.
-3. Keep the data but always land on Main Group after a reload.
-4. Show the age in the banner and let the user judge.
+`setSource()` rather than writing the key directly, because returning to main
+restores the Main Group's parked party arrangement — the entire reason that
+parking exists.
 
-Option 2 or 4 needs the timestamp either way, which is a one-line addition to
-`replace()`.
+Considered and not taken: expiring the lobby by age, or showing its age in the
+banner. Both need an `importedAt` written in `replace()`, which is still a
+one-line addition if the age ever turns out to be worth showing.
 
 ## Design decisions the user made
 
