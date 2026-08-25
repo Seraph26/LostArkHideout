@@ -41,14 +41,32 @@
     return !!entry && !entry.error && !Array.isArray(entry.enlightenment);
   }
 
+  /* Deliberately NOT CandidateRoster.getAll(). The note above rosterCharacters()
+     in ui-fixes-clean.js spells out why: getAll() normalises every New Addition
+     on the way out, which stringifies each whole profile and can write back to
+     localStorage. Doing that on a repeating timer froze the tab outright on a
+     real roster -- the profiles are hundreds of KB each and the writes are
+     synchronous. Read the two keys directly and let the live group swap them,
+     which is the same cheap path the repair layer uses. */
+  const MAIN_KEY = 'lostark-hideout-private-v3';
+  const NEW_KEY = 'lostark-hideout-new-additions-v1';
+
+  function rosterCharacters() {
+    let out = [];
+    try { const s = JSON.parse(localStorage.getItem(MAIN_KEY) || 'null');
+      if (s && Array.isArray(s.characters)) out = out.concat(s.characters); } catch {}
+    try { const extra = JSON.parse(localStorage.getItem(NEW_KEY) || 'null');
+      if (Array.isArray(extra)) out = out.concat(extra); } catch {}
+    try { const live = window.LostArkLiveGroup?.resolveRoster?.(out);
+      if (Array.isArray(live)) return live; } catch {}
+    return out;
+  }
+
   function run() {
-    const roster = window.LostArkCandidateRoster;
     const builds = window.LostArkBuildProfilesV3;
-    if (!roster || typeof roster.getAll !== 'function') return false;
     if (!builds || typeof builds.refresh !== 'function') return false;
 
-    let chars = [];
-    try { chars = roster.getAll() || []; } catch { return false; }
+    const chars = rosterCharacters();
     if (!chars.length) return false;                 /* nothing loaded yet */
 
     const store = cache();
@@ -61,13 +79,26 @@
     return true;
   }
 
-  /* The roster and the profile cache are both populated by modules that load
-     after this one, and a live lobby is resolved later still. Poll briefly
-     rather than guess a delay, and stop as soon as one pass has something real
-     to look at. A fixed timeout was tried elsewhere in this codebase and was
-     consistently either too early or needlessly slow. */
+  /* The profile cache and the lobby modules load after this one, so poll --
+     but every pass now only reads localStorage, with no normalisation and no
+     writes, and it stops at the first pass that finds a roster. Slower interval
+     and fewer attempts as well: healing is not urgent, and nothing else waits
+     on it. */
   let tries = 0;
-  const tick = () => { if (run()) return; if (++tries < 40) setTimeout(tick, 250); };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(tick, 250), { once: true });
-  else setTimeout(tick, 250);
+  const tick = () => { if (run()) return; if (++tries < 20) setTimeout(tick, 500); };
+
+  /* Starts only after the load event, plus a pause. Healing is background work
+     that nothing on screen waits for, so it must never be able to sit between
+     the user and a rendered page -- whatever it ends up costing later. */
+  /* Escape hatch, checked before anything is scheduled:
+     localStorage.setItem('lostark-heal-off','1') stops this dead, so a bad
+     interaction can be switched off from the console without waiting on a
+     deploy to recover. */
+  let off = false;
+  try { off = localStorage.getItem('lostark-heal-off') === '1'; } catch {}
+  if (!off) {
+    const begin = () => setTimeout(tick, 2000);
+    if (document.readyState === 'complete') begin();
+    else window.addEventListener('load', begin, { once: true });
+  }
 })();
