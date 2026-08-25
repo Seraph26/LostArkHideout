@@ -8,6 +8,15 @@ const norm=v=>String(v??'').normalize('NFKC').trim().toLowerCase().replace(/[’
 const clean=v=>String(v??'').replace(/\s+/g,' ').trim();
 function load(k){try{return JSON.parse(localStorage.getItem(k)||'null')||{}}catch{return{}}}
 function className(p,b){return clean(p?.class||p?.className||p?.characterClass||b?.className||b?.class||'')}
+/* specFor runs per card per repair, so this stays a Set lookup and warns at most
+   once per class. Read the collected list with LostArkSpecAuthority.gaps(). */
+const specGaps=new Map();
+function noteSpecGap(cls,nodes){
+ if(!cls||specGaps.has(cls))return;
+ specGaps.set(cls,nodes||[]);
+ try{console.warn('[spec] no rule matched the Ark Passive Enlightenment nodes for "'+cls+
+  '". Nodes: '+(nodes||[]).join(', ')+'. Add an entry to the rules table in ui-fixes-clean.js.')}catch{}
+}
 function specFor(p,b){
  const cls=norm(className(p,b));
  const t=norm([...(p?.enlightenment||[]),p?.engravings,p?.arkGrid,p?.arkPassive,p?.skills,p?.tripods,p?.skillsText,p?.skillText,p?.tripodsText,p?.arkGridText,p?.arkPassiveText,p?.rawText,b?.text,...(b?.engravings||[]),...(b?.grid||[]).map(x=>`${x.name} ${x.type} ${x.branch}`),...(b?.arkPassive||[]).map(x=>`${x.name} ${x.level}`)].flat().join(' '));
@@ -34,7 +43,13 @@ function specFor(p,b){
     were parsed, which have no `enlightenment` at all; those heal on the next
     profile refresh. */
  const nodes=norm((b?.enlightenment||[]).join(' '));
- if(nodes){for(const [needle,label] of(rules[cls]||[]))if(nodes.includes(needle))return label;return ''}
+ if(nodes){for(const [needle,label] of(rules[cls]||[]))if(nodes.includes(needle))return label;
+  /* Nodes parsed, but no rule in this class's table matched one. Reading the
+     nodes exclusively means the table is now the only path, so a class whose
+     needles do not match the names Bible actually uses silently shows the class
+     name instead of a spec. Record it rather than let it pass unseen -- the
+     nodes are printed because they are exactly what a new table entry needs. */
+  noteSpecGap(cls,b.enlightenment);return ''}
  for(const [needle,label] of(rules[cls]||[]))if(t.includes(needle))return label;return clean(p?.specialization||b?.specialization||'')||'';
 }
 function positionFor(p,b){const cls=norm(className(p,b));if(['bard','artist','paladin','valkyrie'].includes(cls))return'N/A';const explicit=clean(b?.positional||p?.positional||'');if(explicit&&!/^unknown$/i.test(explicit))return explicit;const t=norm([b?.text,p?.engravings,p?.arkGrid,p?.arkPassive,p?.tripods].flat().join(' '));if(/ambush master|back attack|entropy/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(cls==='berserker'&&/mayhem|berserker'?s technique|berserker technique/.test(t))return'Back Attack';if(cls==='summoner'&&/master summoner|communication overflow|ancient spear/.test(t))return'Hit Master';if(cls==='souleater'&&/full moon harvester|night.?s edge/.test(t))return'Hit Master';
@@ -107,7 +122,7 @@ let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimati
 function start(){repair();new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});window.addEventListener('lostark-build-profiles-v3-ready',()=>setTimeout(repair,100))}
 /* Single source of truth for the displayed specialization, shared so Raid
    Specific shows the same label as the Main Group instead of the class name. */
-window.LostArkSpecAuthority={specFor,className};
+window.LostArkSpecAuthority={specFor,className,gaps:()=>[...specGaps].map(([cls,nodes])=>({cls,nodes}))};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 
 /* General Optimize lifecycle guard. UI state only: no scoring, hover, arrow,
