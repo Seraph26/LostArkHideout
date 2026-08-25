@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lobby import — logic tests</title>
+<style>
+ body{font:13px/1.55 Inter,system-ui,sans-serif;background:#11151c;color:#e7edf6;margin:0;padding:20px}
+ h1{font-size:17px;margin:0 0 2px}
+ .sub{color:#8fa0b8;margin:0 0 18px}
+ #summary{font-size:15px;font-weight:700;margin:14px 0;padding:10px 14px;border-radius:8px;display:inline-block}
+ .allpass{background:#12301f;color:#6ee7a8;border:1px solid #2c6b46}
+ .anyfail{background:#301418;color:#f0798f;border:1px solid #6b2c38}
+ table{border-collapse:collapse;width:100%;font-size:12px}
+ th,td{border-bottom:1px solid #273040;padding:5px 9px;text-align:left;vertical-align:top}
+ th{color:#9fb0c8}
+ td.p{color:#6ee7a8;font-weight:700;width:52px}
+ td.f{color:#f0798f;font-weight:700;width:52px}
+ code{background:#0d1117;padding:1px 5px;border-radius:4px}
+ .grp{margin-top:22px;font-weight:700;color:#9fb0c8;font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<h1>Lobby import — logic tests</h1>
+<p class="sub">Pure logic only: no network, no OCR, no DOM writes. Runs against fixtures captured from real screenshots and real Bible responses.</p>
+<div id="summary">running…</div>
+<div id="out"></div>
+
+<script src="lobby-import-v1.js?v=1"></script>
+<script>
+/* Real tesseract output (eng+deu+fra+spa) from the 8-man Kazeros lobby,
+   485x371 clipboard-grade capture. Verbatim, including its errors. */
+const KAZEROS_OCR = [
+ '[Hard] Final Day',
+ 'Gate 1 1-2 reclear 1 dps',
+ 'Party 1',
+ 'yA Brelshaza $ 1775.83 © Balthorr ® 1756.67',
+ 'Göldensparrow ws @ Largemitts (oy)',
+ 'len) Vairgrys $ 1750.83 & Nineveh ® 1765.00',
+ 'Zhaturno (oy) BussyBaka (oy)',
+ 'Party 2',
+ 'Y Vairgrys ® 1754.17 & Breishaza $ 1765.83',
+ 'Marcelinhö We Q Phuingara Q',
+ 'ES Balthorr ® 174000 ® Balthorr $ 1739.17',
+ '* Méteorologist & Parellina &'
+].join('\n');
+
+/* HAND-BUILT, not real OCR -- we never captured tesseract output for the 4-man
+   lobby, only the screenshot. Exercises party-size and translation, not OCR
+   fidelity. Replace with a real capture when one exists. */
+const SERCA_OCR = [
+ '[Nightmare] Sanctum of Frost',
+ 'Gate 1 full',
+ 'Party 1',
+ 'Vairgrys ® 1800.00 Vairgrys ® 1780.00',
+ 'Thesickness Q Eläsa Q',
+ 'Luterra ® 1760.00 Luterra ® 1785.00',
+ 'Ayamekzaka Q Yuesp Q'
+].join('\n');
+
+/* Verbatim from Bible's search for "Meteorologist" on NA. */
+const METEO_CANDIDATES = [
+ {name:'Mèteorologist', classId:'weather_artist', itemLevel:1740},
+ {name:'Meteorölogist', itemLevel:1735.8334},
+ {name:'Metëorologist', itemLevel:1715}
+];
+
+const L = window.LostArkLobbyImport;
+const results = [];
+let group = '';
+function g(name){ group = name; results.push({group:name}); }
+function eq(desc, actual, expected){
+  const a = JSON.stringify(actual), e = JSON.stringify(expected);
+  results.push({desc, pass:a===e, actual:a, expected:e});
+}
+function ok(desc, cond, detail){ results.push({desc, pass:!!cond, actual:String(detail===undefined?cond:detail), expected:'truthy'}); }
+
+let ENC = {}, MANIFEST = null;
+fetch('raid-encounters.json?v=1').then(r=>r.json()).then(m=>{
+  MANIFEST = m;
+  /* Through the helper, not m.raids -- Armoche lives in `optional` and the
+     extreme raids in `events`. */
+  L.allEncounters(m).forEach(r=>{ ENC[r.id]=r; });
+}).catch(()=>{}).then(run);
+
+function run(){
+  g('de-accenting (Bible search is accent-insensitive)');
+  eq('Göldensparrow → ASCII', L.deaccent('Göldensparrow'), 'Goldensparrow');
+  eq('Mèteorologist → ASCII', L.deaccent('Mèteorologist'), 'Meteorologist');
+  eq('Dragondëëz → ASCII (two marks)', L.deaccent('Dragondëëz'), 'Dragondeez');
+  eq('Eläsa → ASCII', L.deaccent('Eläsa'), 'Elasa');
+  eq('Bussyßaka → ss, not b', L.deaccent('Bussyßaka'), 'Bussyssaka');
+
+  g('item level repair and comparison');
+  eq('dropped decimal 174000', L.repairIlvl('174000'), '1740.00');
+  eq('dropped decimal 177583', L.repairIlvl('177583'), '1775.83');
+  eq('already well formed', L.repairIlvl('1739.17'), '1739.17');
+  eq('not an item level', L.repairIlvl('Party'), null);
+  ok('Bible 1739.1661 == lobby 1739.17 (Bible truncates, game rounds)', L.ilvlMatches(1739.1661, '1739.17'));
+  ok('Bible 1800.0001 == lobby 1800.00', L.ilvlMatches(1800.0001, '1800.00'));
+  ok('Bible 1759.17 != lobby 1800.00 (the Thesickness impostor)', !L.ilvlMatches(1759.17, '1800.00'));
+
+  g('server fuzzy match and region vote');
+  eq('Breishaza → Brelshaza', L.nearestServer('Breishaza'), 'Brelshaza');
+  eq('Baithorr → Balthorr', L.nearestServer('Baithorr'), 'Balthorr');
+  eq('Vaurgrys → Vairgrys', L.nearestServer('Vaurgrys'), 'Vairgrys');
+  eq('short icon noise ignored', L.nearestServer('ES'), null);
+  ok('no CE server within the d<=2 window of an NA one', (function(){
+    const na=[],ce=[];
+    Object.keys(L.SERVERS).forEach(s=>(L.SERVERS[s]==='NA'?na:ce).push(s));
+    let min=Infinity;
+    na.forEach(a=>ce.forEach(b=>{ min=Math.min(min, L.lev(a,b)); }));
+    return min>2;
+  })(), 'closest cross-region distance > 2');
+
+  g('8-man Kazeros lobby (real OCR)');
+  const kz = L.parseLobby(KAZEROS_OCR);
+  eq('encounter id', kz.encounterId, 'kazeros-g1');
+  eq('gate', kz.gate, 1);
+  eq('region', kz.region, 'NA');
+  eq('slot count', kz.slots.length, 8);
+  eq('item levels all recovered', kz.slots.map(s=>s.ilvl),
+     ['1775.83','1756.67','1750.83','1765.00','1754.17','1765.83','1740.00','1739.17']);
+  eq('servers all recovered', kz.slots.map(s=>s.server),
+     ['Brelshaza','Balthorr','Vairgrys','Nineveh','Vairgrys','Brelshaza','Balthorr','Balthorr']);
+  eq('names read (3 wrong, as expected from OCR)', kz.slots.map(s=>s.name),
+     ['Göldensparrow','Largemitts','Zhaturno','BussyBaka','Marcelinhö','Phuingara','Méteorologist','Parellina']);
+  ok('validates as a full 8-man lobby', L.validate(kz, ENC['kazeros-g1']).ok, JSON.stringify(L.validate(kz, ENC['kazeros-g1'])));
+
+  g('4-man Serca lobby (hand-built fixture)');
+  const sc = L.parseLobby(SERCA_OCR);
+  eq('encounter id', sc.encounterId, 'serca-g1');
+  eq('region', sc.region, 'NA');
+  eq('slot count', sc.slots.length, 4);
+  ok('manifest says 4 players', ENC['serca-g1'] && Number(ENC['serca-g1'].players)===4, ENC['serca-g1']&&ENC['serca-g1'].players);
+  ok('validates as a full 4-man lobby', L.validate(sc, ENC['serca-g1']).ok, JSON.stringify(L.validate(sc, ENC['serca-g1'])));
+
+  g('extreme lobbies say Gate 1; the manifest numbers it g2');
+  /* Verbatim from a real capture: "[Extreme Nightmare] Sennir Basin", Gate 1. */
+  const ext = L.parseLobby([
+    '[Extreme Nightmare] Sennir Basin |',
+    'Gate 1 reclear/rtc LF DPS',
+    'Party 1',
+    'Vairgrys ® 1770.83 Vairgrys ® 1771.67',
+    'Lauramarx Q Röckypunch Q',
+    'Nineveh ® 1786.67 Thaemine ® 1782.50',
+    'Muronda Q Flashybuns Q',
+    'Party 2',
+    'Vairgrys ® 1772.50 Luterra ® 1798.33',
+    'Djœul Q Ddeman Q',
+    'Vairgrys ® 1781.67 Vairgrys ® 1773.33',
+    'Batatanovamente Q Myrelise Q'
+  ].join('\n'));
+  eq('raid resolved despite OCR debris in the title', ext.raid, 'extreme-brelshaza');
+  eq('difficulty read', ext.difficulty, 'Extreme Nightmare');
+  eq('lobby gate kept as reported', ext.gate, 1);
+  eq('but the encounter is the g2 entry', ext.encounterId, 'extreme-brelshaza-g2');
+  eq('slots', ext.slots.length, 8);
+  eq('region', ext.region, 'NA');
+  eq('item levels', ext.slots.map(s=>s.ilvl),
+     ['1770.83','1771.67','1786.67','1782.50','1772.50','1798.33','1781.67','1773.33']);
+  ok('validates against the g2 entry', L.validate(ext, ENC['extreme-brelshaza-g2']).ok,
+     JSON.stringify(L.validate(ext, ENC['extreme-brelshaza-g2'])));
+  eq('non-extreme raids still use the gate as read', L.parseLobby(KAZEROS_OCR).encounterId, 'kazeros-g1');
+
+  g('the manifest is three arrays, not one');
+  eq('all nine encounters are visible', L.allEncounters(MANIFEST).length, 9);
+  ok('Armoche comes from `optional`', !!L.findEncounter(MANIFEST,'armoche-g1'));
+  ok('the extreme raid comes from `events`', !!L.findEncounter(MANIFEST,'extreme-brelshaza-g2'));
+  eq('reading only `raids` would have missed three', (MANIFEST.raids||[]).length, 6);
+
+  g('refusals');
+  const echidna = L.parseLobby('[Normal] Spiral of the Crimson Tide\nGate 1\nParty 1\nVairgrys ® 1700.00 Luterra ® 1700.00\nAaaa Q Bbbb Q');
+  ok('unsupported content is refused', !L.validate(echidna, null).ok, L.validate(echidna, null).reason);
+  const short = L.parseLobby(SERCA_OCR.split('\n').slice(0,5).join('\n'));
+  ok('partial lobby is refused', !L.validate(short, ENC['serca-g1']).ok, L.validate(short, ENC['serca-g1']).reason);
+
+  g('candidate selection (search narrows, item level decides)');
+  const pick = L.pickCandidate(METEO_CANDIDATES, '1740.00');
+  eq('picks the item-level match', pick.status, 'matched');
+  eq('and it is the right character', pick.candidate && pick.candidate.name, 'Mèteorologist');
+  eq('no match → surfaced, not guessed', L.pickCandidate(METEO_CANDIDATES, '1999.99').status, 'no-ilvl-match');
+  eq('empty search → none', L.pickCandidate([], '1740.00').status, 'none');
+  eq('lone candidate without item level match is flagged, not taken silently',
+     L.pickCandidate([{name:'Onlyone', itemLevel:1234}], '1740.00').status, 'single-no-ilvl');
+
+  render();
+}
+
+function render(){
+  let pass=0, fail=0, html='<table>';
+  for(const r of results){
+    if(r.group){ html += `<tr><td colspan="4" class="grp">${r.group}</td></tr>`; continue; }
+    r.pass ? pass++ : fail++;
+    html += `<tr><td class="${r.pass?'p':'f'}">${r.pass?'PASS':'FAIL'}</td><td>${r.desc}</td>`
+          + `<td><code>${escapeHtml(r.actual)}</code></td>`
+          + `<td>${r.pass?'':'<code>'+escapeHtml(r.expected)+'</code>'}</td></tr>`;
+  }
+  html += '</table>';
+  document.getElementById('out').innerHTML = html;
+  const s = document.getElementById('summary');
+  s.textContent = `${pass} passed · ${fail} failed`;
+  s.className = fail ? 'anyfail' : 'allpass';
+  window.__testResult = {pass, fail};
+}
+function escapeHtml(s){ return String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+</script>
+</body>
+</html>

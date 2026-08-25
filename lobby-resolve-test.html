@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lobby import — resolution tests</title>
+<style>
+ body{font:13px/1.55 Inter,system-ui,sans-serif;background:#11151c;color:#e7edf6;margin:0;padding:20px}
+ h1{font-size:17px;margin:0 0 2px}
+ .sub{color:#8fa0b8;margin:0 0 16px}
+ #summary{font-size:15px;font-weight:700;margin:12px 0;padding:10px 14px;border-radius:8px;display:inline-block}
+ .allpass{background:#12301f;color:#6ee7a8;border:1px solid #2c6b46}
+ .anyfail{background:#301418;color:#f0798f;border:1px solid #6b2c38}
+ table{border-collapse:collapse;width:100%;font-size:12px}
+ th,td{border-bottom:1px solid #273040;padding:5px 9px;text-align:left;vertical-align:top}
+ th{color:#9fb0c8}
+ td.p{color:#6ee7a8;font-weight:700;width:52px}
+ td.f{color:#f0798f;font-weight:700;width:52px}
+ .grp{margin-top:20px;font-weight:700;color:#9fb0c8;font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+ code{background:#0d1117;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>Lobby import — resolution tests</h1>
+<p class="sub">No network. Transports are stubbed with values recorded from live Bible responses; the search stub reproduces the real endpoint's behaviour (accent-insensitive prefix match, ten results max).</p>
+<div id="summary">running…</div>
+<div id="out"></div>
+
+<script src="lobby-import-v1.js?v=1"></script>
+<script src="lobby-resolve-v1.js?v=1"></script>
+<script>
+const L = window.LostArkLobbyImport;
+const R = window.LostArkLobbyResolve;
+
+/* Names and item levels recorded verbatim from live Bible responses on
+   2026-08-24 -- the search payloads for "Dragond", "Meteorologist" and "Bussy",
+   and the raw itemLevel field from the character pages. Nothing invented, with
+   one exception noted below. */
+const KNOWN = [
+  {name:'Dragond',        itemLevel:51.666668},
+  {name:'Dragondo',       itemLevel:1779.1666, classId:'dragon_knight'},
+  {name:'Dragondiu',      itemLevel:1750.8334},
+  {name:'Dragondre',      itemLevel:1715},
+  {name:'Dragondae',      itemLevel:1700.8334},
+  {name:'Dragondog',      itemLevel:1561.6666, classId:'soul_eater'},
+  {name:'Dragondéez',     itemLevel:1743.3334},
+  {name:'Dragondesu',     itemLevel:1740},
+  {name:'Dragondëëz',     itemLevel:1730.8334},
+  {name:'Dràgondeez',     itemLevel:1722.5},
+  {name:'Mèteorologist',  itemLevel:1740,      classId:'weather_artist'},
+  {name:'Meteorölogist',  itemLevel:1735.8334},
+  {name:'Metëorologist',  itemLevel:1715},
+  {name:'Bussyboi',       itemLevel:1712.6666, classId:'devil_hunter'},
+  {name:'Bussyßaka',      itemLevel:1765,      classId:'bard'},
+  {name:'Bussybreak',     itemLevel:1700.8334},
+  {name:'Bussybaker',     itemLevel:1660.8334},
+  {name:'Bussymunch',     itemLevel:1660.1666},
+  {name:'Bussyglace',     itemLevel:1656.1666},
+  {name:'Bussybobby',     itemLevel:1608.3334},
+  {name:'Bussymochi',     itemLevel:1585},
+  {name:'Bussyroach',     itemLevel:1437.5},
+  {name:'Bussyreaper',    itemLevel:1670.8334},
+  {name:'Thesíckness',    itemLevel:1759.17,   classId:'infighter_male'},
+  {name:'Thesîckness',    itemLevel:1800.0001, classId:'force_master'},
+  {name:'Thesicknëss',    itemLevel:1685,      classId:'blade'},
+  {name:'Zhaturno',       itemLevel:1750.8331},
+  {name:'Parellina',      itemLevel:1739.1661, classId:'yinyangshi'},
+  /* Item level taken from this character's profile payload rather than a search
+     response -- the search hit was recorded, its item level was not. */
+  {name:'Góldensparrow',  itemLevel:1775.8331, classId:'reaper'}
+];
+
+const flat = s => L.deaccent(s).toLowerCase();
+
+/* Reproduces what the live endpoint does: matches on the de-accented name, is
+   case-insensitive, and returns at most ten. */
+function stubSearch(query, region){
+  const q = flat(query);
+  if (!q) return Promise.resolve([]);
+  return Promise.resolve(KNOWN.filter(c => flat(c.name).startsWith(q)).slice(0, 10));
+}
+
+/* Bible answers a missing character with HTTP 200 and a page whose heading is
+   "Character Not Found", so the stub returns that shape rather than null. */
+let profileCalls = 0;
+function stubProfile(name, region){
+  profileCalls++;
+  const hit = KNOWN.find(c => c.name.toLowerCase() === String(name).toLowerCase());
+  return Promise.resolve(hit
+    ? {name: hit.name, ilvl: hit.itemLevel, class: hit.classId || 'Unknown'}
+    : {name: 'Character Not Found', ilvl: null, class: 'Unknown'});
+}
+
+const io = {search: stubSearch, fetchProfile: stubProfile};
+
+const results = [];
+function g(name){ results.push({group:name}); }
+function eq(desc, actual, expected){
+  results.push({desc, pass: JSON.stringify(actual)===JSON.stringify(expected),
+                actual: JSON.stringify(actual), expected: JSON.stringify(expected)});
+}
+
+async function run(){
+  g('the not-found guard');
+  eq('a real profile is not missing', R.looksMissing({name:'Zhaturno', ilvl:1750.83}), false);
+  eq('Bible’s 200-with-error page is missing', R.looksMissing({name:'Character Not Found', ilvl:null}), true);
+  eq('no item level means missing', R.looksMissing({name:'Something', ilvl:null}), true);
+
+  g('read correctly — no search at all');
+  const a = await R.resolveSlot({name:'Zhaturno', ilvl:'1750.83'}, 'NA', io);
+  eq('status', a.status, 'direct');
+  eq('searches used', a.searches, 0);
+
+  g('wrong accent — one search fixes it');
+  const b = await R.resolveSlot({name:'Göldensparrow', ilvl:'1775.83'}, 'NA', io);
+  eq('status', b.status, 'resolved');
+  eq('name', b.name, 'Góldensparrow');
+  eq('searches used', b.searches, 1);
+
+  const c = await R.resolveSlot({name:'Méteorologist', ilvl:'1740.00'}, 'NA', io);
+  eq('grave accent recovered', c.name, 'Mèteorologist');
+  eq('and it beat two accent twins', c.status, 'resolved');
+
+  g('two accents in one name (previously unreachable)');
+  const d = await R.resolveSlot({name:'Dragondeez', ilvl:'1730.83'}, 'NA', io);
+  eq('name', d.name, 'Dragondëëz');
+  eq('status', d.status, 'resolved');
+  eq('one search, not a combinatorial sweep', d.searches, 1);
+
+  g('shape error — search cannot see it, prefix can');
+  const e = await R.resolveSlot({name:'BussyBaka', ilvl:'1765.00'}, 'NA', io);
+  eq('name', e.name, 'Bussyßaka');
+  eq('status', e.status, 'resolved');
+  eq('two searches: de-accented, then prefix', e.searches, 2);
+
+  g('impostors are rejected, not imported');
+  const f = await R.resolveSlot({name:'Thesickness', ilvl:'1800.00'}, 'NA', io);
+  eq('picks the item-level match', f.name, 'Thesîckness');
+  eq('not the Scrapper at 1759.17 nor the Shadowhunter at 1685', f.status, 'resolved');
+  const ghost = await R.resolveSlot({name:'Notarealperson', ilvl:'1700.00'}, 'NA', io);
+  eq('nothing found is reported, not guessed', ghost.status, 'none');
+  eq('and no name is invented', ghost.name, null);
+
+  g('stale data is flagged, never rejected');
+  const stale = await R.resolveSlot({name:'Zhaturno', ilvl:'1799.99'}, 'NA', io);
+  eq('still imported', stale.status, 'direct-ilvl-mismatch');
+  eq('with the profile attached', stale.profile && stale.profile.name, 'Zhaturno');
+
+  g('a full lobby end to end');
+  profileCalls = 0;
+  const slots = [
+    {name:'Göldensparrow', ilvl:'1775.83'}, {name:'Zhaturno',      ilvl:'1750.83'},
+    {name:'BussyBaka',     ilvl:'1765.00'}, {name:'Méteorologist', ilvl:'1740.00'},
+    {name:'Parellina',     ilvl:'1739.17'}, {name:'Dragondeez',    ilvl:'1730.83'},
+    {name:'Thesickness',   ilvl:'1800.00'}, {name:'Dragondo',      ilvl:'1779.17'}
+  ];
+  const all = await R.resolveAll(slots, 'NA', io);
+  const s = R.summarise(all);
+  eq('every slot resolved', s.direct + s.resolved, 8);
+  eq('none needing attention', s.needsAttention, 0);
+  eq('searches stayed inside the budget (<=2 per name)', s.searches <= 16, true);
+  eq('searches actually used', s.searches, 6);
+  eq('profile fetches: one probe per name plus one per recovery', profileCalls, 13);
+
+  render();
+}
+
+function render(){
+  let pass=0, fail=0, html='<table>';
+  for(const r of results){
+    if(r.group){ html += `<tr><td colspan="4" class="grp">${r.group}</td></tr>`; continue; }
+    r.pass ? pass++ : fail++;
+    html += `<tr><td class="${r.pass?'p':'f'}">${r.pass?'PASS':'FAIL'}</td><td>${r.desc}</td>`
+          + `<td><code>${esc(r.actual)}</code></td><td>${r.pass?'':'<code>'+esc(r.expected)+'</code>'}</td></tr>`;
+  }
+  document.getElementById('out').innerHTML = html + '</table>';
+  const el = document.getElementById('summary');
+  el.textContent = `${pass} passed · ${fail} failed`;
+  el.className = fail ? 'anyfail' : 'allpass';
+  window.__testResult = {pass, fail};
+}
+const esc = s => String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+run().catch(e => { document.getElementById('out').textContent = 'ERROR: ' + e.message; window.__testResult={error:e.message}; });
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lobby import — live group storage tests</title>
+<style>
+ body{font:13px/1.55 Inter,system-ui,sans-serif;background:#11151c;color:#e7edf6;margin:0;padding:20px}
+ h1{font-size:17px;margin:0 0 2px}
+ .sub{color:#8fa0b8;margin:0 0 16px}
+ #summary{font-size:15px;font-weight:700;margin:12px 0;padding:10px 14px;border-radius:8px;display:inline-block}
+ .allpass{background:#12301f;color:#6ee7a8;border:1px solid #2c6b46}
+ .anyfail{background:#301418;color:#f0798f;border:1px solid #6b2c38}
+ table{border-collapse:collapse;width:100%;font-size:12px}
+ th,td{border-bottom:1px solid #273040;padding:5px 9px;text-align:left;vertical-align:top}
+ th{color:#9fb0c8}
+ td.p{color:#6ee7a8;font-weight:700;width:52px}
+ td.f{color:#f0798f;font-weight:700;width:52px}
+ .grp{margin-top:20px;font-weight:700;color:#9fb0c8;font-size:12px;letter-spacing:.05em;text-transform:uppercase}
+ code{background:#0d1117;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>Lobby import — live group storage tests</h1>
+<p class="sub">Every <code>lostark-hideout-*</code> key is snapshotted before the run and restored byte for byte afterwards, including keys that did not exist.</p>
+<div id="summary">running…</div>
+<div id="out"></div>
+<div class="sub" id="restore"></div>
+
+<script src="lobby-group-v1.js?v=1"></script>
+<script>
+const G = window.LostArkLiveGroup;
+const MAIN_KEY = 'lostark-hideout-private-v3';
+const results = [];
+function g(name){ results.push({group:name}); }
+function eq(desc, actual, expected){
+  results.push({desc, pass: JSON.stringify(actual)===JSON.stringify(expected),
+                actual: JSON.stringify(actual), expected: JSON.stringify(expected)});
+}
+function ok(desc, cond, detail){ results.push({desc, pass:!!cond, actual:String(detail===undefined?cond:detail), expected:'truthy'}); }
+
+/* Snapshot everything this suite could plausibly disturb. */
+const touched = [MAIN_KEY, G.LIVE_KEY, G.LIVE_KEY+'-meta', G.SOURCE_KEY];
+const snapshot = {};
+for (const k of touched) snapshot[k] = localStorage.getItem(k);
+
+function restore(){
+  let restored = 0;
+  for (const k of touched) {
+    const was = snapshot[k];
+    if (was === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, was); }
+    restored++;
+  }
+  document.getElementById('restore').textContent =
+    `${restored} keys restored to their pre-test values.`;
+}
+
+const char = (id, name, ilvl) => ({id, name, region:'NA',
+  url:'https://lostark.bible/character/NA/'+name, profile:{name, ilvl, class:'Bard'}});
+
+function run(){
+  /* A Main Group that must survive everything below untouched. */
+  const mainState = {characters:[char('na-alpha','Alpha',1700), char('na-beta','Beta',1710)]};
+  localStorage.setItem(MAIN_KEY, JSON.stringify(mainState));
+  const mainBefore = localStorage.getItem(MAIN_KEY);
+  const mainList = mainState.characters;
+
+  g('defaults');
+  G.clear();
+  eq('source defaults to main', G.source(), 'main');
+  eq('not live', G.isLive(), false);
+  eq('no characters', G.characters(), []);
+  eq('roster passes the Main Group straight through', G.resolveRoster(mainList).map(c=>c.id), ['na-alpha','na-beta']);
+
+  g('importing a lobby');
+  const lobby = [char('na-lauramarx','Lauramarx',1770.83), char('na-ddeman','Ddeman',1798.33)];
+  G.replace(lobby, {encounterId:'extreme-brelshaza-g2', importedAt:'2026-08-24T22:00:00Z'});
+  eq('stored', G.characters().map(c=>c.id), ['na-lauramarx','na-ddeman']);
+  eq('meta stored', G.meta().encounterId, 'extreme-brelshaza-g2');
+  eq('still on main until switched', G.source(), 'main');
+  eq('so the roster is still the Main Group', G.resolveRoster(mainList).map(c=>c.id), ['na-alpha','na-beta']);
+
+  g('switching source');
+  G.setSource('live');
+  eq('now live', G.isLive(), true);
+  eq('roster is the imported lobby', G.resolveRoster(mainList).map(c=>c.id), ['na-lauramarx','na-ddeman']);
+  eq('switching back restores the Main Group', (G.setSource('main'), G.resolveRoster(mainList).map(c=>c.id)), ['na-alpha','na-beta']);
+  eq('an unknown value is treated as main', (G.setSource('nonsense'), G.source()), 'main');
+
+  g('an empty live group must not blank the dashboard');
+  G.replace([]);
+  G.setSource('live');
+  eq('falls back to the Main Group', G.resolveRoster(mainList).map(c=>c.id), ['na-alpha','na-beta']);
+
+  g('clearing');
+  G.replace(lobby, {encounterId:'kazeros-g1'});
+  G.setSource('live');
+  G.clear();
+  eq('characters gone', G.characters(), []);
+  eq('meta gone', G.meta(), null);
+  eq('and it returns to the Main Group rather than nothing', G.source(), 'main');
+
+  g('the Main Group is never touched');
+  /* Everything above ran with a Main Group in place. */
+  ok('byte-for-byte identical after every operation', localStorage.getItem(MAIN_KEY) === mainBefore,
+     localStorage.getItem(MAIN_KEY) === mainBefore ? 'unchanged' : 'MODIFIED');
+  ok('the live key is not the Main Group key', G.LIVE_KEY !== MAIN_KEY, G.LIVE_KEY);
+  ok('the source key is its own, not the optimizer mode key',
+     G.SOURCE_KEY !== 'lostark-hideout-optimizer-mode-v1', G.SOURCE_KEY);
+
+  render();
+  restore();
+}
+
+function render(){
+  let pass=0, fail=0, html='<table>';
+  for(const r of results){
+    if(r.group){ html += `<tr><td colspan="4" class="grp">${r.group}</td></tr>`; continue; }
+    r.pass ? pass++ : fail++;
+    html += `<tr><td class="${r.pass?'p':'f'}">${r.pass?'PASS':'FAIL'}</td><td>${r.desc}</td>`
+          + `<td><code>${esc(r.actual)}</code></td><td>${r.pass?'':'<code>'+esc(r.expected)+'</code>'}</td></tr>`;
+  }
+  document.getElementById('out').innerHTML = html + '</table>';
+  const el = document.getElementById('summary');
+  el.textContent = `${pass} passed · ${fail} failed`;
+  el.className = fail ? 'anyfail' : 'allpass';
+  window.__testResult = {pass, fail};
+}
+const esc = s => String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+try { run(); } catch (e) { restore(); document.getElementById('out').textContent = 'ERROR: '+e.message; window.__testResult={error:e.message}; }
+</script>
+</body>
+</html>

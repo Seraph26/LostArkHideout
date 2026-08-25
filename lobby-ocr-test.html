@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lobby import — OCR harness</title>
+<style>
+ body{font:13px/1.55 Inter,system-ui,sans-serif;background:#11151c;color:#e7edf6;margin:0;padding:20px}
+ h1{font-size:17px;margin:0 0 2px}
+ .sub{color:#8fa0b8;margin:0 0 16px}
+ .panel{background:#161c26;border:1px solid #273040;border-radius:9px;padding:14px;margin-bottom:14px}
+ .hint{border:2px dashed #3a4760;border-radius:10px;padding:20px;text-align:center;color:#8fa0b8}
+ button{font:inherit;font-weight:600;padding:7px 14px;border-radius:7px;border:1px solid #4a5a80;background:#2c5cc5;color:#fff;cursor:pointer}
+ button:disabled{opacity:.5;cursor:default}
+ pre{background:#0d1117;border:1px solid #273040;border-radius:6px;padding:10px;max-height:230px;overflow:auto;white-space:pre-wrap;font-size:12px;margin:8px 0 0}
+ table{border-collapse:collapse;width:100%;font-size:12px}
+ th,td{border-bottom:1px solid #273040;padding:5px 9px;text-align:left}
+ th{color:#9fb0c8}
+ .ok{color:#6ee7a8;font-weight:700}.bad{color:#f0798f;font-weight:700}.warn{color:#e8c46a}
+ #status{margin:10px 0;color:#9fb0c8}
+ code{background:#0d1117;padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<h1>Lobby import — OCR harness</h1>
+<p class="sub">Pixels in, parsed lobby out. No network calls to Bible, no storage writes, no roster changes.</p>
+
+<div class="panel hint" id="hint">
+ Press <b>Win+Shift+S</b>, drag a box around the party panel, then <b>Ctrl+V</b> here.
+ <div class="sub" style="margin:8px 0 0">
+  Run the game in <b>Borderless</b>. Exclusive fullscreen presents straight to the GPU, so captures
+  often come back black and alt-tabbing forces a slow mode switch. Windowed works but shrinks the UI.
+  Leave the aspect ratio native — forcing 21:9 on a 16:9 monitor letterboxes the view and renders
+  every panel smaller, which is the one setting that measurably costs OCR accuracy.
+ </div>
+</div>
+
+<div class="panel">
+ <button id="fixture">Run the saved reference capture</button>
+ <button id="fullshot" class="secondary">Run the saved full-screen capture</button>
+ <span id="status">idle</span>
+</div>
+
+<div class="panel" id="croppanel" style="display:none"><strong>Choose the party panel</strong><div id="crop"></div></div>
+
+<div class="panel"><strong>Parsed lobby</strong><div id="parsed">—</div></div>
+<div class="panel"><strong>Raw OCR text</strong><pre id="raw">—</pre></div>
+
+<script src="lobby-import-v1.js?v=1"></script>
+<script src="lobby-crop-v1.js?v=1"></script>
+<script src="lobby-ocr-v1.js?v=1"></script>
+<script>
+const $ = s => document.querySelector(s);
+const status = t => { $('#status').textContent = t; };
+
+/* The reference capture lives outside the repo on purpose -- it is a screenshot
+   of real players and does not belong in version control. Served cross-origin
+   from the scratchpad with CORS so the canvas stays untainted. */
+const FIXTURE = 'http://localhost:8790/ocrtest1.png';
+
+/* What the reference capture actually contains, verified against Bible. */
+const EXPECT = {
+  encounterId: 'kazeros-g1',
+  region: 'NA',
+  slots: 8,
+  ilvls: ['1775.83','1756.67','1750.83','1765.00','1754.17','1765.83','1740.00','1739.17'],
+  servers: ['Brelshaza','Balthorr','Vairgrys','Nineveh','Vairgrys','Brelshaza','Balthorr','Balthorr'],
+  names: ['Góldensparrow','Largemitts','Zhaturno','Bussyßaka','Marcelinhö','Phuingara','Mèteorologist','Parellina']
+};
+
+function row(label, actual, expected){
+  const pass = JSON.stringify(actual) === JSON.stringify(expected);
+  return `<tr><td class="${pass?'ok':'bad'}">${pass?'PASS':'FAIL'}</td><td>${label}</td>`
+       + `<td><code>${esc(JSON.stringify(actual))}</code></td>`
+       + `<td>${pass?'':'<code>'+esc(JSON.stringify(expected))+'</code>'}</td></tr>`;
+}
+const esc = s => String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function show(result){
+  const lo = result.lobby;
+  $('#raw').textContent = result.text || '(empty)';
+  let html = `<p class="sub">source ${result.source.width}×${result.source.height} → OCR ${result.ocr.width}×${result.ocr.height} `
+           + `(scale ${result.ocr.scale}×) · ${result.ms}ms`
+           + (result.wideCapture ? ' · <span class="warn">wide capture — a tighter crop reads better</span>' : '') + '</p>';
+  /* The pass/fail columns only mean anything for the reference capture. Any
+     other lobby is simply reported, not scored against someone else's roster. */
+  if (lo.encounterId !== EXPECT.encounterId) {
+    html += `<p><b>${esc(lo.act||'?')}</b> — ${esc(lo.difficulty||'?')} · gate ${lo.gate} `
+          + `→ <code>${esc(lo.encounterId||'none')}</code> · region ${esc(lo.region||'?')} · `
+          + `${lo.slots.filter(s=>s.name).length}/${lo.slots.length} named</p>`
+          + '<table><tr><th>server</th><th>name</th><th>item level</th></tr>'
+          + lo.slots.map(s=>`<tr><td>${esc(s.server||'—')}</td><td>${esc(s.name||'—')}</td><td>${esc(s.ilvl)}</td></tr>`).join('')
+          + '</table>';
+    $('#parsed').innerHTML = html;
+    window.__ocrResult = {encounterId:lo.encounterId, region:lo.region,
+      slots:lo.slots.length, named:lo.slots.filter(s=>s.name).length, reference:false, ms:result.ms};
+    return;
+  }
+  html += '<table><tr><th></th><th>field</th><th>actual</th><th>expected</th></tr>';
+  html += row('encounter id', lo.encounterId, EXPECT.encounterId);
+  html += row('region', lo.region, EXPECT.region);
+  html += row('slot count', lo.slots.length, EXPECT.slots);
+  html += row('item levels', lo.slots.map(s=>s.ilvl), EXPECT.ilvls);
+  html += row('servers', lo.slots.map(s=>s.server), EXPECT.servers);
+  html += '</table>';
+
+  /* Names are expected to be partly wrong -- that is what the search and item
+     level oracle exist to fix in increment 3. Report the count, not a pass. */
+  const got = lo.slots.map(s=>s.name);
+  const exact = got.filter((n,i)=>n===EXPECT.names[i]).length;
+  html += `<p style="margin-top:10px"><b>names read exactly: ${exact}/8</b> `
+        + `<span class="sub">(the rest are resolved by search + item level in increment 3)</span></p>`;
+  html += '<table><tr><th>OCR</th><th>truth</th></tr>'
+        + got.map((n,i)=>`<tr><td class="${n===EXPECT.names[i]?'ok':'warn'}">${esc(n)}</td><td>${esc(EXPECT.names[i])}</td></tr>`).join('')
+        + '</table>';
+  $('#parsed').innerHTML = html;
+  window.__ocrResult = {encounterId:lo.encounterId, region:lo.region, slots:lo.slots.length,
+    ilvlsOk: JSON.stringify(lo.slots.map(s=>s.ilvl))===JSON.stringify(EXPECT.ilvls),
+    serversOk: JSON.stringify(lo.slots.map(s=>s.server))===JSON.stringify(EXPECT.servers),
+    namesExact: exact, ms: result.ms};
+}
+
+async function runOn(source){
+  $('#fixture').disabled = true;
+  window.__ocrResult = null;
+  try {
+    const result = await LostArkLobbyOCR.readLobby(source, m => status(`${m.status} ${Math.round((m.progress||0)*100)}%`));
+    status(`done in ${result.ms}ms`);
+    show(result);
+  } catch (e) {
+    status('failed');
+    $('#parsed').innerHTML = `<span class="bad">${esc(e.message)}</span>`;
+    window.__ocrResult = {error: e.message};
+  }
+  $('#fixture').disabled = false;
+}
+
+/* A snip of the panel goes straight through; a wide capture gets a crop step,
+   because locating the panel automatically in a full-screen frame does not
+   work -- a real 1920x1080 grab produced no readable anchors at all. */
+async function start(source){
+  const url = (source instanceof Blob) ? URL.createObjectURL(source) : source;
+  const probe = new Image();
+  if (typeof url === 'string' && /^https?:/i.test(url)) probe.crossOrigin = 'anonymous';
+  probe.onerror = () => status('that image could not be read');
+  probe.onload = async () => {
+    if (!LostArkLobbyCrop.needsCrop(probe.naturalWidth)) {
+      $('#croppanel').style.display = 'none';
+      return runOn(url);
+    }
+    status(`${probe.naturalWidth}×${probe.naturalHeight} — pick the party panel`);
+    $('#croppanel').style.display = '';
+    try {
+      const picked = await LostArkLobbyCrop.pickRegion($('#crop'), url);
+      $('#croppanel').style.display = 'none';
+      status(picked.cropped ? `cropped to ${picked.rect.w}×${picked.rect.h}` : 'using the whole image');
+      runOn(picked.canvas);
+    } catch (e) { status('crop failed: ' + e.message); }
+  };
+  probe.src = url;
+}
+
+$('#fixture').addEventListener('click', () => { status('loading reference capture…'); start(FIXTURE); });
+$('#fullshot').addEventListener('click', () => { status('loading full-screen capture…'); start('http://localhost:8790/fullscreen1.webp'); });
+
+LostArkLobbyOCR.onPasteImage(file => { status(`pasted ${file.type}, ${Math.round(file.size/1024)}KB`); start(file); });
+</script>
+</body>
+</html>

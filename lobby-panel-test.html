@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lobby import — panel harness</title>
+<style>
+ body{font:13px/1.55 Inter,system-ui,sans-serif;background:#11151c;color:#e7edf6;margin:0;padding:20px}
+ h1{font-size:17px;margin:0 0 2px}
+ .sub{color:#8fa0b8;margin:0 0 16px}
+ .panel{background:#161c26;border:1px solid #273040;border-radius:9px;padding:14px;margin-bottom:14px}
+ button.demo{font:inherit;font-weight:600;padding:7px 13px;border-radius:7px;border:1px solid #46516a;background:#1a2230;color:#edf2fb;cursor:pointer}
+ code{background:#0d1117;padding:1px 5px;border-radius:4px}
+ pre{background:#0d1117;border:1px solid #273040;border-radius:6px;padding:10px;font-size:12px;overflow:auto;max-height:220px}
+</style>
+</head>
+<body>
+<h1>Lobby import — panel harness</h1>
+<p class="sub">The real panel, with Bible calls stubbed from recorded responses. Nothing reaches the network; the live group is written to its own key and restored when you press Reset.</p>
+
+<div class="panel">
+ <button class="demo" id="ref">Run the reference capture</button>
+ <button class="demo" id="full">Run the full-screen capture (crop step)</button>
+ <button class="demo" id="reset">Reset stored state</button>
+</div>
+
+<div class="panel" id="host"></div>
+<div class="panel"><strong>Live group as stored</strong><pre id="stored">—</pre></div>
+
+<script src="lobby-import-v1.js?v=1"></script>
+<script src="lobby-group-v1.js?v=1"></script>
+<script src="lobby-crop-v1.js?v=1"></script>
+<script src="lobby-ocr-v1.js?v=1"></script>
+<script src="lobby-resolve-v1.js?v=1"></script>
+<script src="lobby-panel-v1.js?v=1"></script>
+<script>
+const L = window.LostArkLobbyImport;
+
+/* Recorded from live Bible responses on 2026-08-24. Item levels marked (i) are
+   inferred from the rendered page rather than the raw payload -- Bible's page
+   truncates, so the raw value is the shown one plus a fraction. */
+const KNOWN = [
+  {name:'Góldensparrow', itemLevel:1775.8331, classId:'reaper'},
+  {name:'Largemitts',    itemLevel:1756.6661, classId:'infighter_male'},  /* (i) */
+  {name:'Zhaturno',      itemLevel:1750.8331},
+  {name:'Bussyßaka',     itemLevel:1765.0001, classId:'bard'},
+  {name:'Marcelinhö',    itemLevel:1754.1661, classId:'devil_hunter'},    /* (i) */
+  {name:'Phuingara',     itemLevel:1765.8331},                            /* (i) */
+  {name:'Mèteorologist', itemLevel:1740,      classId:'weather_artist'},
+  {name:'Parellina',     itemLevel:1739.1661, classId:'yinyangshi'},
+  /* Impostors that really exist and must be rejected by the item level check. */
+  {name:'Metëorologist', itemLevel:1715},
+  {name:'Meteorölogist', itemLevel:1735.8334},
+  {name:'Sussybaka',     itemLevel:1690},
+  /* Sennir Basin lobby. */
+  {name:'Lauramarx',      itemLevel:1770.8331},
+  {name:'Röckypunch',     itemLevel:1771.6661},
+  {name:'Muronda',        itemLevel:1786.6661},
+  {name:'Flashybuns',     itemLevel:1782.5001},
+  {name:'Djœul',          itemLevel:1772.5001},
+  {name:'Ddeman',         itemLevel:1798.3331},
+  {name:'Batatanovamente',itemLevel:1781.6661},
+  {name:'Myrelise',       itemLevel:1773.3331}
+];
+
+const flat = s => L.deaccent(s).toLowerCase();
+const io = {
+  /* Reproduces the live endpoint: de-accented, case-insensitive, prefix, max 10. */
+  search: (q) => Promise.resolve(
+    KNOWN.filter(c => flat(c.name).startsWith(flat(q))).slice(0, 10)),
+  fetchProfile: (name) => {
+    const hit = KNOWN.find(c => c.name.toLowerCase() === String(name).toLowerCase());
+    return Promise.resolve(hit
+      ? {name: hit.name, ilvl: hit.itemLevel, class: hit.classId || 'Unknown'}
+      : {name: 'Character Not Found', ilvl: null, class: 'Unknown'});
+  }
+};
+
+const $ = s => document.querySelector(s);
+const showStored = () => {
+  const G = window.LostArkLiveGroup;
+  $('#stored').textContent = JSON.stringify({
+    source: G.source(), meta: G.meta(),
+    characters: G.characters().map(c => `${c.name} (${c.id}) ilvl ${c.profile && c.profile.ilvl}`)
+  }, null, 1);
+};
+
+let panel = null;
+fetch('raid-encounters.json?v=1').then(r => r.json()).then(manifest => {
+  panel = LostArkLobbyPanel.create($('#host'), {manifest, io, onImport: showStored});
+  window.__panel = panel;
+  showStored();
+});
+
+$('#ref').addEventListener('click', () => panel.handle('http://localhost:8790/ocrtest1.png'));
+$('#full').addEventListener('click', () => panel.handle('http://localhost:8790/fullscreen1.webp'));
+$('#reset').addEventListener('click', () => { window.LostArkLiveGroup.clear(); showStored(); });
+</script>
+</body>
+</html>

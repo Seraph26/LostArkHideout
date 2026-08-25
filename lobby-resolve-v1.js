@@ -1,0 +1,132 @@
+/* Lobby import — turning an OCR'd name into a confirmed character.
+
+   OCR gets the base letters right and the diacritics wrong, so a name often
+   does not exist as read. Bible's character search ignores diacritics, which
+   makes the de-accented name the reliable query, and it returns item levels
+   inline so a candidate can be checked without fetching anything.
+
+   Transports are injected rather than imported. That keeps this file testable
+   against recorded payloads, and means it does not care whether the calls go
+   through the worker or a stub.
+
+   Traffic discipline (Bible's maintainers dislike scraping, and this is their
+   undocumented internal endpoint):
+     - direct profile fetch first, because most names read correctly and a miss
+       costs 6.7KB against 230KB for a real profile
+     - at most two searches per name: de-accented, then a short prefix
+     - never fetch profiles for candidates -- search already carries item level,
+       so only the winner is fetched
+     - no enumeration, no prefix crawling, no speculative lookups
+   That works out to roughly what a person opening the same character pages by
+   hand would cost, which is what this replaces. */
+(function () {
+  'use strict';
+
+  /* Bible answers a missing character with HTTP 200 and a normal-looking page
+     whose <h1> is "Character Not Found" -- 6.7KB against 170-316KB for a real
+     profile. Without this guard a mistyped name becomes a card literally named
+     after the error, which is a live bug for hand-entered URLs too. */
+  const MISSING_HEADING = /character not found/i;
+  function looksMissing(profile) {
+    if (!profile) return true;
+    if (MISSING_HEADING.test(String(profile.name || ''))) return true;
+    /* A real profile always carries an item level; the not-found page has none.
+       Test for absence before converting -- Number(null) is 0, which is finite,
+       so a null item level would otherwise sail through this guard. */
+    const ilvl = profile.ilvl;
+    if (ilvl === null || ilvl === undefined || ilvl === '') return true;
+    return !Number.isFinite(Number(ilvl));
+  }
+
+  const PREFIX_LEN = 5;
+
+  /* Used only when the de-accented name finds nothing, which happens for shape
+     errors rather than accent errors -- tesseract read Bussyßaka as BussyBaka,
+     and "Bussybaka" de-accents to "Bussyssaka", matching nothing. A short
+     prefix still finds it. */
+  function prefixFor(name, deaccent) {
+    const flat = deaccent ? deaccent(name) : String(name || '');
+    return flat.length <= PREFIX_LEN ? flat : flat.slice(0, PREFIX_LEN);
+  }
+
+  /* One slot, one answer, with the reason attached so the review UI can explain
+     itself rather than silently substituting a name. */
+  async function resolveSlot(slot, region, io) {
+    const api = window.LostArkLobbyImport;
+    const out = { slot, region, name: null, profile: null, status: 'unresolved', searches: 0, tried: [] };
+    if (!slot || !slot.name) { out.status = 'no-name'; return out; }
+
+    /* 1. As read. Most names are correct, and this costs almost nothing when
+          they are not. */
+    out.tried.push(slot.name);
+    const direct = await io.fetchProfile(slot.name, region);
+    if (!looksMissing(direct)) {
+      out.name = direct.name || slot.name;
+      out.profile = direct;
+      out.status = api.ilvlMatches(direct.ilvl, slot.ilvl) ? 'direct' : 'direct-ilvl-mismatch';
+      return out;
+    }
+
+    /* 2. De-accented, because the search sees through diacritics. */
+    const flat = api.deaccent(slot.name);
+    out.tried.push(flat);
+    out.searches++;
+    let candidates = await io.search(flat, region);
+    let pick = api.pickCandidate(candidates, slot.ilvl);
+
+    /* 3. Short prefix, for errors the search cannot see through. */
+    if (pick.status === 'none' || pick.status === 'no-ilvl-match') {
+      const prefix = prefixFor(slot.name, api.deaccent);
+      if (prefix && prefix !== flat) {
+        out.tried.push(prefix + '…');
+        out.searches++;
+        const more = await io.search(prefix, region);
+        const second = api.pickCandidate(more, slot.ilvl);
+        if (second.status === 'matched') { pick = second; candidates = more; }
+        else if (pick.status === 'none') { pick = second; candidates = more; }
+      }
+    }
+
+    if (pick.status === 'matched') {
+      const profile = await io.fetchProfile(pick.candidate.name, region);
+      if (!looksMissing(profile)) {
+        out.name = pick.candidate.name;
+        out.profile = profile;
+        out.status = 'resolved';
+        out.candidate = pick.candidate;
+        return out;
+      }
+    }
+
+    /* Anything else is handed to the person rather than guessed. Collisions are
+       normal -- Dragondeez, Thesickness and Meteorologist each have three live
+       accent variants -- so a single unverified candidate is a suggestion, not
+       an answer. */
+    out.status = pick.status === 'matched' ? 'unresolved' : pick.status;
+    out.candidates = pick.candidates || (pick.candidate ? [pick.candidate] : []);
+    return out;
+  }
+
+  /* Serial on purpose. The connector paces Bible calls ~650ms apart; three
+     concurrent was tried previously and was far worse (Bible rate-limits the
+     burst: 10 characters took 107s against ~21s serial). */
+  async function resolveAll(slots, region, io, onProgress) {
+    const results = [];
+    for (let i = 0; i < slots.length; i++) {
+      if (onProgress) onProgress({ index: i, total: slots.length, slot: slots[i] });
+      results.push(await resolveSlot(slots[i], region, io));
+    }
+    return results;
+  }
+
+  const summarise = results => ({
+    total: results.length,
+    direct: results.filter(r => r.status === 'direct').length,
+    resolved: results.filter(r => r.status === 'resolved').length,
+    flagged: results.filter(r => r.status === 'direct-ilvl-mismatch').length,
+    needsAttention: results.filter(r => !['direct', 'resolved'].includes(r.status)).length,
+    searches: results.reduce((n, r) => n + r.searches, 0)
+  });
+
+  window.LostArkLobbyResolve = { looksMissing, prefixFor, resolveSlot, resolveAll, summarise, PREFIX_LEN };
+})();
