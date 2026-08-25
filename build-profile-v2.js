@@ -20,7 +20,27 @@ const burst=/(igniter|punisher|full moon|burst|death strike|surge|identity burst
 const buildText=clean([engr.join(' '),grid.map(x=>x.name+' '+x.points+' '+x.type+' '+x.branch).join(' '),arkPassive.map(x=>x.name+' '+x.level).join(' '),t].join(' '));
 return{engravings:engr,grid,arkPassive,stats,positional,burst,text:buildText,retrievedAt:new Date().toISOString()}}
 async function fetchBuild(c){const r=await fetch(`${CONNECTOR}?url=${encodeURIComponent(c.url)}`,{cache:'no-store',headers:{Accept:'application/json'}});const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw Error('Bible connector returned non-JSON data')}if(!r.ok||data.ok===false)throw Error(data.error||`HTTP ${r.status}`);return parse(data.html||data.characterHtml||data.content||data.page)}
-async function refresh(){let state;try{state=JSON.parse(localStorage.getItem(STATE)||'null')}catch{return}if(!Array.isArray(state?.characters))return;const cache=load();for(const c of state.characters){if(!c?.url)continue;try{cache[c.url]=await fetchBuild(c)}catch(e){if(!cache[c.url])cache[c.url]={error:e.message}}}save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-ready'))}
+/* This refetched every Main Group character's full Bible page on every single
+   page load, with no cache check at all -- roughly 230KB each, serialised
+   behind the 650ms pacer in bible-fetch-retry-v1.js, so eight characters cost
+   something like twenty seconds of connector traffic every time the dashboard
+   was opened, to rewrite a cache that already held the same thing.
+
+   Bible request volume is the binding constraint on this project, and none of
+   it was needed: v3 is the primary cache, and every consumer reads v2 only as a
+   fallback behind it. Fetch what is missing and leave the rest alone. Pass true
+   to force a full rebuild. */
+async function refresh(force){let state;try{state=JSON.parse(localStorage.getItem(STATE)||'null')}catch{return}if(!Array.isArray(state?.characters))return;const cache=load();let fetched=0;
+ for(const c of state.characters){if(!c?.url)continue;
+  /* An entry carrying {error} is retried: it holds no build data to keep. */
+  if(!force){const e=cache[c.url];if(e&&!e.error)continue}
+  try{cache[c.url]=await fetchBuild(c);fetched++}catch(e){if(!cache[c.url])cache[c.url]={error:e.message}}}
+ if(!fetched&&!force)return;                 /* nothing fetched: nothing to save or announce */
+ save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-ready'))}
 window.LostArkBuildProfilesV2={get:url=>load()[url]||null,refresh};
-refresh();
+/* After the load event, never during it. Filling a fallback cache is background
+   work that nothing on screen waits for, and it used to run while the page was
+   still coming up. */
+if(document.readyState==='complete')setTimeout(refresh,2500);
+else window.addEventListener('load',()=>setTimeout(refresh,2500),{once:true});
 })();
