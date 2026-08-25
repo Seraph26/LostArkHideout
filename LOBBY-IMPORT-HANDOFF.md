@@ -173,23 +173,51 @@ account-wide data.
    push. The two cannot be separated by branch — a worker-only deploy needs a
    commit on `main` that touches only `worker/`, which is how `cb39a93` was
    done while the lobby feature stayed on `lobby-import`.
-3. **Spec display regression** — live-lobby cards show the class (`Breaker`)
-   instead of the specialization (`Asura's Path`), because the spec-display
-   layer reads `private-v3` and cannot see imported characters. Genuine
-   HANDOFF item 6 territory. Find the real seam; three previous guesses at this
-   class of bug were all wrong.
+3. ~~**Spec display regression**~~ — **done 2026-08-25.** The stated cause was
+   the fourth wrong guess: `build-spec-display-v1.js` never reads `private-v3`
+   at all, it reads `lostark-hideout-build-profiles-v3` keyed by Bible URL. It
+   was two faults, not one:
+   - **No build profiles existed for an imported lobby.** Not cosmetic —
+     `encounter-scoring-v2.js` and both optimizers read that same cache, so the
+     lobby was being scored with no engravings, no positional and no Ark
+     Passive. Fixed in `lobby-wiring-v1.js` via `BuildProfilesV3.refresh()`.
+   - **The roster-card repair could not see the lobby.** `rosterCharacters()` in
+     `ui-fixes-clean.js` built its map from the Main Group and New Additions
+     keys. Now runs the list through `resolveRoster()` — deliberately *not*
+     `getAll()`, which normalises and can write to localStorage on a path that
+     runs per mutation.
+
+   Plus `Dreadful Roar`, Guardian Knight's specialization, which was missing
+   from `KNOWN_ENGRAVINGS` and both spec tables. All three edits are in shared
+   authorities, so the **Main Group gets them too** — verified by seeding four
+   characters and confirming Dreadful Roar, Asura's Path, Blessed Aura and Wind
+   Fury all render outside live mode.
+
+   Two hours went into this that the rAF note in HANDOFF would have saved: the
+   labels looked unchanged in the browser pane because `schedule()` latches
+   `queued=true` behind a dead `requestAnimationFrame`, so `repair()` never ran
+   again. The logic had been correct for some time. **Confirm display fixes by
+   calling the logic directly, or by dispatching
+   `lostark-build-profiles-v3-ready`, which bypasses rAF.**
 4. **Untested:** ~~search end-to-end~~ (done, see item 2), multi-accent names,
    a 4-player lobby import, Bible staleness tolerance (observed up to 15 days
    stale but still matching), CE lobbies (user has no EU characters; de-risked
    analytically). **The OCR paste path has still never run in `index.html`** —
    it needs a real `Ctrl+V` of a real screenshot, which only the user can do.
    That is the one thing standing between here and calling this confirmed.
-5. **Deferred by the user until the feature is finished:** updating `HANDOFF.md`,
-   and adding a **new-class checklist** to it. A new class needs five things:
-   name (automatic), icon, support/DPS role, spec rules, synergy table — and the
-   last three affect correctness, not just appearance. Warpweaver is expected
-   next month.
-6. Prune or keep the five test harnesses and the OCR spike deliberately.
+5. ~~**Deferred until the feature is finished**~~ — **done 2026-08-25.**
+   `HANDOFF.md` has a new **Live Lobby Import** section, and item 9 is now a
+   full **new-class checklist** — eight steps with exact file locations, worked
+   through against Guardian Knight rather than written from memory. It turned
+   out to be eight things, not five: class recognition in the build parser and
+   spec *extraction* (`KNOWN_ENGRAVINGS`) are separate from the spec *label*,
+   and the label itself lives in two tables. Warpweaver is expected next month.
+6. ~~Prune or keep the harnesses and the OCR spike~~ — **decided 2026-08-25.**
+   `lobby-preview.html` and `lobby-preview-wiring.js` are **deleted**; the real
+   page is the test surface now and both were superseded by `lobby-wiring-v1.js`
+   (copies in the session scratchpad, content in git). The **five harnesses are
+   kept** — they are committed, they pass (50/50, 27/27, 19/19), and they are
+   the only regression cover for the pure logic and the resolution rules.
 
 ## Design decisions the user made
 

@@ -108,6 +108,32 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
   Raid uses both for its card labels and hovers. The General model's support uptime already consults the selected encounter, so its numbers are encounter-aware.
 - **Party size**: `raid-encounters.json` carries `players` (4 or 8). Horizon Cathedral and Serca are 4-player. General has its own `#generalFormatSelect` (8-player / 4-player), hidden while Raid Specific is selected, persisted in `lostark-hideout-general-format-v1`.
 
+## Live Lobby Import
+
+Paste a party-finder screenshot → OCR → each character resolved on Bible → the
+lobby loads as a temporary roster **in place of** the Main Group, which is never
+written to. Full detail, including the OCR and resolution findings, is in
+`LOBBY-IMPORT-HANDOFF.md`. What the rest of the app needs to know:
+
+- **The roster seam is `LostArkLiveGroup.resolveRoster(list)`**: give it the
+  Main-Group-plus-New-Additions list and it hands back the live lobby when the
+  source is live, or the list untouched otherwise. `candidate-roster-v1.js`
+  `allCharacters()` goes through it, so `getAll()`/`getEligible()` are already
+  live-aware and both optimizers came along for free.
+  **On the repair path use `resolveRoster()` directly, not `getAll()`** —
+  `getAll()` normalises New Additions and can write to localStorage.
+- **Build profiles are not automatic.** They are keyed by Bible URL and were only
+  ever built for the Main Group. An imported lobby with none is not merely
+  missing its spec label — `encounter-scoring-v2.js` and both optimizers read the
+  same cache, so it scores with no engravings, no positional and no Ark Passive.
+  `lobby-wiring-v1.js` calls `BuildProfilesV3.refresh(missing)` for exactly the
+  members absent from the cache, once each.
+- **Anything that caches a map keyed off localStorage signatures** must include
+  the live-group and source keys, *and* must not cache at all while a live lobby
+  is stored but the lobby modules have not loaded yet — nothing in the signature
+  changes when they arrive, so an early pass otherwise pins the wrong map for the
+  life of the page. This is what `stateProfiles()` in `ui-fixes-clean.js` does.
+
 ## Render loops — read before touching any display layer
 
 Layers observe `#suggestedParties` (or `body`) and write back into it. Unguarded this self-feeds: idle churn was **~10,480 DOM mutations every 2 seconds**, which caused the Firefox slowdown, laggy swaps and hover text rewriting itself. Now **0**.
@@ -220,9 +246,46 @@ Supports score 0 contribution individually by design — their value is inside t
    the *previous* profile was support-shaped, so a bugged first import is never locked
    in and a bugged → good refresh always heals. The one false positive is a genuine
    respec on a support class: Remove and re-add forces it through.
-9. **New classes** (e.g. Warpweaver): the class *name* resolves automatically
-   from the Bible header chip, but icon, support/DPS role, spec rules and synergy
-   table are hardcoded lists needing manual entries.
+9. **New classes — checklist** (e.g. Warpweaver). Only the class *name* resolves
+   automatically, from the Bible header chip. Everything below is a hardcoded
+   list, and the last four affect **correctness**, not just appearance. Worked
+   through end to end on 2026-08-25 for Guardian Knight, which is how the
+   locations below are known to be complete.
+
+   1. **Name** — automatic. Nothing to do.
+   2. **Icon** — `class-icon-authority-v1.js`. Fandom is abandoned for new
+      classes (no Breaker, no Wildsoul), so expect to commit a local SVG and
+      point at it. `app-fixed.js` `classIconUrl()` holds an older fallback map;
+      it defers to the authority, so it does not need the entry.
+   3. **Class recognition in the build parser** — the alternation in
+      `build-profile-v3.js` `parse()` (`classMatch`), plus `canonicalClass()` if
+      Bible's spelling differs from ours. Miss this and `className` is
+      `'Unknown'`, which silently degrades everything downstream.
+   4. **Spec extraction** — `KNOWN_ENGRAVINGS` in `build-profile-v3.js`. Modern
+      specs read as T1 Ark Passive *Enlightenment* nodes (`Asura's Path Lv. 1`),
+      and are picked up **only** because the name appears in this list — the
+      `arkPassive` array is usually empty, because its line regex expects
+      newlines the flattened page text does not have. If the name is not here,
+      no later layer can recover it.
+   5. **Spec label — two tables, both needed.**
+      `ui-fixes-clean.js` `specFor()` has a **per-class** rule map and is the one
+      that labels the cards (`LostArkSpecAuthority`); `build-spec-display-v1.js`
+      has a **flat** rule list. A class absent from the per-class map falls back
+      to showing the class name, which is exactly what "Breaker instead of
+      Asura's Path" looked like.
+   6. **Support/DPS role** — `SUPPORTS` is duplicated in
+      `general-party-optimizer-v2.js`, `optimizer-v17.js`, `hover-summary-v6.js`,
+      `general-party-label-bridge-v1.js` and `positional-authority-v1.js`
+      (lower-cased there), plus `SUPPORT_SPECS` in `app-fixed.js`, which also
+      drives the support-profile guard.
+   7. **Positional** — `positional-authority-v1.js`, and the `RANGED` set at the
+      top of `ui-fixes-clean.js` if the class is ranged.
+   8. **Synergy table** — `party-synergy-authority-v1.js`.
+
+   **Verify against a real profile, never from memory.** Guardian Knight's spec
+   is **Dreadful Roar**; it was very nearly entered as "Dreadful Road". Fetch the
+   character through the connector and grep the payload for the name before
+   adding it anywhere.
 10. **The raid list is hand-maintained, deliberately.** `raid-encounters.json` is edited
     directly; a new or departing raid needs an entry there **and** in the `fallback()` list
     inside `raid-selector-v1.js` (used when the manifest fetch fails), plus a scoring profile
