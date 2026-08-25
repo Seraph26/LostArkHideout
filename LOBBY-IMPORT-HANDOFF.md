@@ -226,6 +226,27 @@ account-wide data.
    kept** — they are committed, they pass (50/50, 27/27, 19/19), and they are
    the only regression cover for the pure logic and the resolution rules.
 
+## Open decision: how long an imported lobby should live
+
+An imported lobby persists in `lostark-hideout-live-group-v1` until it is
+replaced by another import or cleared with **Back to Main Group**. Nothing
+expires it and **no timestamp is stored**, so switching back to Live days later
+restores that same lobby — noticed by the user on 2026-08-25.
+
+That is what the code does, and it is defensible: reloading while inspecting one
+lobby keeps your place. The risk is a stale party read as current — item levels
+move, and the lobby itself is long gone. The banner names the lobby but cannot
+say how old it is, because nothing records that.
+
+Options, none taken yet:
+1. Leave it. Persist until replaced or cleared.
+2. Add `importedAt` at `replace()` and clear on load past some age.
+3. Keep the data but always land on Main Group after a reload.
+4. Show the age in the banner and let the user judge.
+
+Option 2 or 4 needs the timestamp either way, which is a one-line addition to
+`replace()`.
+
 ## Design decisions the user made
 
 - Paste only (`Ctrl+V`); no drag-drop, no upload, no sample lobbies.

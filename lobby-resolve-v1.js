@@ -110,17 +110,22 @@
   /* Serial on purpose. The connector paces Bible calls ~650ms apart; three
      concurrent was tried previously and was far worse (Bible rate-limits the
      burst: 10 characters took 107s against ~21s serial). */
-  /* Slots were resolved strictly one after another, and each one is a full
-     Bible page through the connector, so a full lobby cost the *sum* of eight
-     round trips -- tens of seconds sitting on "Resolving 3 of 8".
+  /* Slots used to be resolved strictly one after another: fetch, parse, next.
 
-     They are independent, so run a few at once. Four is a deliberate middle:
-     enough to hide most of the latency, few enough to stay polite to Bible.
-     The number of requests is unchanged -- only their timing -- so this does
-     not touch the "no added Bible volume" constraint.
+     Four workers run here, but be clear about what that does and does not buy.
+     It does NOT issue four requests at once: bible-fetch-retry-v1.js wraps
+     window.fetch and serialises every connector /character call behind a 650ms
+     pacer, so request timing is unchanged no matter what call sites do. Three
+     concurrent was measured and was far worse -- Bible rate-limits the burst --
+     and that is why the pacer exists. See "Refresh behaviour" in HANDOFF.
 
-     Progress now counts completions rather than starts, because with workers
-     in flight "starting number 5" no longer means four are finished. */
+     What it buys is overlap: one slot's parsing and its de-accented search
+     happen while another slot's page is still on the wire, instead of the whole
+     lobby waiting on one strictly serial chain. Same requests, same order, less
+     dead time between them.
+
+     Progress counts completions rather than starts, because with workers in
+     flight "starting number 5" no longer means four are finished. */
   const RESOLVE_LIMIT = 4;
 
   async function resolveAll(slots, region, io, onProgress) {

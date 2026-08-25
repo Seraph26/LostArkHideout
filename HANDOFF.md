@@ -50,6 +50,22 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
 
 ## Data / Bible facts (hard-won)
 
+- **The profile page has no lines.** `clean()` collapses every run of whitespace
+  to a single space, so anything doing `text.split(/\n+/)` gets one enormous
+  line. `parse()` did exactly that until 2026-08-25, which is why `arkPassive`,
+  `grid`, `stats` and `sections` came back **empty for every character ever
+  parsed** — silently, with the optimizers scoring on engravings alone. Read
+  structure out of the DOM, or use anchored patterns against the flat text.
+  Shapes that work: Ark Passive rows carry a tier chip (`T2 Keen Sense Lv. 2`);
+  Ark Grid reads `Apex 18 | Order Sun`; combat stats read `Crit +92`, **never**
+  `Crit 92`; skills read `Lv. 10 Wild Uppercut 222 Quick Recharge`, where an
+  absent rune is the literal `No rune` and must be stripped before matching or
+  the name capture stops early and the rune swallows the rest of it.
+- **`sections` is still empty** and nothing reads it. Left alone deliberately.
+- **`tripods` used to be junk.** A regex loose enough to match accessory rows
+  gave every character the same six entries — Necklace, Earring, Earring, Ring,
+  Ring, Stone — and that was flattened into the text the optimizers
+  pattern-match against. It carries real skills now.
 - WebFetch gets 403 on lostark.bible. The in-app browser loads it fine. The app's own connector:
   `https://lostark-bible-connector.seraph0226.workers.dev/character?url=<encoded bible url>`
 - **The connector is origin-locked.** `/character`, `/raid-stats` and `/visits` answer only
@@ -147,6 +163,28 @@ Also: `text()`/`build()` in the General optimizer and `build()`/`info()` in the 
 ## Refresh behaviour
 
 - Connector calls are **serialised** with a 650ms gap. Three concurrent was tried and is much worse (Bible rate-limits the burst; 10 characters took 107s vs ~21s serial). Fewer requests is the only real lever.
+  **The pacer is invisible from every call site**, which is why this keeps being
+  missed: `bible-fetch-retry-v1.js` wraps `window.fetch` itself, so a loop that
+  looks like it runs four at a time still issues its requests one at a time,
+  650ms apart. Adding concurrency at a call site changes **request timing not at
+  all**. `resolveAll()` and `BuildProfilesV3.refresh()` do run workers, and their
+  comments say plainly that the only thing gained is overlapping a 230KB parse
+  with the next page's network wait. Do not "improve" this into real parallelism;
+  that road was measured and lost.
+- **Nothing refetches a cached build profile on load any more.** `build-profile-v2.js`
+  used to call `refresh()` unconditionally at startup with no cache check, pulling
+  every Main Group character's full page (~230KB each) to overwrite data it already
+  had — about 20s of connector traffic per dashboard open, against the one constraint
+  that actually binds. It now fills gaps only (and retries `{error}` entries, which
+  hold no build data), after the load event. Consequence: **v2 no longer refreshes
+  itself at all**. That is fine while v3 is healthy — every consumer reads v2 only
+  as a fallback behind v3 — but a forced rebuild is now an explicit
+  `LostArkBuildProfilesV2.refresh(true)`.
+- `build-profile-heal-v1.js` backfills profiles cached before Ark Passive parsed
+  (staleness = no `enlightenment` array; the parser always writes it, as `[]` when
+  a character genuinely has no Enlightenment block, so it cannot loop). Runs after
+  the load event, one fetch per stale character, once. Kill switch:
+  `localStorage.setItem('lostark-heal-off','1')`.
 - Profiles fetched within **60s** are skipped (Main Group and New Additions), reported in the status. **Shift-click Refresh Profiles forces all.** This window was 10 minutes and silently skipped deliberate refreshes after a respec — don't lengthen it.
 - New Additions cap is **8** (`MAX` in `candidate-roster-v1.js`); the counter reads from that constant.
 
@@ -261,18 +299,31 @@ Supports score 0 contribution individually by design — their value is inside t
       `build-profile-v3.js` `parse()` (`classMatch`), plus `canonicalClass()` if
       Bible's spelling differs from ours. Miss this and `className` is
       `'Unknown'`, which silently degrades everything downstream.
-   4. **Spec extraction** — `KNOWN_ENGRAVINGS` in `build-profile-v3.js`. Modern
-      specs read as T1 Ark Passive *Enlightenment* nodes (`Asura's Path Lv. 1`),
-      and are picked up **only** because the name appears in this list — the
-      `arkPassive` array is usually empty, because its line regex expects
-      newlines the flattened page text does not have. If the name is not here,
-      no later layer can recover it.
-   5. **Spec label — two tables, both needed.**
-      `ui-fixes-clean.js` `specFor()` has a **per-class** rule map and is the one
-      that labels the cards (`LostArkSpecAuthority`); `build-spec-display-v1.js`
-      has a **flat** rule list. A class absent from the per-class map falls back
-      to showing the class name, which is exactly what "Breaker instead of
-      Asura's Path" looked like.
+   4. **Ark Passive parsing** — nothing to add for a new class; `parse()` reads
+      the nodes structurally. Worth knowing how, because it is what step 5 uses:
+      rows carry a tier chip (`T2 Keen Sense Lv. 2`), and the list is three
+      blocks — Evolution, **Enlightenment**, Leap — laid out in order, each
+      restarting at T1, so a block ends wherever the tier goes backwards.
+      `enlightenment` is the middle block.
+      **Do not read the block's first node as the spec.** It looks right on
+      Breaker (Asura's Path) and Guardian Knight (Dreadful Roar) and is wrong
+      elsewhere: Deathblade opens with Swift Strike and carries Remaining Energy
+      at T2, Paladin opens with Holy Protection and carries Blessed Aura at T2.
+      Right for four of seven characters tested — not a rule.
+   5. **Spec label — two tables, both needed, and both read only the
+      Enlightenment nodes.** `ui-fixes-clean.js` `specFor()` has a **per-class**
+      rule map and is the one that labels the cards (`LostArkSpecAuthority`);
+      `build-spec-display-v1.js` has a **flat** rule list.
+      When the nodes are present they are the whole answer: no match means the
+      card shows the class name, deliberately, rather than falling through to a
+      page-wide text search. That search invented specs — Haylebrella was
+      labelled Wind Fury from a page that never contains the words, whose nodes
+      read `T1 Drizzle`.
+      A class missing from the table is therefore **invisible except that it
+      shows the class name**, so `specFor` records it: one console warning naming
+      the class and the nodes it saw, collected in
+      `LostArkSpecAuthority.gaps()`. Those nodes are exactly what the new table
+      entry needs.
    6. **Support/DPS role** — `SUPPORTS` is duplicated in
       `general-party-optimizer-v2.js`, `optimizer-v17.js`, `hover-summary-v6.js`,
       `general-party-label-bridge-v1.js` and `positional-authority-v1.js`

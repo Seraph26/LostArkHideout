@@ -112,9 +112,12 @@ async function refresh(list){let chars;
  if(Array.isArray(list))chars=list;
  else{let state;try{state=JSON.parse(localStorage.getItem(STATE)||'null')}catch{return}chars=state?.characters}
  if(!Array.isArray(chars))return;const cache=load();
- /* Same reasoning as resolveAll in lobby-resolve-v1.js: these are independent
-    pages and were fetched strictly one after another, so a full lobby paid the
-    sum of eight round trips. Same request count, fewer seconds. */
+ /* Same shape as resolveAll in lobby-resolve-v1.js, and the same caveat: these
+    workers do NOT issue four requests at once. bible-fetch-retry-v1.js wraps
+    window.fetch and serialises every connector /character call behind a 650ms
+    pacer, so request timing is identical either way -- bursting was measured as
+    far worse and is exactly what the pacer prevents. The win is that parsing a
+    230KB page overlaps the next page's network wait instead of following it. */
  const pending=chars.filter(c=>c?.url),LIMIT=4;let next=0;
  async function worker(){for(;;){const i=next++;if(i>=pending.length)return;const c=pending[i];
   try{cache[c.url]=await fetchBuild(c)}catch(e){if(!cache[c.url])cache[c.url]={error:e.message}}}}
