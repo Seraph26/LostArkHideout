@@ -10,9 +10,16 @@ each character is resolved on lostark.bible → the lobby loads as a temporary
 roster that replaces the Main Group → optimize it for the raid the screenshot
 names. The Main Group is never touched and returns when you switch back.
 
-**Status: wired into `index.html` and working end to end from the real
-dashboard — Party Source toggle, import panel, live cards, and Raid Specific
-optimize all verified locally. Still uncommitted and unpushed.**
+**Status: shipped 2026-08-25.** Live on `https://seraph26.github.io/LostArkParty/`
+and the worker is deployed. Verified on the live origin: all modules load, the
+panel mounts, no console errors, and the page defaults to **Main Group**, so the
+feature is inert until someone picks Live Lobby.
+
+Smoke-tested through a synthetic paste rather than a real screenshot: OCR ran,
+translated *Sennir Basin* to `[EXTREME] Brelshaza — Gate 2` (act-name map **and**
+the G2 pin), then correctly refused the import because the row count was not 8.
+**Row-level OCR accuracy on a real 8-person capture is still the one unproven
+step** — everything around it is verified.
 
 Branch: `lobby-import`. **Nothing committed, nothing pushed.**
 
