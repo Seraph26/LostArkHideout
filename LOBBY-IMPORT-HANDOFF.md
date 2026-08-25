@@ -157,20 +157,33 @@ account-wide data.
    One known gap: `autoSelectEncounter()` runs on import only, so a lobby
    restored from storage on page load leaves the raid dropdown on whatever it
    last held rather than the lobby's own fight.
-2. **Deploy the worker.** Two changes wait: `/search` (without it autocomplete
-   is dead and accented names must be typed) and the `validBibleUrl` fix —
-   **that one is a live bug today**: any character whose name contains "roster",
-   "siblings" or "account" cannot be added at all (`Siriusaltroster` fails).
-   Pushing deploys in ~80s with no review step; verify with
-   `curl <worker>/health`.
+2. ~~**Deploy the worker.**~~ — **done 2026-08-25**, commit `cb39a93`, live as
+   `2026-08-25-search-and-name-fix` about 45s after the push. Verified against
+   the deployed worker:
+   - `/search?name=goldensparrow&region=NA` → `Góldensparrow`, reaper,
+     1775.8334; the length and region guards return 400.
+   - `/character` now fetches `Siriusaltroster` (233KB profile) while
+     `…/Someone/roster` and `…/Someone/siblings` still 400, as do non-https
+     and non-Bible hosts.
+   - End to end through `resolveSlot()` from the page: `Goldensparrow` resolves
+     to `Góldensparrow` in one search, Reaper, ilvl 1775.83 exact.
+
+   **Deploy coupling, worth knowing:** Cloudflare builds the worker from a push
+   to `main`, and `pages.yml` deploys the whole repo to Pages from that same
+   push. The two cannot be separated by branch — a worker-only deploy needs a
+   commit on `main` that touches only `worker/`, which is how `cb39a93` was
+   done while the lobby feature stayed on `lobby-import`.
 3. **Spec display regression** — live-lobby cards show the class (`Breaker`)
    instead of the specialization (`Asura's Path`), because the spec-display
    layer reads `private-v3` and cannot see imported characters. Genuine
    HANDOFF item 6 territory. Find the real seam; three previous guesses at this
    class of bug were all wrong.
-4. **Untested:** search end-to-end, multi-accent names, a 4-player lobby import,
-   Bible staleness tolerance (observed up to 15 days stale but still matching),
-   CE lobbies (user has no EU characters; de-risked analytically).
+4. **Untested:** ~~search end-to-end~~ (done, see item 2), multi-accent names,
+   a 4-player lobby import, Bible staleness tolerance (observed up to 15 days
+   stale but still matching), CE lobbies (user has no EU characters; de-risked
+   analytically). **The OCR paste path has still never run in `index.html`** —
+   it needs a real `Ctrl+V` of a real screenshot, which only the user can do.
+   That is the one thing standing between here and calling this confirmed.
 5. **Deferred by the user until the feature is finished:** updating `HANDOFF.md`,
    and adding a **new-class checklist** to it. A new class needs five things:
    name (automatic), icon, support/DPS role, spec rules, synergy table — and the
