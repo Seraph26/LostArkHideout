@@ -150,6 +150,55 @@
     fire(raid);
   }
 
+  /* Build profiles are keyed by Bible URL and, left alone, are built only for
+     the Main Group. An imported lobby therefore has none -- which is not just a
+     display problem: encounter-scoring-v2.js and both optimizers read the same
+     cache, so the lobby was being scored with no engravings, no positional and
+     no Ark Passive. The class name showing where a specialization belongs was
+     the visible half of that.
+
+     BuildProfilesV3.refresh() already takes an explicit list; candidate-roster-
+     v1.js does exactly this for new additions. Ask only for the ones missing
+     from the cache, so toggling source or reloading the page costs Bible
+     nothing -- each lobby member is fetched once, ever. */
+  const BUILD_KEY = 'lostark-hideout-build-profiles-v3';
+  let buildsRunning = false;
+  /* refresh() dispatches lostark-build-profiles-v3-ready, and this module calls
+     apply() on that event -- so this function is in its own feedback path. The
+     cache check alone does terminate, but only by an argument about what
+     refresh() writes on failure. Remembering what we have already asked for
+     makes it terminate by construction instead, which is the rule this codebase
+     keeps re-learning about layers that observe their own output. */
+  const attempted = new Set();
+
+  function ensureLiveBuilds() {
+    if (buildsRunning || !G.isLive()) return;
+    const refresh = window.LostArkBuildProfilesV3 && window.LostArkBuildProfilesV3.refresh;
+    if (typeof refresh !== 'function') return;
+
+    const chars = (G.characters() || []).filter(c => c && c.url);
+    if (!chars.length) return;
+
+    let cache = {};
+    try { cache = JSON.parse(localStorage.getItem(BUILD_KEY) || '{}'); } catch {}
+    /* Trailing slashes vary between what Bible returns and what we stored, and
+       the cache is matched by href elsewhere, so compare without one. */
+    const flat = u => String(u).replace(/\/$/, '');
+    const keys = Object.keys(cache).map(flat);
+    const missing = chars.filter(c => !cache[c.url] && !keys.includes(flat(c.url)) &&
+      !attempted.has(flat(c.url)));
+    if (!missing.length) return;
+    missing.forEach(c => attempted.add(flat(c.url)));
+
+    buildsRunning = true;
+    Promise.resolve(refresh(missing)).then(() => {
+      buildsRunning = false;
+      /* refresh() fires lostark-build-profiles-v3-ready itself, which is what
+         the spec label listens for; this redraws the cards behind it. */
+      if (window.LostArkDashboard) window.LostArkDashboard.render();
+    }).catch(() => { buildsRunning = false; });
+  }
+
   /* In live mode the Main Group sections are replaced rather than added to,
      which is the whole point of the toggle. */
   function apply() {
@@ -189,6 +238,7 @@
       ? 'Optimizing a live lobby. Your Main Group is untouched and returns when you switch back.'
       : 'Optimize your own Main Group, or a live party finder lobby you are inspecting.';
     banner();
+    ensureLiveBuilds();
   }
 
   function start() {
