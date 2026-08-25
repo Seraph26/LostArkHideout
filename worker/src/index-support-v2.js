@@ -1,6 +1,11 @@
-const WORKER_VERSION = "2026-08-23-counter-reset";
+const WORKER_VERSION = "2026-08-25-search-and-name-fix";
 const BIBLE_HOST = "lostark.bible";
 const BIBLE_REMOTE = "https://lostark.bible/_app/remote/1ranzqj/raidStatsSearch";
+/* Same shape as BIBLE_REMOTE: a SvelteKit remote-function id. These have been
+   stable across Bible deploys (1ranzqj has been hardcoded since 2026-08-18),
+   but treat a failure here as "search unavailable" rather than fatal -- the
+   import panel falls back to manual entry. */
+const BIBLE_SEARCH = "https://lostark.bible/_app/remote/ngsbie/search";
 /* Counting changed from "every page load" to "once per browser session", and the
    old total was almost entirely our own testing, so it restarts under a new key
    rather than being zeroed by hand in the dashboard. The old page-load figure is
@@ -72,7 +77,11 @@ function validBibleUrl(value) {
   try {
     const u = new URL(value);
     const p = u.pathname.split("/").filter(Boolean);
-    return u.protocol === "https:" && u.hostname === BIBLE_HOST && p.length >= 3 && p[0].toLowerCase() === "character" && !/roster|siblings|account/i.test(u.pathname);
+    /* Exactly three segments: character/REGION/NAME. This blocks the roster,
+       siblings and logs sub-tabs by shape rather than by matching words -- the
+       old substring test rejected any character whose NAME contained one of
+       them, so Siriusaltroster could never be fetched. */
+    return u.protocol === "https:" && u.hostname === BIBLE_HOST && p.length === 3 && p[0].toLowerCase() === "character";
   } catch {
     return false;
   }
@@ -138,6 +147,41 @@ export default {
         return json({ ok: true, visits }, 200, origin);
       } catch {
         return json({ ok: false, error: "Unable to update visit counter." }, 500, origin);
+      }
+    }
+
+    /* Character search. Bible's own site calls this to power its search box; it
+       matches on the de-accented name, so "goldensparrow" finds Góldensparrow.
+       That is what lets the import panel suggest a name nobody can reasonably
+       type. The payload is built here rather than accepted from the client so
+       its shape cannot be abused, and results are edge-cached so repeated
+       lookups cost Bible nothing. */
+    if (u.pathname === "/search") {
+      const name = (u.searchParams.get("name") || "").trim();
+      const region = (u.searchParams.get("region") || "").trim().toUpperCase();
+      if (name.length < 2) return json({ ok: false, error: "Search needs at least two characters." }, 400, origin);
+      if (name.length > 32) return json({ ok: false, error: "Search term is too long." }, 400, origin);
+      if (!/^[A-Z]{2,4}$/.test(region)) return json({ ok: false, error: "Missing or invalid region." }, 400, origin);
+      try {
+        const bytes = new TextEncoder().encode(JSON.stringify([["__skrao", 1], { name: 2, region: 3 }, name, region]));
+        let binary = "";
+        for (const b of bytes) binary += String.fromCharCode(b);
+        const payload = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        const response = await fetch(BIBLE_SEARCH + "?payload=" + encodeURIComponent(payload), {
+          headers: {
+            Accept: "application/json,text/plain,*/*",
+            "User-Agent": "Mozilla/5.0 (compatible; LostArkParty/1.0; +https://github.com/Seraph26/LostArkParty)",
+          },
+          cf: { cacheTtl: 300, cacheEverything: false },
+        });
+        if (!response.ok) return json({ ok: false, error: "Bible search returned HTTP " + response.status + "." }, 502, origin);
+        const body = await response.text();
+        return new Response(body, {
+          status: 200,
+          headers: { ...corsHeaders(origin), "Content-Type": response.headers.get("content-type") || "application/json; charset=utf-8" },
+        });
+      } catch {
+        return json({ ok: false, error: "Unable to reach Bible search." }, 502, origin);
       }
     }
 
