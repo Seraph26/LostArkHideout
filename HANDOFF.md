@@ -331,15 +331,22 @@ Supports score 0 contribution individually by design — their value is inside t
     `WORKER_VERSION`. Note the coupling: `pages.yml` publishes the whole repo to
     Pages on that *same* push, so a worker-only deploy needs a commit that
     touches only `worker/`, with page changes held on a branch.
-16. **`KNOWN_ENGRAVINGS` is matched against raw HTML, and invents engravings.**
-    `parse()` tests each name against `raidText(d)`, which falls back to the
-    cleaned `outerHTML` — and Bible embeds a payload naming every spec a class
-    can take. Haylebrella came back with `Wind Fury` among her engravings while
-    the rendered page never contains that string at all; her Ark Passive reads
-    `T1 Drizzle`. So `engravings` can contain things the character does not have,
-    and it feeds `positional`, `classBehavior` and `buildText`.
-    The spec *label* no longer depends on it (`specFor` reads the Enlightenment
-    nodes first), but the rest still does. The likely fix is to match engravings
-    against `d.body.textContent` rather than `raidText`; that changes scoring
-    inputs for the Main Group, so it wants a deliberate decision and a check
-    against several real profiles first.
+16. **A build profile once carried engravings the character did not have —
+    cause unknown, do not trust the first explanation.** Haylebrella parsed with
+    `Control, Wind Fury, Adrenaline, Raid Captain`, and the spec label read
+    *Wind Fury*, while a page fetched minutes later contained the words "Wind
+    Fury" **zero times** and read `T1 Drizzle`; she now parses as
+    `Hit Master, Drizzle, ...`. Not reproducible since.
+
+    The obvious explanation — `KNOWN_ENGRAVINGS` being tested against
+    `raidText(d)`, which *can* return cleaned `outerHTML` — was **checked and is
+    wrong**: on real profiles `raidText` comes back with zero HTML tags, so the
+    body-text branch is the one that wins. Whatever happened, it was not that.
+    Most likely Bible served different loadout data at that moment, but that is
+    a guess and is written here as one.
+
+    It no longer reaches the spec label, which now reads the Enlightenment nodes
+    and nothing else — that is the durable protection, whatever the cause. But
+    `engravings` still feeds `positional`, `classBehavior` and `buildText`, so if
+    a character's positioning or behaviour ever looks wrong, compare the cached
+    engravings against a freshly fetched page before believing either.

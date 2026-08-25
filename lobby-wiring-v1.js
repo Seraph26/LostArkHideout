@@ -185,7 +185,13 @@
        the cache is matched by href elsewhere, so compare without one. */
     const flat = u => String(u).replace(/\/$/, '');
     const keys = Object.keys(cache).map(flat);
-    const missing = chars.filter(c => !cache[c.url] && !keys.includes(flat(c.url)) &&
+    /* A profile cached before the Ark Passive nodes were parsed has no
+       `enlightenment`, and the spec label falls back to the old page-wide text
+       search that could report a spec the character does not have. Treat those
+       as missing so they are rebuilt once. */
+    const stale = u => { const e = cache[u] || cache[keys.find(k => k === flat(u))];
+      return e && !e.error && !Array.isArray(e.enlightenment); };
+    const missing = chars.filter(c => (!cache[c.url] && !keys.includes(flat(c.url)) || stale(c.url)) &&
       !attempted.has(flat(c.url)));
     if (!missing.length) return;
     missing.forEach(c => attempted.add(flat(c.url)));

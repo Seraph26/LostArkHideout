@@ -11,12 +11,20 @@ function text(p){return norm([
  p?.engravingsText,p?.buildText,p?.raidLoadoutText,p?.skillsText,p?.skillText,
  p?.arkGridText,p?.arkPassiveText,p?.rawText
  ].filter(Boolean).join(' '))}
-function specFor(p){const e=text(p);const rules=[
+/* Same rule as LostArkSpecAuthority: the spec is read from Bible's Ark Passive
+   Enlightenment nodes and nowhere else, because the flattened page also carries
+   a payload naming every spec a class can take, which produced specs the
+   character does not have. When the nodes are present and none matches, return
+   nothing so the card keeps the class name instead of inventing one. The text
+   search below is only for profiles cached before the nodes were parsed. */
+function specFor(p){const enl=norm((p?.enlightenment||[]).join(' '));const e=enl||text(p);const rules=[
  [/master summoner/,'Master Summoner'],[/communication overflow/,'Communication Overflow'],[/pinnacle/,'Pinnacle'],[/control/,'Control'],[/mayhem/,'Mayhem'],[/berserker'?s technique|berserker technique/,"Berserker's Technique"],
  [/surge/,'Surge'],[/remaining energy/,'Remaining Energy'],[/igniter/,'Igniter'],[/reflux/,'Reflux'],[/hunger/,'Hunger'],[/full moon harvester/,'Full Moon Harvester'],[/night.?s edge/,"Night's Edge"],
  [/predator/,'Predator'],[/punisher/,'Punisher'],[/deathblow/,'Deathblow'],[/esoteric flurry/,'Esoteric Flurry'],[/first intention/,'First Intention'],[/esoteric skill enhancement/,'Esoteric Skill Enhancement'],[/asura.?s path/,"Asura's Path"],[/brawl king storm/,'Brawl King Storm'],[/dreadful roar/,'Dreadful Roar'],
  [/peacemaker/,'Peacemaker'],[/time to hunt/,'Time to Hunt'],[/empress grace/,'Empress Grace'],[/emperor'?s decree|emperor/,"Emperor's Decree"],[/barrage enhancement/,'Barrage Enhancement'],[/firepower enhancement/,'Firepower Enhancement'],[/enhanced weapon/,'Enhanced Weapon'],[/pistoleer/,'Pistoleer'],[/death strike/,'Death Strike'],[/loyal companion/,'Loyal Companion'],[/demonic impulse/,'Demonic Impulse'],[/perfect suppression/,'Perfect Suppression'],[/wind fury/,'Wind Fury'],[/drizzle/,'Drizzle'],[/full bloom/,'Full Bloom'],[/recurrence/,'Recurrence'],[/shock training/,'Shock Training'],[/taijutsu/,'Taijutsu'],[/remaining energy/,'Remaining Energy'],[/deathblow/,'Deathblow'],[/esoteric flurry/,'Esoteric Flurry'],[/barrage enhancement/,'Barrage Enhancement'],[/firepower enhancement/,'Firepower Enhancement'],[/desperate salvation/,'Desperate Salvation'],[/true courage/,'True Courage']
- ];for(const [re,name] of rules)if(re.test(e))return name;return p?.spec||p?.specialization||''}
+ ];for(const [re,name] of rules)if(re.test(e))return name;
+ if(enl)return'';                       /* nodes are authoritative: no match means no spec */
+ return p?.spec||p?.specialization||''}
 function normalizeUrl(x){try{return new URL(x,location.href).href.replace(/\/$/,'')}catch{return String(x||'').replace(/\/$/,'')}}
 function profileFor(a,cache){const href=a.getAttribute('href');return cache[href]||cache[normalizeUrl(href)]||null}
 function apply(){const cache=load();document.querySelectorAll('#suggestedParties a[href*="lostark.bible/character/"]').forEach(a=>{const p=profileFor(a,cache);if(!p)return;const spec=specFor(p);if(!spec)return;const host=a.closest('.party-member')||a.parentElement;const classEl=host?.querySelector('.party-class-label');if(classEl){classEl.textContent=spec;return}const candidates=[...(host?.children||[])].filter(x=>x!==a);const old=candidates.find(x=>{const t=norm(x.textContent);return t===norm(p.className)||t===norm(p.class)||t===norm(spec+' '+p.className)||t===norm(spec+' '+p.class)||t===norm(spec)});if(old)old.textContent=spec})}
