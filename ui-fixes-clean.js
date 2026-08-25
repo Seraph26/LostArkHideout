@@ -11,7 +11,12 @@ function className(p,b){return clean(p?.class||p?.className||p?.characterClass||
 function specFor(p,b){
  const cls=norm(className(p,b));
  const t=norm([...(p?.enlightenment||[]),p?.engravings,p?.arkGrid,p?.arkPassive,p?.skills,p?.tripods,p?.skillsText,p?.skillText,p?.tripodsText,p?.arkGridText,p?.arkPassiveText,p?.rawText,b?.text,...(b?.engravings||[]),...(b?.grid||[]).map(x=>`${x.name} ${x.type} ${x.branch}`),...(b?.arkPassive||[]).map(x=>`${x.name} ${x.level}`)].flat().join(' '));
- const rules={berserker:[["berserker's technique","Berserker Technique"],['berserker technique','Berserker Technique'],['mayhem','Mayhem']],souleater:[['full moon harvester','Full Moon Harvester'],['full moon','Full Moon Harvester'],['full bloom','Full Bloom'],["night's edge","Night's Edge"],['night edge',"Night's Edge"]],summoner:[['master summoner','Master Summoner'],['communication overflow','Communication Overflow']],scrapper:[['shock training','Shock Training'],['taijutsu','Taijutsu']],glaivier:[['pinnacle','Pinnacle'],['control','Control']],glavier:[['pinnacle','Pinnacle'],['control','Control']],wardancer:[['first intention','First Intention'],['esoteric skill enhancement','Esoteric Skill Enhancement']],deathblade:[['surge','Surge'],['remaining energy','Remaining Energy']],reaper:[['hunger','Hunger'],['nightmare','Nightmare']],striker:[['deathblow','Deathblow'],['esoteric flurry','Esoteric Flurry']],gunslinger:[['peacemaker','Peacemaker'],['time to hunt','Time to Hunt']],deadeye:[['pistoleer','Pistoleer'],['enhanced weapon','Enhanced Weapon']],artillerist:[['barrage enhancement','Barrage Enhancement'],['firepower enhancement','Firepower Enhancement']],slayer:[['predator','Predator'],['punisher','Punisher']],breaker:[["asura's path","Asura's Path"],['asura','Asura'],['brawl king storm','Brawl King Storm']],destroyer:[['gravity training','Gravity Training'],['rage hammer','Rage Hammer']],gunlancer:[['combat readiness','Combat Readiness'],['lone knight','Lone Knight']],soulfist:[['energy overflow','Energy Overflow'],['robust spirit','Robust Spirit']],sharpshooter:[['death strike','Death Strike'],['loyal companion','Loyal Companion']],aeromancer:[['wind fury','Wind Fury'],['drizzle','Drizzle']],arcanist:[['emperor','Emperor'],['empress','Empress']],arcana:[['emperor','Emperor'],['empress','Empress']],sorceress:[['igniter','Igniter'],['reflux','Reflux']],artist:[['full bloom','Full Bloom']],bard:[['desperate salvation','Desperate Salvation'],['true courage','True Courage']],paladin:[['blessed aura','Blessed Aura'],['judgment','Judgment']],valkyrie:[['liberator','Liberator'],['shining knight','Shining Knight'],['blessed aura','Blessed Aura']]};
+ const rules={berserker:[["berserker's technique","Berserker Technique"],['berserker technique','Berserker Technique'],['mayhem','Mayhem']],souleater:[['full moon harvester','Full Moon Harvester'],['full moon','Full Moon Harvester'],['full bloom','Full Bloom'],["night's edge","Night's Edge"],['night edge',"Night's Edge"]],summoner:[['master summoner','Master Summoner'],['communication overflow','Communication Overflow']],scrapper:[['shock training','Shock Training'],['taijutsu','Taijutsu']],glaivier:[['pinnacle','Pinnacle'],['control','Control']],glavier:[['pinnacle','Pinnacle'],['control','Control']],wardancer:[['first intention','First Intention'],['esoteric skill enhancement','Esoteric Skill Enhancement']],deathblade:[['surge','Surge'],['remaining energy','Remaining Energy']],reaper:[['hunger','Hunger'],['nightmare','Nightmare']],striker:[['deathblow','Deathblow'],['esoteric flurry','Esoteric Flurry']],gunslinger:[['peacemaker','Peacemaker'],['time to hunt','Time to Hunt']],deadeye:[['pistoleer','Pistoleer'],['enhanced weapon','Enhanced Weapon']],artillerist:[['barrage enhancement','Barrage Enhancement'],['firepower enhancement','Firepower Enhancement']],slayer:[['predator','Predator'],['punisher','Punisher']],breaker:[["asura's path","Asura's Path"],['asura','Asura'],['brawl king storm','Brawl King Storm']],destroyer:[['gravity training','Gravity Training'],['rage hammer','Rage Hammer']],gunlancer:[['combat readiness','Combat Readiness'],['lone knight','Lone Knight']],soulfist:[['energy overflow','Energy Overflow'],['robust spirit','Robust Spirit']],sharpshooter:[['death strike','Death Strike'],['loyal companion','Loyal Companion']],aeromancer:[['wind fury','Wind Fury'],['drizzle','Drizzle']],arcanist:[['emperor','Emperor'],['empress','Empress']],arcana:[['emperor','Emperor'],['empress','Empress']],sorceress:[['igniter','Igniter'],['reflux','Reflux']],artist:[['full bloom','Full Bloom']],bard:[['desperate salvation','Desperate Salvation'],['true courage','True Courage']],paladin:[['blessed aura','Blessed Aura'],['judgment','Judgment']],valkyrie:[['liberator','Liberator'],['shining knight','Shining Knight'],['blessed aura','Blessed Aura']],
+ /* Guardian Knight. Only the one entry, because Dreadful Roar is the only spec
+    confirmed against a real profile (Dhrammygon, 2026-08-25, "Dreadful Roar
+    Lv. 1" as a T1 Enlightenment node). The class's other specs are unverified
+    and guessing at them is how this file got reverted once already. */
+ guardianknight:[['dreadful roar','Dreadful Roar']]};
  for(const [needle,label] of(rules[cls]||[]))if(t.includes(needle))return label;return clean(p?.specialization||b?.specialization||'')||'';
 }
 function positionFor(p,b){const cls=norm(className(p,b));if(['bard','artist','paladin','valkyrie'].includes(cls))return'N/A';const explicit=clean(b?.positional||p?.positional||'');if(explicit&&!/^unknown$/i.test(explicit))return explicit;const t=norm([b?.text,p?.engravings,p?.arkGrid,p?.arkPassive,p?.tripods].flat().join(' '));if(/ambush master|back attack|entropy/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(cls==='berserker'&&/mayhem|berserker'?s technique|berserker technique/.test(t))return'Back Attack';if(cls==='summoner'&&/master summoner|communication overflow|ancient spear/.test(t))return'Hit Master';if(cls==='souleater'&&/full moon harvester|night.?s edge/.test(t))return'Hit Master';
@@ -33,8 +38,17 @@ function icon(cls){try{return window.LostArkHideoutClassData?.iconUrl?.(cls)||''
    whole profile and can write back to localStorage -- far too expensive for
    something on the repair path. */
 const NEW_KEY='lostark-hideout-new-additions-v1';
-function rosterCharacters(){const out=[...(load(KEY).characters||[])];
+const LIVE_KEY='lostark-hideout-live-group-v1', SOURCE_KEY='lostark-hideout-roster-source-v1', LIVE_SOURCE='live';
+/* Still deliberately not CandidateRoster.getAll(), for the reason above. But an
+   imported lobby has to be visible here too, or its cards keep the raw class
+   name where the specialization belongs -- the same shape of miss item 6 in
+   HANDOFF describes for New Additions. resolveRoster() is the cheap half of
+   what getAll() does: two small reads and a swap, with no normalisation and no
+   write-back, so it is safe on a path that runs per mutation. */
+function rosterCharacters(){
+ const out=[...(load(KEY).characters||[])];
  try{const extra=JSON.parse(localStorage.getItem(NEW_KEY)||'null');if(Array.isArray(extra))out.push(...extra)}catch{}
+ try{const live=window.LostArkLiveGroup?.resolveRoster?.(out);if(Array.isArray(live))return live}catch{}
  return out}
 /* repair() runs on every mutation of document.body, and this map was rebuilt from
    scratch each time -- with getBuild() re-parsing the entire build-profile cache
@@ -45,11 +59,22 @@ function rosterCharacters(){const out=[...(load(KEY).characters||[])];
 let profileCache=null,profileSig='';
 function stateProfiles(){
  const raw=localStorage.getItem(KEY)||'',extra=localStorage.getItem(NEW_KEY)||'',builds=localStorage.getItem(BUILD)||'';
- const sig=`${raw.length}:${extra.length}:${builds.length}:${raw.slice(-64)}${extra.slice(-64)}${builds.slice(-64)}`;
+ /* The live lobby and the source toggle have to be part of the signature too,
+    or switching source keeps serving the cache built for the other roster and
+    every card keeps the label it had before the switch. */
+ const live=localStorage.getItem(LIVE_KEY)||'',src=localStorage.getItem(SOURCE_KEY)||'';
+ const sig=`${raw.length}:${extra.length}:${builds.length}:${live.length}:${src}:${raw.slice(-64)}${extra.slice(-64)}${builds.slice(-64)}${live.slice(-64)}`;
  if(profileCache&&sig===profileSig)return profileCache;
  const cache=load(BUILD),m=new Map();
  for(const c of rosterCharacters()){const p=c?.profile||{};const url=c?.url||'';const name=norm(p.name||c.name);
   if(name&&!m.has(name))m.set(name,{p,url,b:(url&&cache[url])||null})}
+ /* The lobby modules load after this one, so an early repair() can run while a
+    live lobby is stored but LostArkLiveGroup is not answering yet. That pass
+    builds a Main-Group-only map, and nothing in the signature changes when the
+    module finally loads, so the wrong map would be pinned for the life of the
+    page. Only cache once the source can actually be resolved; repair() runs on
+    every body mutation, so the next pass rebuilds. */
+ if(localStorage.getItem(SOURCE_KEY)===LIVE_SOURCE&&!window.LostArkLiveGroup)return m;
  profileSig=sig;profileCache=m;return m}
 function makeInline(img){img.style.display='inline-block';img.style.width='22px';img.style.height='22px';img.style.objectFit='contain';img.style.verticalAlign='middle';img.style.margin='0 7px 0 0';img.style.flex='0 0 22px';img.style.position='static'}
 function applyIcon(container,cls){if(!container||!cls)return;const src=icon(cls);if(!src)return;let img=container.querySelector(':scope > img.class-icon');if(!img){img=document.createElement('img');img.className='class-icon';container.insertBefore(img,container.firstChild)}img.src=src;img.alt=cls;img.removeAttribute('srcset');makeInline(img);container.style.display='inline-flex';container.style.alignItems='center';container.style.flexWrap='nowrap'}
