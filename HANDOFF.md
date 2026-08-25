@@ -324,7 +324,22 @@ Supports score 0 contribution individually by design — their value is inside t
     once and rebuilds only when the underlying localStorage actually changed.
     Never put per-character `JSON.parse`/`JSON.stringify` on that path, and do not
     call `CandidateRoster.getAll()` from it (it normalises and can write).
-15. **Worker has a GitHub repo connected** (visible under Settings → Build). Build
-    and deploy commands looked empty, so it appears inert and every worker change
-    so far has been a manual paste — but this was never confirmed. Worth checking
-    before assuming a future worker edit needs the manual step.
+15. ~~**Worker has a GitHub repo connected**~~ — **confirmed live on 2026-08-25.**
+    It is not inert: a push to `main` that touches `worker/` deploys the worker
+    automatically, live about **45 seconds** later. No manual paste is needed.
+    Verified by pushing `cb39a93` and watching `/health` flip to the new
+    `WORKER_VERSION`. Note the coupling: `pages.yml` publishes the whole repo to
+    Pages on that *same* push, so a worker-only deploy needs a commit that
+    touches only `worker/`, with page changes held on a branch.
+16. **`KNOWN_ENGRAVINGS` is matched against raw HTML, and invents engravings.**
+    `parse()` tests each name against `raidText(d)`, which falls back to the
+    cleaned `outerHTML` — and Bible embeds a payload naming every spec a class
+    can take. Haylebrella came back with `Wind Fury` among her engravings while
+    the rendered page never contains that string at all; her Ark Passive reads
+    `T1 Drizzle`. So `engravings` can contain things the character does not have,
+    and it feeds `positional`, `classBehavior` and `buildText`.
+    The spec *label* no longer depends on it (`specFor` reads the Enlightenment
+    nodes first), but the rest still does. The likely fix is to match engravings
+    against `d.body.textContent` rather than `raidText`; that changes scoring
+    inputs for the Main Group, so it wants a deliberate decision and a check
+    against several real profiles first.
