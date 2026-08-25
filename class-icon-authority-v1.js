@@ -11,11 +11,29 @@
   const asset = name => new URL(name, document.baseURI).href;
   const VALKYRIE_ICON = asset('valkyrie-icon.svg');
   const GUARDIANKNIGHT_ICON = asset('guardianknight-icon.svg');
-  const WILDSOUL_ICON = 'https://static.wikia.nocookie.net/lostark_gamepedia/images/3/3b/ClassIcon-Specialist.png/revision/latest/scale-to-width-down/120?cb=20230901205506';
+  /* Fandom hosts an icon for every class except Breaker, so this is the same
+     repository-hosted fallback Valkyrie and Guardianknight already use. Taken
+     from Bible's roster tab, with xmlns added and currentColor replaced -- an
+     <img> cannot inherit currentColor and renders blank without both. */
+  const BREAKER_ICON = asset('breaker-icon.svg');
+  /* Fandom has no Wildsoul icon -- only the generic Specialist group icon, which
+     is what this used to point at and why it looked wrong. Taken from Bible's
+     roster tab like the Breaker one. */
+  const WILDSOUL_ICON = asset('wildsoul-icon.svg');
   const SPECIAL = {
     valkyrie: VALKYRIE_ICON,
     wildsoul: WILDSOUL_ICON,
-    guardianknight: GUARDIANKNIGHT_ICON
+    guardianknight: GUARDIANKNIGHT_ICON,
+    breaker: BREAKER_ICON
+  };
+
+  /* Display names for the classes we host locally. Keep in step with SPECIAL:
+     an entry missing here just means the card keeps whatever alt it already had. */
+  const DISPLAY_NAMES = {
+    valkyrie: 'Valkyrie',
+    wildsoul: 'Wildsoul',
+    guardianknight: 'Guardianknight',
+    breaker: 'Breaker'
   };
 
   function iconFor(name) {
@@ -58,7 +76,10 @@
       if (!icon) return;
       if (img.getAttribute('src') !== icon) img.src = icon;
       img.removeAttribute('srcset');
-      img.alt = cls === 'valkyrie' ? 'Valkyrie' : cls === 'guardianknight' ? 'Guardianknight' : 'Wildsoul';
+      /* Was a ternary that fell through to 'Wildsoul' for anything unlisted, so
+         adding a class to SPECIAL silently mislabelled it. Look the name up,
+         and leave the existing alt alone when it is not one of ours. */
+      img.alt = DISPLAY_NAMES[cls] || img.alt;
     });
   }
 

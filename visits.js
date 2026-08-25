@@ -56,6 +56,6 @@ document.head.appendChild(wildsoulIconGuardScript);
 // Final hard authority for the supplied Valkyrie SVG and verified Wildsoul asset.
 // Must run after generic and legacy class-icon renderers.
 const classIconAuthorityScript = document.createElement('script');
-classIconAuthorityScript.src = 'class-icon-authority-v1.js?v=20260821icons1';
+classIconAuthorityScript.src = 'class-icon-authority-v1.js?v=20260825icons4';
 classIconAuthorityScript.async = false;
 document.head.appendChild(classIconAuthorityScript);
