@@ -53,7 +53,7 @@ const SECTIONS=[
     those numbers structurally cannot contain before anyone starts trusting
     them. */
  ['Read this first — what it cannot see',
-  `<p>This reads characters, not players. Gear, engravings, Ark Passive, tripods, runes — everything a character carries, and <strong>nothing about who is holding it</strong>.</p>
+  `<p>This reads characters, not players. Gear, engravings, Ark Passive, skills, tripods, runes — everything a character carries, and <strong>nothing about who is holding it</strong>.</p>
    <p><strong>It cannot see that people play better together.</strong> Two players who have run a gate for months cover each other's mistakes, pre-position without being asked, and hold a stagger check that a better-geared pair of strangers will drop. A static that knows its own rhythm beats a stronger group of people meeting for the first time, and none of that is on a character page for this to find.</p>
    <p><strong>It cannot see hands.</strong> It scores what a build could do if played properly. It has no idea whether the person will hit their back attacks, dodge the wipe mechanic, or press their awakening at the right time. A perfect character sheet and no hands is still a wipe.</p>
    <p>So use it for what it is good at — spotting that a support is wasted in one party, or that a fight punishes a build you had not thought about. Then apply what you know that it cannot. <strong>If two arrangements are within a couple of points and one of them is the group that actually plays well together, take that one.</strong> The model will not mind.</p>`],
