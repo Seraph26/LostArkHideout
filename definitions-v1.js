@@ -62,6 +62,33 @@ const SECTIONS=[
   `<p>You have more characters than seats. This tool tries every legal way to split them into parties and keeps the arrangement where the group as a whole hits hardest.</p>
    <p>Every number below is an <strong>estimate from a model</strong>, not a damage meter reading. It is for comparing arrangements against each other. It is not a prediction of your DPS in a real raid.</p>`],
 
+ ['What the optimizer is actually doing',
+  `<p>It builds every legal arrangement, scores each one, and keeps the best. The rules it cannot break:</p>
+   <ul>
+    <li>Every party is <strong>exactly 3 DPS and 1 support</strong>. Never two supports, never none.</li>
+    <li>8-player content fields two parties. 4-player content — Horizon Cathedral and Serca — fields one.</li>
+    <li>Anyone hidden is left out. Un-hidden New Additions are considered, so an outside character can take a seat from a Main Group character.</li>
+   </ul>
+   <p>In Raid Specific mode each character is additionally scored against that encounter — how well their positioning and playstyle suit that fight.</p>`],
+
+ ['What matters most',
+  `<p>Roughly, from a real party on this dashboard:</p>
+   <ul>
+    <li><strong>Own Combat Power — around 60%.</strong> Nothing else comes close. A stronger character is a stronger pick.</li>
+    <li><strong>Party synergy — around 30%.</strong> This is what makes <em>who sits with whom</em> matter.</li>
+    <li><strong>Support impact — around 10%.</strong> Which support, and how well they can keep the party buffed.</li>
+    <li><strong>Build completeness — a fraction of a percent.</strong> Effectively a tie-breaker.</li>
+   </ul>
+   <p>So if two arrangements are close together, it is usually synergy and support pairing separating them — the raw power is much the same either way.</p>`],
+
+ ['Things it does not mean',
+  `<ul>
+   <li>It is <strong>not</strong> in-game DPS, and not a log parse.</li>
+   <li>Contribution is <strong>not</strong> a property of a character. It only exists relative to the party they are in.</li>
+   <li>Two arrangements a fraction of a percent apart are, in practice, a tie. Pick whichever you prefer to play.</li>
+   <li>It is <strong>not</strong> a judgement on the players. It never sees them — see "Read this first" at the top.</li>
+  </ul>`],
+
  ['Combat Power (CP)',
   `<p>How strong a character is on their own — gear, gems, engravings, Ark Passive, bracelet, all of it rolled into one number by Lost Ark Bible.</p>
    <p>CP is read from the <strong>Combat Power panel on the right of the Bible profile</strong>, preferring <em>Estimated Raid Loadout</em>, falling back to <em>Current Loadout (Raid)</em>. The Chaos Dungeon loadout is never used, and neither is the larger number at the top of the page — that one is a personal best, not the current loadout.</p>
@@ -106,33 +133,6 @@ const SECTIONS=[
    </ul>
    <p><strong>Realised party fit</strong>, next to a party's encounter score, is <em>not</em> the average of those four figures. It weights the three DPS by their CP, so a high-scoring low-CP character cannot flatter the party, and then scales the result by that party's own support uptime — which is how the support reaches the figure, rather than being averaged in alongside the DPS. Both of those depend on who is actually in the party, so unlike the card numbers it does change when you move people between parties.</p>
    <p>Compare it across characters in the same fight, never across fights. It says which raid suits a character, not which character is better.</p>`],
-
- ['What the optimizer is actually doing',
-  `<p>It builds every legal arrangement, scores each one, and keeps the best. The rules it cannot break:</p>
-   <ul>
-    <li>Every party is <strong>exactly 3 DPS and 1 support</strong>. Never two supports, never none.</li>
-    <li>8-player content fields two parties. 4-player content — Horizon Cathedral and Serca — fields one.</li>
-    <li>Anyone hidden is left out. Un-hidden New Additions are considered, so an outside character can take a seat from a Main Group character.</li>
-   </ul>
-   <p>In Raid Specific mode each character is additionally scored against that encounter — how well their positioning and playstyle suit that fight.</p>`],
-
- ['What matters most',
-  `<p>Roughly, from a real party on this dashboard:</p>
-   <ul>
-    <li><strong>Own Combat Power — around 60%.</strong> Nothing else comes close. A stronger character is a stronger pick.</li>
-    <li><strong>Party synergy — around 30%.</strong> This is what makes <em>who sits with whom</em> matter.</li>
-    <li><strong>Support impact — around 10%.</strong> Which support, and how well they can keep the party buffed.</li>
-    <li><strong>Build completeness — a fraction of a percent.</strong> Effectively a tie-breaker.</li>
-   </ul>
-   <p>So if two arrangements are close together, it is usually synergy and support pairing separating them — the raw power is much the same either way.</p>`],
-
- ['Things it does not mean',
-  `<ul>
-   <li>It is <strong>not</strong> in-game DPS, and not a log parse.</li>
-   <li>Contribution is <strong>not</strong> a property of a character. It only exists relative to the party they are in.</li>
-   <li>Two arrangements a fraction of a percent apart are, in practice, a tie. Pick whichever you prefer to play.</li>
-   <li>It is <strong>not</strong> a judgement on the players. It never sees them — see "Read this first" at the top.</li>
-  </ul>`]
 ];
 
 function css(){
