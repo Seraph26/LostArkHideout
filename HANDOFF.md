@@ -50,6 +50,13 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
 
 ## Data / Bible facts (hard-won)
 
+- **Bible's search index lags its own profile pages.** `/search` reported Kingqi
+  at **1732.50** while his profile page said **1736.67** — the live figure, and
+  the one the party finder showed. So an item level from *search* is a proximity
+  hint only; the item level from a *profile* is still the exact oracle. Anything
+  matching a character by search results must confirm by fetching the profile,
+  which is what `resolveSlot()` does — and the confirmed value usually then
+  matches to the penny.
 - **The profile page has no lines.** `clean()` collapses every run of whitespace
   to a single space, so anything doing `text.split(/\n+/)` gets one enormous
   line. `parse()` did exactly that until 2026-08-25, which is why `arkPassive`,

@@ -218,10 +218,29 @@ account-wide data.
    Enlightenment nodes. His icon was the case bug in `iconUrl()` — see the
    new-class checklist, step 2, in `HANDOFF.md`.
 
-   Still untested: multi-accent names, a 4-player lobby import, Bible staleness
-   tolerance (observed up to 15 days stale but still matching), CE lobbies (user
-   has no EU characters; de-risked analytically), and Machinist's *other* spec,
-   which will report itself through `gaps()` the first time one is imported.
+   **A 4-player lobby also works — confirmed 2026-08-25.** Serca — Gate 1, NA,
+   Hard: party size came from the manifest, and the optimizer ran the single
+   party correctly.
+
+   That import also found the last real gap in resolution. OCR read `Kingqi` as
+   `Kinggi` (q→g), and the row came back "no such character" even though he
+   plainly existed. Three things were wrong, all now fixed:
+   - The prefix retry used **one** length. `Kinggi` is wrong at position 5, so a
+     5-character prefix carries the error; 4 finds him. Both are tried now, and
+     shorter is *not* simply better — the search returns a bounded set ranked by
+     item level, so `kin` drops him beneath commoner names.
+   - Item level was an equality gate on **search results**, and search lags the
+     profile pages (see HANDOFF). Every candidate failed.
+   - Name distance was not used at all. `pickByName()` now accepts a lone
+     candidate within one edit, using item level to break ties when several are
+     equally close — `Kinggi` is one edit from both `Kingqi` and `Kinggs`, and
+     4.17 vs 26.67 apart in item level settles it. Fails closed to ambiguous.
+   The winner is still confirmed by fetching the profile, so the result was
+   `resolved`, not merely guessed — the profile matched the lobby exactly.
+
+   Still untested: multi-accent names, CE lobbies (user has no EU characters;
+   de-risked analytically), and Machinist's *other* spec, which will report
+   itself through `gaps()` the first time one is imported.
 5. ~~**Deferred until the feature is finished**~~ — **done 2026-08-25.**
    `HANDOFF.md` has a new **Live Lobby Import** section, and item 9 is now a
    full **new-class checklist** — eight steps with exact file locations, worked

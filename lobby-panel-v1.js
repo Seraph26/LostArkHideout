@@ -68,6 +68,10 @@
     direct:                 ['lp-ok',   'read correctly'],
     resolved:               ['lp-ok',   'found by search'],
     'direct-ilvl-mismatch': ['lp-warn', 'item level differs'],
+    /* Found by name after item level failed to decide -- usually Bible being
+       behind the character's latest upgrade. Usable, but shown as a warning so
+       the near-miss is a suggestion the importer confirms, not a silent swap. */
+    'name-ilvl-mismatch':   ['lp-warn', 'name match, item level differs'],
     ambiguous:              ['lp-warn', 'several matches'],
     'single-no-ilvl':       ['lp-warn', 'unverified match'],
     'no-ilvl-match':        ['lp-warn', 'no item level match'],

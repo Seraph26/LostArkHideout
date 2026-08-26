@@ -13,7 +13,8 @@
    undocumented internal endpoint):
      - direct profile fetch first, because most names read correctly and a miss
        costs 6.7KB against 230KB for a real profile
-     - at most two searches per name: de-accented, then a short prefix
+     - at most three searches per name: de-accented, then a 5- and a 4-character
+       prefix, and only for a name that has already failed
      - never fetch profiles for candidates -- search already carries item level,
        so only the winner is fetched
      - no enumeration, no prefix crawling, no speculative lookups
@@ -44,9 +45,10 @@
      errors rather than accent errors -- tesseract read Bussyßaka as BussyBaka,
      and "Bussybaka" de-accents to "Bussyssaka", matching nothing. A short
      prefix still finds it. */
-  function prefixFor(name, deaccent) {
+  function prefixFor(name, deaccent, len) {
+    const n = Number.isFinite(len) ? len : PREFIX_LEN;
     const flat = deaccent ? deaccent(name) : String(name || '');
-    return flat.length <= PREFIX_LEN ? flat : flat.slice(0, PREFIX_LEN);
+    return flat.length <= n ? flat : flat.slice(0, n);
   }
 
   /* One slot, one answer, with the reason attached so the review UI can explain
@@ -74,16 +76,45 @@
     let candidates = await io.search(flat, region);
     let pick = api.pickCandidate(candidates, slot.ilvl);
 
-    /* 3. Short prefix, for errors the search cannot see through. */
+    /* 3. Short prefix, for errors the search cannot see through. Two lengths,
+          because the prefix only helps if it stops before the misread letter:
+          `Kinggi` for `Kingqi` is wrong at position 5, so a 5-character prefix
+          carries the error and finds nothing, while 4 finds him. Shorter is not
+          simply better -- the search returns a bounded set ranked by item level,
+          so "kin" drops him again beneath commoner names. Try both. */
     if (pick.status === 'none' || pick.status === 'no-ilvl-match') {
-      const prefix = prefixFor(slot.name, api.deaccent);
-      if (prefix && prefix !== flat) {
+      const tried = new Set([flat]);
+      for (const len of [PREFIX_LEN, PREFIX_LEN - 1]) {
+        const prefix = prefixFor(slot.name, api.deaccent, len);
+        if (!prefix || tried.has(prefix)) continue;
+        tried.add(prefix);
         out.tried.push(prefix + '…');
         out.searches++;
         const more = await io.search(prefix, region);
         const second = api.pickCandidate(more, slot.ilvl);
-        if (second.status === 'matched') { pick = second; candidates = more; }
-        else if (pick.status === 'none') { pick = second; candidates = more; }
+        if (second.status === 'matched') { pick = second; candidates = more; break; }
+        if (pick.status === 'none') { pick = second; candidates = more; }
+        else if (more.length) candidates = candidates.concat(more);
+      }
+    }
+
+    /* 4. Item level could not decide. That is not always a missing character:
+          it is also what a stale Bible looks like, because item level is only an
+          oracle while Bible is current. So ask what the OCR error looks like
+          instead -- one wrong character -- and accept a lone near-miss name.
+          Flagged, never treated as confirmed: the item level genuinely does not
+          agree, and the person importing should see that. */
+    if (pick.status !== 'matched' && candidates.length) {
+      const byName = api.pickByName(candidates, slot.name, slot.ilvl);
+      if (byName.status === 'name-matched') {
+        const profile = await io.fetchProfile(byName.candidate.name, region);
+        if (!looksMissing(profile)) {
+          out.name = byName.candidate.name;
+          out.profile = profile;
+          out.candidate = byName.candidate;
+          out.status = api.ilvlMatches(profile.ilvl, slot.ilvl) ? 'resolved' : 'name-ilvl-mismatch';
+          return out;
+        }
       }
     }
 
@@ -107,9 +138,6 @@
     return out;
   }
 
-  /* Serial on purpose. The connector paces Bible calls ~650ms apart; three
-     concurrent was tried previously and was far worse (Bible rate-limits the
-     burst: 10 characters took 107s against ~21s serial). */
   /* Slots used to be resolved strictly one after another: fetch, parse, next.
 
      Four workers run here, but be clear about what that does and does not buy.

@@ -286,6 +286,63 @@
      exception -- Dragondeez, Thesickness and Meteorologist each have three live
      accent variants -- so a single candidate is only accepted when nothing else
      matched, and never when two survive. */
+  /* Item level is the identity oracle, but it is only an oracle while Bible is
+     current. Kingqi sat at 1732.50 there and 1736.67 in the lobby -- he had
+     gear-upped since Bible last indexed him -- so every candidate failed the
+     equality test and a character who plainly existed came back as "no such
+     character".
+
+     When item level cannot decide, fall back to what the OCR error actually
+     looks like: a single wrong character. `Kinggi` is one substitution from
+     `Kingqi`. Only a lone candidate within one edit is accepted, and the caller
+     flags the row rather than treating it as confirmed -- accent-variant
+     squatting is normal here, so a near-miss name is a strong suggestion, never
+     proof. Two candidates equally close means we know nothing and say so. */
+  /* One wrong character is common enough that several real players can sit one
+     edit from the same misreading: `Kinggi` is one from both `Kingqi` and
+     `Kinggs`. Item level breaks that tie without being trusted as an equality
+     test -- Kingqi was 4.17 from the lobby figure and Kinggs 26.67.
+
+     The gap is not Bible being stale, it is **Bible's search index lagging its
+     own profile pages**: search reported Kingqi at 1732.50 while his profile
+     said 1736.67, which is the lobby figure exactly. So item level from search
+     is a proximity hint, and item level from a profile is still the oracle --
+     which is why the winner is confirmed by fetching the profile, and usually
+     comes back matching exactly.
+
+     The lag only leaves the index *behind*, and only by what a character gains
+     between indexings, so a candidate tens of levels away is a different person
+     rather than an out-of-date record. MAX_DRIFT bounds that, and
+     MIN_SEPARATION insists the winner is clearly nearest instead of narrowly
+     luckier. Fail closed: anything less clear returns ambiguous and the row goes
+     to the person. */
+  const MAX_DRIFT = 40;
+  const MIN_SEPARATION = 10;
+
+  function pickByName(candidates, readName, lobbyIlvl) {
+    const list = Array.isArray(candidates) ? candidates : [];
+    const want = deaccent(String(readName || '')).toLowerCase();
+    if (!want) return { status: 'none' };
+
+    const near = list.filter(c => lev(deaccent(String(c.name || '')).toLowerCase(), want) <= 1);
+    if (!near.length) return { status: 'none' };
+    if (near.length === 1) return { status: 'name-matched', candidate: near[0] };
+
+    const target = Number(lobbyIlvl);
+    if (!Number.isFinite(target)) return { status: 'ambiguous', candidates: near };
+
+    const ranked = near
+      .map(c => ({ c, diff: Math.abs(round2(c.itemLevel) - round2(target)) }))
+      .filter(x => Number.isFinite(x.diff))
+      .sort((a, b) => a.diff - b.diff);
+
+    if (!ranked.length) return { status: 'ambiguous', candidates: near };
+    const [best, next] = ranked;
+    if (best.diff <= MAX_DRIFT && (!next || next.diff - best.diff >= MIN_SEPARATION))
+      return { status: 'name-matched', candidate: best.c };
+    return { status: 'ambiguous', candidates: near };
+  }
+
   function pickCandidate(candidates, lobbyIlvl) {
     const list = Array.isArray(candidates) ? candidates : [];
     const hits = list.filter(c => ilvlMatches(c.itemLevel, lobbyIlvl));
@@ -302,6 +359,6 @@
     nearestServer, regionFor,
     parseTitle, parseGate, parseSlots, parseLobby,
     allEncounters, findEncounter, ENCOUNTER_GROUPS,
-    validate, pickCandidate
+    validate, pickCandidate, pickByName
   };
 })();
