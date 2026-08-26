@@ -4,8 +4,22 @@
 const STORE='lostark-hideout-private-v3';
 const btn=()=>document.getElementById('optimizeBtn');
 function active(){return window.LostArkOptimizerMode&&!window.LostArkOptimizerMode.general&&window.LostArkOptimizerMode.raid}
-function parameterText(p){const parts=[];const pos=[['Hit Master',Number(p?.hitmaster)||0],['Front Attack',Number(p?.front)||0],['Back Attack',Number(p?.back)||0]].sort((a,b)=>b[1]-a[1]);if(pos[0][1]>0&&pos[0][1]>pos[pos.length-1][1])parts.push(`${pos[0][0]} favored`);const range=Number(p?.ranged)||0,melee=Number(p?.melee)||0;if(range>melee)parts.push('Ranged favored');else if(melee>range)parts.push('Melee favored');if((Number(p?.burst)||0)>1)parts.push('Burst windows favored');const mv=p?.mechanics?.movement;if(mv&&mv!=='low')parts.push(`${String(mv).replace(/-/g,' ')} mobility pressure`);const fp=p?.mechanics?.forcedPositioning;if(fp&&fp!=='low')parts.push(`${String(fp).replace(/-/g,' ')} forced positioning`);if(p?.mechanics?.stagger==='high')parts.push('High stagger demand');if(p?.mechanics?.destruction==='high')parts.push('High destruction demand');return parts.join(' · ')||'Standard encounter parameters'}
-function annotate(){const label=document.getElementById('optimizerModeLabel');if(!label)return;let el=document.getElementById('encounterModelStatus');if(!el){el=document.createElement('span');el.id='encounterModelStatus';el.style.cssText='display:block;margin-top:4px;font-size:11px;color:#9aa0a6';label.parentElement?.appendChild(el)}const p=window.LostArkEncounterScoring?.profile?.();if(!active()){el.textContent='Encounter model inactive';return}if(p)el.textContent=`Encounter scoring: ${p.name} · ${p.confidence} · ${parameterText(p)}`;else el.textContent='Encounter selected · no scoring profile; General model retained'}
+/* This used to print "Encounter scoring: <raid> · <confidence> · <parameters>",
+   which is word for word what the summary bar above the parties already says,
+   so the same sentence appeared twice on screen. It also printed "Encounter
+   model inactive" in General mode, where the mode label directly above it
+   already reads "General Optimization".
+
+   What is kept is the one state neither of those covers: a raid is selected but
+   has no scoring profile, so the General model is quietly standing in. That is
+   worth saying, and nothing else says it. Otherwise the line stays empty and
+   takes no space. */
+function annotate(){const label=document.getElementById('optimizerModeLabel');if(!label)return;
+ let el=document.getElementById('encounterModelStatus');
+ if(!el){el=document.createElement('span');el.id='encounterModelStatus';el.style.cssText='display:block;margin-top:4px;font-size:11px;color:#e0a35b';label.parentElement?.appendChild(el)}
+ const p=window.LostArkEncounterScoring?.profile?.();
+ if(active()&&!p){el.style.display='';el.textContent='Encounter selected · no scoring profile; General model retained';return}
+ el.style.display='none';el.textContent='';}
 function intercept(){const b=btn();if(!b||b.dataset.raidBridgeV3)return;b.dataset.raidBridgeV3='1';annotate();document.getElementById('raidSpecificSelect')?.addEventListener('change',()=>setTimeout(annotate,50));document.getElementById('generalOptimization')?.addEventListener('change',()=>setTimeout(annotate,50));b.addEventListener('click',()=>setTimeout(annotate,150),{capture:true})}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',intercept,{once:true});else intercept();
 })();
