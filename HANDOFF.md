@@ -279,6 +279,18 @@ came from the user, not from the payload — Bible gives only the name. Mapped:
 | Wealth | identity generation | burst, same axis as Specialization |
 | Protection / Iron Wall / Mountain's Face | shield or damage taken while casting | push resilience |
 | Conviction **+** Judgment | paired: cooldown window | mobility (uptime), **only when both are present** |
+| Rage 1.0 / Quick Recharge 0.5 / Galewind 0.5 | speed and cooldown | mobility (uptime), pooled, step at **2 points** |
+
+**Uptime runes are pooled, not counted one step each.** Five different signals
+argue for the same axis — Swiftness, the Judgment pair, Rage, Quick Recharge,
+Galewind — and giving each its own step would mean almost everyone gets it, which
+discriminates nothing. Weights are how much of a skill's slot actually buys
+uptime: Rage is worth double the others because its buff lands on *subsequent*
+actions rather than the skill carrying it, which is why it goes on something
+short-cooldown and cast often. One incidental Galewind (0.5) earns nothing; two
+Rage, or a real build's two Quick Recharge plus two Galewind, reaches 2 and earns
+the single step. Verified: 0 / 0.5 / 1.0 points all score 75.788, and 2.0 points
+scores 77.335.
 
 **Conviction and Judgment are one mechanic wearing two rune slots.** Conviction
 on skill A can proc a 3s state; Judgment on skill B can consume it to open a 6s

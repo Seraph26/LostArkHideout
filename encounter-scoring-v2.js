@@ -112,11 +112,24 @@ const RUNE_IDENTITY = /^wealth$/i;
 const RUNE_GUARD = /^(protection|iron wall|mountain'?s face)$/i;
 const RUNE_CONVICTION = /^conviction$/i;
 const RUNE_JUDGMENT = /^judgment$/i;
+/* Uptime runes, pooled rather than each granting the same step, because they all
+   argue for the same thing and several of them together is a different claim
+   from one of them alone. Weights are how much of the skill's slot actually buys
+   uptime:
+     Rage           1.0  attack *and* move speed for 6s, benefiting what follows
+     Quick Recharge 0.5  chance at cooldown on that one skill
+     Galewind       0.5  casting speed, that one skill only
+   Rage is worth more than the other two despite being a proc, because the buff
+   lands on subsequent actions rather than on the skill carrying it -- which is
+   also why it is put on something short-cooldown and cast often. */
+const RUNE_UPTIME = { rage: 1, 'quick recharge': .5, galewind: .5 };
 function runeCounts(skills){
- const out={stagger:0,identity:0,guard:0,conviction:0,judgment:0};
+ const out={stagger:0,identity:0,guard:0,conviction:0,judgment:0,uptime:0};
  for(const s of (Array.isArray(skills)?skills:[])){
   const r=String(s&&s.rune||'').trim();
   if(!r)continue;
+  const up=RUNE_UPTIME[r.toLowerCase()];
+  if(up){out.uptime+=up;continue}
   if(RUNE_STAGGER.test(r))out.stagger+=1;
   else if(RUNE_STAGGER_HALF.test(r))out.stagger+=0.5;
   else if(RUNE_IDENTITY.test(r))out.identity++;
@@ -155,7 +168,13 @@ function statShaped(bh,stats,runes){
     Note it therefore changes nothing for a class already at standard or high
     mobility, because mobilityFactor returns 1 for both -- the same limit that
     applies to Swiftness, and it stays until that table is widened. */
- const wantsMobility=dom==='swiftness'||r.judgmentCombo;
+ /* One step, from whichever uptime evidence is strong enough to earn it, never
+    once per signal. Swiftness at 24+ of 40 and a working Conviction/Judgment
+    pair are each strong on their own; rune uptime has to reach 2 points, which
+    a couple of Rage-grade choices does and a single incidental Galewind does
+    not. */
+ const UPTIME_BAR=2;
+ const wantsMobility=dom==='swiftness'||r.judgmentCombo||r.uptime>=UPTIME_BAR;
  const wantsGuard=r.guard>=2;
  if(!wantsBurst&&!wantsMobility&&!wantsGuard)return bh;
  const out={...bh,evidence:(bh.evidence||[]).slice()};
@@ -163,7 +182,9 @@ function statShaped(bh,stats,runes){
   out.mobility=out.mobility==='low'?'standard':'high';
   out.evidence.push(dom==='swiftness'
    ? `Swiftness ${stats[dom]}/${stats.total} — mobility read up one step`
-   : 'Conviction + Judgment runes paired — cooldown window');
+   : r.judgmentCombo
+     ? 'Conviction + Judgment runes paired — cooldown window'
+     : `Uptime runes (${r.uptime.toFixed(1)} pts) — speed and cooldown`);
  }
  if(wantsBurst&&out.burstDependency!=='high'){
   out.burstDependency='high';
