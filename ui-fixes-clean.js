@@ -73,8 +73,15 @@ function notePositionGap(cls,b){
  if(!cls||posGaps.has(cls))return;
  const nodes=(b&&Array.isArray(b.enlightenment))?b.enlightenment:[];
  posGaps.set(cls,nodes);
- try{console.warn('[position] no positional rule for "'+cls+'", and it is not a ranged class. Nodes: '+
-  (nodes.join(', ')||'(none parsed)')+'. Add a rule to positionFor() in ui-fixes-clean.js.')}catch{}
+ /* Check staleness before writing a rule. A melee character reading Unknown is
+    usually a build profile parsed before its engravings were read, not a gap in
+    the table: Ryohaku and Trashtierweeb both looked like missing Glaivier and
+    Scrapper rules, and both actually run Ambush Master, which a fresh parse
+    picks up and turns into Back Attack on its own. Refresh Profiles first --
+    shift-click forces every character -- and only add a rule if it survives. */
+ try{console.warn('[position] "'+cls+'" resolved to Unknown: melee, no positional engraving parsed, no spec rule. '+
+  'Nodes: '+(nodes.join(', ')||'(none parsed)')+'. Refresh Profiles first -- a stale build profile is the usual cause -- '+
+  'and only add a rule to positionFor() in ui-fixes-clean.js if it persists.')}catch{}
 }
 function positionFor(p,b){const cls=norm(className(p,b));if(['bard','artist','paladin','valkyrie'].includes(cls))return'N/A';const explicit=clean(b?.positional||p?.positional||'');if(explicit&&!/^unknown$/i.test(explicit))return explicit;const t=norm([b?.text,p?.engravings,p?.arkGrid,p?.arkPassive,p?.tripods].flat().join(' '));if(/ambush master|back attack|entropy/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(cls==='berserker'&&/mayhem|berserker'?s technique|berserker technique/.test(t))return'Back Attack';if(cls==='summoner'&&/master summoner|communication overflow|ancient spear/.test(t))return'Hit Master';if(cls==='souleater'&&/full moon harvester|night.?s edge/.test(t))return'Hit Master';
  /* A ranged class has no positional requirement to begin with, so "Unknown" was
