@@ -267,6 +267,42 @@ It refines an ordering rather than rewriting one.
 `bh` is the cached profile's own object — `statShaped` copies it, because
 mutating it would edit the stored build profile by reference.
 
+### Mobility skills, and the tripod ceiling (2026-08-25)
+
+Class archetype decides mobility, so a Master Summoner reads `low` because
+Ancient skills root you — regardless of what movement tools the build brings.
+`MOBILITY_SKILLS` in `encounter-scoring-v2.js` corrects that: two or more
+equipped movement skills promote mobility one step. One is what most builds
+carry anyway; two is a character who can reposition. Verified: a Deathblade with
+Spincutter **and** Dark Axel goes 1.0 → 1.01, with one of them it does not move,
+and a Gunlancer bringing Guardian's Leap and Shield Charge has its 0.98 penalty
+lifted.
+
+Keyed **by class**, because Charge, Fly, Death Fire, Moon Flash Kick, Somersault
+Shot and Executor's Sword each belong to several classes and a flat name list
+credits the wrong ones.
+
+**Only skills that move you regardless of tripods are listed, and that is a hard
+limit rather than a choice.** Excellent Mobility, Double Jump, Additional
+Maneuver, Spiral Kick, Infiltrate Decimation and Free Move are *tripod* names.
+Bible's payload carries tripods as bare indices — `skills:[{id:49110,level:10,
+rune:65103004,tripods:[2,2,2]}]` — with no names anywhere; searching a profile
+for "Excellent Mobility" returns zero hits. So Paladin's Charge, whose +4m comes
+from Excellent Mobility, cannot be told apart from a Charge without it.
+
+**This is why the original example does not work.** Master Summoner's Released
+Will gets its movement from Quick Pace, which is Move Speed rather than
+displacement, and Fly and Flash Thrust get theirs from Excellent Mobility. All
+tripod-granted, so Summoner has no entry at all. The mechanism is right; the data
+is not there.
+
+Also excluded: Quick Pace, Nimble Movement and Life Absorption are Move Speed,
+not displacement, and Agile Movement is Attack Speed and not mobility at all.
+
+**What would unlock it:** the payload gives stable numeric skill ids and per-tier
+tripod indices, so a skill-id → tripod-name mapping would make rules of the form
+"skill 49110, tier 2, index 3" exact. Without that mapping, do not guess.
+
 ### Skill runes (2026-08-25)
 
 Runes are chosen per skill, so they say what a player built *for*. Rune effects

@@ -65,12 +65,12 @@ function behaviorFor(cls,eng,low,bh){
  return b;
 }
 function parseClassName(v){const x=String(v||'').trim().toLowerCase();const map={arcana:'Arcanist',arcanist:'Arcanist',souleater:'Souleater',soul_eater:'Souleater',guardianknight:'Guardianknight'};return map[x]||String(v||'Unknown').trim()||'Unknown'}
-function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=parseClassName(p.class||p.className||p.characterClass||'');let position=b.positional&&b.positional!=='Unknown'?b.positional:'unknown';const bh=behaviorFor(cls,b.engravings||[],t,b.behavior||{}),runes=runeCounts(b.skills);
+function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=parseClassName(p.class||p.className||p.characterClass||'');let position=b.positional&&b.positional!=='Unknown'?b.positional:'unknown';const bh=behaviorFor(cls,b.engravings||[],t,b.behavior||{}),runes=runeCounts(b.skills),mskills=mobilitySkillPoints(cls,b.skills);
  if(bh.positioning)position=bh.positioning==='back'?'Back Attack':bh.positioning==='hitmaster'?'Hit Master':bh.positioning==='front'?'Front Attack':position;
  if(position==='unknown'){if(POSITIONAL.back.test(t))position='Back Attack';else if(POSITIONAL.front.test(t))position='Front Attack';else if(POSITIONAL.hitmaster.test(t))position='Hit Master'}
  const burst=Boolean(b.burst)||bh.burstDependency==='high'||/igniter|punisher|full moon|surge|death strike|identity burst|master summoner|asura.?s path|brawl king storm|robust spirit|deathblow/i.test(t);
  const support=SUPPORT_CLASSES.has(cls);
- return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats,runes),runes,uptimePoints:uptimePoints(b.stats,runes)};}
+ return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats,runes,mskills),runes,uptimePoints:uptimePoints(b.stats,runes),mobilitySkills:mskills};}
 /* Mobility and burst dependence were decided by class and engravings alone, so
    every character of a class scored identically no matter how they were built.
    The Ark Passive Evolution allocation is the per-character difference: 40
@@ -156,36 +156,27 @@ function staggerFactor(count,mechanics){
  if(d!=='high'&&d!=='very-high')return 1;
  const step=d==='very-high'?.005:.004;
  return 1+Math.min(count,2)*step}
-function statShaped(bh,stats,runes){
+function statShaped(bh,stats,runes,skillPts){
  const dom=stats&&stats.dominant;
  const r=runes||{stagger:0,identity:0,guard:0};
  const wantsBurst=dom==='specialization'||r.identity>=2;
- /* The Judgment window is cooldown reduction, which is uptime, and uptime is the
-    mobility axis here. Deliberately the same single step Swiftness gets and
-    never additive with it: this is a chance to proc a state, then a chance to
-    consume it, then a reward only for what is cast inside six seconds. It is a
-    real build choice worth recognising, not a multiplier to stack.
-    Note it therefore changes nothing for a class already at standard or high
-    mobility, because mobilityFactor returns 1 for both -- the same limit that
-    applies to Swiftness, and it stays until that table is widened. */
- /* Deliberately no longer promotes mobility. Class mobility and build uptime are
-    different claims and were being conflated: stacking Swiftness does not turn a
-    Gunlancer into an Artist, and treating it that way made seven of eight
-    characters in a real lobby read `high`, which discriminates nothing. Class
-    mobility stays whatever the class is; build uptime is scored separately by
-    uptimeFactor, so a slow class that invested in speed keeps its penalty and
-    earns a smaller bonus beside it -- which is what actually happens. */
- const wantsMobility=false;
+ /* Stats and runes deliberately do NOT promote mobility -- stacking Swiftness
+    does not turn a Gunlancer into an Artist, and treating it that way made seven
+    of eight characters in a real lobby read `high`, which discriminates nothing.
+    They are scored separately by uptimeFactor.
+
+    Equipped mobility skills are different: a dash, a leap or a teleport is
+    displacement, which is the thing the mobility axis measures. Two of them is
+    the bar, because one is what most builds carry anyway and two is a character
+    who can actually reposition -- which is exactly the Master Summoner case,
+    flagged `low` by the engraving while bringing real movement tools. */
+ const wantsMobility=(skillPts||0)>=2;
  const wantsGuard=r.guard>=2;
  if(!wantsBurst&&!wantsMobility&&!wantsGuard)return bh;
  const out={...bh,evidence:(bh.evidence||[]).slice()};
  if(wantsMobility&&out.mobility!=='high'){
   out.mobility=out.mobility==='low'?'standard':'high';
-  out.evidence.push(dom==='swiftness'
-   ? `Swiftness ${stats[dom]}/${stats.total} — mobility read up one step`
-   : r.judgmentCombo
-     ? 'Conviction + Judgment runes paired — cooldown window'
-     : `Uptime runes (${r.uptime.toFixed(1)} pts) — speed and cooldown`);
+  out.evidence.push(`${skillPts} mobility skills equipped — repositioning tools`);
  }
  if(wantsBurst&&out.burstDependency!=='high'){
   out.burstDependency='high';
@@ -235,6 +226,58 @@ function mobilityFactor(level,mechanics){
   if(m==='moderate')return .992;
  }
  return 1}
+/* Mobility skills, by class. Class archetype says a Master Summoner is slow
+   because Ancient skills root you -- but a build bringing Released Will, Fly and
+   Flash Thrust has real movement tools, and was being penalised for slowness it
+   does not have.
+
+   Keyed by class deliberately: Charge, Fly, Death Fire, Moon Flash Kick,
+   Somersault Shot and Executor's Sword each appear under several classes, and a
+   flat name list would credit the wrong ones.
+
+   **Only skills that move you regardless of tripods are listed.** Excellent
+   Mobility, Double Jump, Additional Maneuver, Spiral Kick, Infiltrate
+   Decimation and Free Move are *tripod* names, not skill properties, and
+   Bible's payload carries tripods as selected indices with no names at all --
+   `tripods:[2,2,2]` and nothing to say what 2 means. Searching the page for
+   "Excellent Mobility" returns zero hits. So a skill whose movement comes from a
+   tripod cannot be verified, and crediting it would be guessing: Paladin's
+   Charge earns its +4m from Excellent Mobility, and a Charge without it moves
+   nobody.
+
+   Also excluded: Quick Pace, Nimble Movement and Life Absorption are Move Speed
+   rather than displacement, and Agile Movement is Attack Speed and not mobility
+   at all. Anything the source described only as "movement" without saying
+   whether the skill or a tripod provides it is left out too -- silence is
+   cheaper than a wrong entry.
+
+   If a skill-id to tripod-name mapping ever exists, the payload gives stable
+   numeric skill ids and per-tier indices, so an exact rule becomes possible. */
+const MOBILITY_SKILLS={
+ berserker:{'shoulder charge':1,'wind blade':1},
+ destroyer:{dreadnaught:1},
+ gunlancer:{"guardian's leap":1,'shield charge':1},
+ glaivier:{vault:1},
+ wardancer:{'lightning kick':1},
+ scrapper:{'charging blow':1,'dragon advent':1},
+ soulfist:{'merciless pummel':1,'bolting crash':1},
+ deathblade:{spincutter:1,'dark axel':1},
+ shadowhunter:{'demonic slash':1},
+ reaper:{distortion:1,nightmare:1},
+ arcanist:{'scratch dealer':1},
+ sorceress:{blink:1}
+};
+function mobilitySkillPoints(cls,skills){
+ const table=MOBILITY_SKILLS[String(cls||'').trim().toLowerCase()];
+ if(!table)return 0;
+ let pts=0;
+ for(const s of (Array.isArray(skills)?skills:[])){
+  /* Bible prints the skill name as equipped; "Stroke: Hopper" and friends carry
+     a subtitle, so match the leading name rather than the whole string. */
+  const n=String(s&&s.name||'').trim().toLowerCase().split(':')[0].trim();
+  if(table[n])pts+=table[n];
+ }
+ return pts}
 /* Build-bought uptime, kept separate from class mobility above. Points:
      Swiftness dominant (24+ of 40)   2
      Conviction + Judgment paired     2
