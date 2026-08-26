@@ -431,9 +431,36 @@ flat-text parse in `skillsFrom()`, including the literal `No rune`.
    100%**: nearly every character sits below 100 on a real encounter, so an
    absolute rule painted every card red. Green = suits them more than the rest of
    the eight, red = less, grey = within a third of a point. The party header
-   figure was renamed from "Fit" to **Average Party Encounter Favorability** and
-   is wrapped in `<strong class="party-fit">` so the swap-arrow layer can anchor
-   to it; its arrow reads in **points**, since the figure is already a percentage.
+   figure went "Fit" → "Average Party Encounter Favorability" → **Realised party
+   fit** (2026-08-25). It is wrapped in `<strong class="party-fit">` so the
+   swap-arrow layer can anchor to it; its arrow reads in **points**, since the
+   figure is already a percentage.
+
+   **Why it was renamed the second time.** It had been
+   `EncounterScoring.partyScore()`, which is a plain arithmetic mean of the four
+   card values — literally `(93.3+78.2+73.9+76.1)/4` — so it carried nothing the
+   cards above it did not already show and could not tell two arrangements of the
+   same eight people apart. It also weighted every member equally, letting a
+   high-fit low-CP character flatter the party (swapping a CP 6,192 member for a
+   CP 5,269 one raised the average while Base DPS Power *fell*), and it averaged
+   supports in with DPS though a support's favorability measures aura and
+   placement rather than uptime.
+
+   `partyRealisedFit()` in `encounter-optimizer-v1.js` is CP-weighted across the
+   **DPS only**, then scaled by that party's **support uptime** — supports reach
+   it through the uptime term instead of being averaged in. Both inputs depend on
+   who is actually in the party. Measured on a real lineup: the two parties moved
+   from 90.2 / 85.4 under the mean to **90.0 / 80.7**, widening a 4.8-point gap to
+   9.3 and matching the Encounter score ordering.
+
+   **Display only.** The arrangement is still chosen by `scoreParty()`
+   (`dpsValue × supportFactor`), so this does not double-count into optimisation.
+
+   The per-card number is deliberately **not** party-aware. Party composition is
+   already modelled and already shown (Party Synergy, Support Impact, Support
+   uptime), so folding it into the card would count it twice — and the card's
+   value is that it is stable: "this character suits this fight at 86.3%" holds
+   wherever they are seated, which is what makes drag-to-compare meaningful.
 5. **Support encounter fit was flattened by the clamp.** Every support hit the
    old `.75` floor on extreme content and displayed an identical 75%. The floor
    is now `.60`, and `supportFactor` scales placement (flexible vs

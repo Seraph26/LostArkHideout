@@ -94,7 +94,41 @@ function synergyLine(p,gs){let labels='';try{labels=window.LostArkGeneralModel?.
 /* The encounter score is wrapped in <strong> so the swap-arrow layer has an
    anchor to place its indicator after, exactly as it does on the General
    "Estimated potential" figure. */
-function renderParty(title,p,score,opts){const solo=!!(opts&&opts.solo),key=(opts&&opts.key)||'party1';const fit=(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1);const gs=generalScore(p);return `<article class="party encounter-optimized-party${solo?' solo-encounter-party':''}"><h3>${esc(title)}</h3><div class="score party-score">Encounter score <strong>${Math.round(score).toLocaleString()}</strong> · Average Party Encounter Favorability <strong class="party-fit">${fit}%</strong></div><div class="slots" data-enc-party="${key}">${p.map(c=>slotHtml(c,gs,p,opts&&opts.mean)).join('')}</div>${synergyLine(p,gs)}</article>`}
+/* The party figure used to be LostArkEncounterScoring.partyScore(), which is a
+   plain arithmetic mean of the four card numbers -- literally
+   (93.3+78.2+73.9+76.1)/4 -- so it carried no information the cards above it did
+   not already show, and could not tell two arrangements of the same eight people
+   apart.
+
+   Two things were wrong with that as a *party* measure. It weighted every member
+   equally, so a high-fit low-CP character flattered the party: swapping a CP
+   6,192 character for a CP 5,269 one raised the average while Base DPS Power
+   fell. And it averaged supports in with DPS, though a support's favorability
+   measures aura and placement value rather than uptime, and their real
+   contribution to the party is that they keep the buffs up.
+
+   So: CP-weighted across the DPS, then scaled by the party's own support uptime.
+   Both terms depend on who is actually in the party, which is what makes the
+   number party-level rather than a restatement. Supports are not averaged in --
+   they appear through the uptime term instead.
+
+   Deliberately display-only. The arrangement is still chosen by scoreParty()
+   (dpsValue x supportFactor), so nothing here double-counts into optimisation.
+   The <strong class="party-fit"> anchor is kept; the swap-arrow layer reads it. */
+function partyRealisedFit(p,gs){
+ let num=0,den=0;
+ for(const c of p){
+  if(info(c).role==='Support')continue;
+  const v=favourability(c);if(v===null)continue;
+  const cp=Number(info(c).cp)||0;if(cp<=0)continue;
+  num+=v*cp;den+=cp;
+ }
+ if(!den)return null;
+ const weighted=num/den;
+ const up=Number(gs&&gs.coherence);
+ return Number.isFinite(up)&&up>0?weighted*(up/100):weighted;
+}
+function renderParty(title,p,score,opts){const solo=!!(opts&&opts.solo),key=(opts&&opts.key)||'party1';const gs=generalScore(p);const fitValue=partyRealisedFit(p,gs);const fit=fitValue===null?(window.LostArkEncounterScoring.partyScore(p).score*100).toFixed(1):fitValue.toFixed(1);return `<article class="party encounter-optimized-party${solo?' solo-encounter-party':''}"><h3>${esc(title)}</h3><div class="score party-score">Encounter score <strong>${Math.round(score).toLocaleString()}</strong> · Realised party fit <strong class="party-fit">${fit}%</strong></div><div class="slots" data-enc-party="${key}">${p.map(c=>slotHtml(c,gs,p,opts&&opts.mean)).join('')}</div>${synergyLine(p,gs)}</article>`}
 function render(best){const root=document.getElementById('suggestedParties');if(!root)return;const model=window.LostArkEncounterScoring.profile();const params=parameterText(model);
 /* The colour baseline for the favorability badges: everyone actually seated. */
 const seated=[...(best.a||[]),...(best.b||[])].map(favourability).filter(v=>v!==null);
