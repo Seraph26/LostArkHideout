@@ -70,7 +70,7 @@ function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=pars
  if(position==='unknown'){if(POSITIONAL.back.test(t))position='Back Attack';else if(POSITIONAL.front.test(t))position='Front Attack';else if(POSITIONAL.hitmaster.test(t))position='Hit Master'}
  const burst=Boolean(b.burst)||bh.burstDependency==='high'||/igniter|punisher|full moon|surge|death strike|identity burst|master summoner|asura.?s path|brawl king storm|robust spirit|deathblow/i.test(t);
  const support=SUPPORT_CLASSES.has(cls);
- return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats,runes),runes};}
+ return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats,runes),runes,uptimePoints:uptimePoints(b.stats,runes)};}
 /* Mobility and burst dependence were decided by class and engravings alone, so
    every character of a class scored identically no matter how they were built.
    The Ark Passive Evolution allocation is the per-character difference: 40
@@ -168,13 +168,14 @@ function statShaped(bh,stats,runes){
     Note it therefore changes nothing for a class already at standard or high
     mobility, because mobilityFactor returns 1 for both -- the same limit that
     applies to Swiftness, and it stays until that table is widened. */
- /* One step, from whichever uptime evidence is strong enough to earn it, never
-    once per signal. Swiftness at 24+ of 40 and a working Conviction/Judgment
-    pair are each strong on their own; rune uptime has to reach 2 points, which
-    a couple of Rage-grade choices does and a single incidental Galewind does
-    not. */
- const UPTIME_BAR=2;
- const wantsMobility=dom==='swiftness'||r.judgmentCombo||r.uptime>=UPTIME_BAR;
+ /* Deliberately no longer promotes mobility. Class mobility and build uptime are
+    different claims and were being conflated: stacking Swiftness does not turn a
+    Gunlancer into an Artist, and treating it that way made seven of eight
+    characters in a real lobby read `high`, which discriminates nothing. Class
+    mobility stays whatever the class is; build uptime is scored separately by
+    uptimeFactor, so a slow class that invested in speed keeps its penalty and
+    earns a smaller bonus beside it -- which is what actually happens. */
+ const wantsMobility=false;
  const wantsGuard=r.guard>=2;
  if(!wantsBurst&&!wantsMobility&&!wantsGuard)return bh;
  const out={...bh,evidence:(bh.evidence||[]).slice()};
@@ -199,7 +200,62 @@ function statShaped(bh,stats,runes){
   out.evidence.push(`${r.guard} Protection / Iron Wall runes — casts defended`);
  }
  return out}
-function mobilityFactor(level,mechanics){const m=mechanics?.movement||'low';if(level==='high')return 1;if(level==='low'){if(m==='very-high')return .975;if(m==='high')return .98;if(m==='moderate-high')return .985;if(m==='moderate')return .992}return 1}
+/* High mobility used to return 1, exactly like standard, so mobility could only
+   ever cost a character and never earn them anything. That made every signal
+   pointing at it -- Swiftness, the Conviction/Judgment pair, Rage, Quick
+   Recharge, Galewind -- inert for any class not already flagged `low`, which is
+   to say almost all of them.
+
+   `high` now earns a bonus that scales with how much the fight moves you, the
+   same shape burstFactor uses for burst windows, and `standard` stays the
+   neutral baseline at 1.
+
+   The bonus is deliberately about half the matching penalty: being too slow
+   costs uptime directly and continuously, while extra speed past what the
+   mechanics demand converts into progressively less -- you need enough to make
+   the movement, and surplus beyond that buys little. Sized to sit with the
+   model's other bonuses (burst 1.003-1.012, pushImmunity 1.01) rather than to
+   mirror the penalty.
+
+   `very-high` movement appears in no profile today; it is kept so the table
+   stays complete if one is written. */
+function mobilityFactor(level,mechanics){
+ const m=mechanics?.movement||'low';
+ if(level==='high'){
+  if(m==='very-high')return 1.012;
+  if(m==='high')return 1.01;
+  if(m==='moderate-high')return 1.006;
+  if(m==='moderate')return 1.003;
+  return 1;
+ }
+ if(level==='low'){
+  if(m==='very-high')return .975;
+  if(m==='high')return .98;
+  if(m==='moderate-high')return .985;
+  if(m==='moderate')return .992;
+ }
+ return 1}
+/* Build-bought uptime, kept separate from class mobility above. Points:
+     Swiftness dominant (24+ of 40)   2
+     Conviction + Judgment paired     2
+     uptime runes                     Rage 1.0, Quick Recharge 0.5, Galewind 0.5
+   Two points is the floor -- one incidental Galewind is not a decision -- and it
+   saturates at four, because a build only has so many slots and the returns on
+   piling more speed into the same rotation fall away.
+
+   Scaled by how much the fight moves you, for the same reason mobility is: speed
+   is worth little on a stationary gate. Smaller than the class-mobility bonus,
+   because runes and a stat line move a character less than the class they
+   picked. */
+function uptimeFactor(points,mechanics){
+ if(!(points>=2))return 1;
+ const m=mechanics?.movement||'low';
+ const scale=m==='very-high'?1:m==='high'?.8:m==='moderate-high'?.6:m==='moderate'?.4:0;
+ if(!scale)return 1;
+ return 1+.008*scale*(Math.min(points,4)/4)}
+function uptimePoints(stats,runes){
+ const r=runes||{};
+ return (stats&&stats.dominant==='swiftness'?2:0)+(r.judgmentCombo?2:0)+(r.uptime||0)}
 function burstFactor(level,mechanics){const w=mechanics?.burstWindows||'low';if(level==='high'){if(w==='very-high')return 1.012;if(w==='high')return 1.008;if(w==='moderate')return 1.003}return 1}
 function pushFactor(level,mechanics){if(level==='high'&&mechanics?.forcedPositioning==='very-high')return 1.005;return 1}
 function supportStatsFor(cls){try{const stats=window.LostArkSupportStats?.summary?.(cls);return stats&&typeof stats==='object'?stats:null}catch{return null}}
@@ -244,6 +300,8 @@ function characterScore(c){const p=profile();if(!p)return{score:1,components:{},
     Skill runes are the per-character half of it: a build spending rune slots on
     Overwhelm or Vision has given up damage for stagger, which is worth something
     on a gate with stagger checks and nothing on one without. */
+ const upf=uptimeFactor(t.uptimePoints||0,p.mechanics);score*=upf;components.buildUptime=upf;
+ if(upf!==1)reasons.push(`Build uptime (${(t.uptimePoints||0).toFixed(1)} pts) vs ${p.mechanics?.movement||'unknown'} movement × ${upf.toFixed(3)}`);
  const stf=staggerFactor(t.runes?.stagger||0,p.mechanics);score*=stf;components.stagger=stf;
  if(stf!==1)reasons.push(`Stagger runes vs ${p.mechanics?.stagger||'unknown'} stagger demand × ${stf.toFixed(3)}`);
  const sf=supportFactor(t,p);if(t.support){score*=sf;components.support=sf;const live=supportUptimeFactor(t.cls);if(live.source==='bible'){components.bibleSupportUptime=live.factor;if(live.weighted!==null)components.bibleWeightedUptime=live.weighted;reasons.push(`Bible support uptime × ${live.factor.toFixed(3)} (${(live.weighted*100).toFixed(1)}% weighted uptime)`)}else reasons.push(`Support encounter fit × ${sf.toFixed(3)}`)}else components.support=1;
