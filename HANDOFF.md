@@ -615,12 +615,21 @@ flat-text parse in `skillsFrom()`, including the literal `No rune`.
     `WORKER_VERSION`. Note the coupling: `pages.yml` publishes the whole repo to
     Pages on that *same* push, so a worker-only deploy needs a commit that
     touches only `worker/`, with page changes held on a branch.
-16. **A build profile once carried engravings the character did not have —
-    cause unknown, do not trust the first explanation.** Haylebrella parsed with
-    `Control, Wind Fury, Adrenaline, Raid Captain`, and the spec label read
-    *Wind Fury*, while a page fetched minutes later contained the words "Wind
-    Fury" **zero times** and read `T1 Drizzle`; she now parses as
-    `Hit Master, Drizzle, ...`. Not reproducible since.
+16. **A build profile once carried engravings the character did not have.**
+    Haylebrella parsed with `Control, Wind Fury, Adrenaline, Raid Captain`, and
+    the spec label read *Wind Fury*, while a page fetched minutes later
+    contained the words "Wind Fury" **zero times** and read `T1 Drizzle`; she now
+    parses as `Hit Master, Drizzle, ...`. Not reproducible on demand.
+
+    **A cached profile going stale is the likely explanation**, arrived at later
+    from an unrelated symptom: Ryohaku and Trashtierweeb showed position
+    "Unknown" and looked like missing positional rules, but both run Ambush
+    Master and a *fresh* parse of either produces `Back Attack`. Their stored
+    profiles simply predated that reading. The Haylebrella case has the same
+    shape — a cached parse disagreeing with a live one — so suspect the cache
+    before the parser. **Compare a cached profile against a fresh fetch before
+    concluding anything about parsing**, and note that a stale profile can
+    mislead the gap detectors into recommending rules that are not needed.
 
     The obvious explanation — `KNOWN_ENGRAVINGS` being tested against
     `raidText(d)`, which *can* return cleaned `outerHTML` — was **checked and is
