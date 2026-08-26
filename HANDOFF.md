@@ -311,9 +311,26 @@ kin) feed the uptime axis.
 **Bible's skill ids are five digits and class-blocked** — 25xxx Deathblade,
 31xxx Artist, 32xxx Aeromancer, 36xxx Paladin, 37xxx Sorceress, 47xxx Breaker,
 49xxx Guardian Knight; 162 observed across seven characters, range 25040–49430,
-**all five digits**. Rule sets found elsewhere use seven-digit ids
-(`2020001`, `3518001`) which appear nowhere in real data, so **rules keyed that
-way are inert**. Check the id space before adding rules.
+**all five digits**, and **every one ends in 0**.
+
+**Rule sets found elsewhere use a seven-digit id space** (`2020001`,
+`3518001`). They convert:
+
+```
+bibleId = floor(theirId / 1000) * 10
+```
+
+because Bible's are `ABCD*10` and theirs are `ABCD*1000+1`. Supporting evidence:
+all 162 observed ids end in 0, and the six ids converted this way land in
+prefixes 17, 20, 24, 28, 35, 38 — none colliding with the seven class blocks
+already seen, which is what should happen for classes not yet imported.
+
+**That is well-supported, not proven, and a wrong transform would credit the
+wrong skill's tripod.** So it self-checks:
+`LostArkEncounterScoring.mobilityTripodReport()` names the skill each rule points
+at as soon as a character of that class is cached, and says "not seen yet"
+until then. **Read it the first time one of those classes comes through a lobby**
+and confirm the skill is the one the rule was written for.
 
 **`LostArkBuildProfilesV3.skillNames()`** builds the translation table. Bible
 never states which id is which skill, but the payload and the markup both carry

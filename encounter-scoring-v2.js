@@ -276,28 +276,49 @@ const MOBILITY_SKILLS={
    Speed without displacing, so they are kept apart and score on the uptime axis
    instead, the same way Galewind and Rage do.
 
-   **These rules are currently inert, and knowingly so.** They arrived in a
-   different id space: Bible's skill ids are five digits and class-blocked
-   (25xxx Deathblade, 49xxx Guardian Knight, observed range 25040-49430, 162 of
-   them across seven characters, all five digits), while these are seven. None
-   of them appears in any real profile, so nothing here can match yet.
+   The rules were supplied in a different id space -- seven digits against
+   Bible's five -- and are rekeyed here by a transform rather than by hand:
 
-   They are kept rather than dropped because the mechanism around them is
-   verified and the rules are the right shape; only the key is wrong. Translating
-   them needs a skill id to name mapping, which is what
-   LostArkBuildProfilesV3.skillNames() builds out of cached profiles. Once a rule
-   is rekeyed to a five-digit id it starts working with no other change. */
+     bibleId = floor(theirId / 1000) * 10
+
+   Evidence for it: **all 162 distinct Bible ids observed end in 0**, so Bible's
+   are ABCD*10, while the supplied ones are ABCD*1000+1. The six derived ids fall
+   in prefixes 17, 20, 24, 28, 35 and 38 -- none of which collides with the seven
+   class blocks already seen (25, 31, 32, 36, 37, 47, 49), which is what should
+   happen if they belong to classes not yet imported.
+
+   That is well-supported, not proven, and the failure mode matters: a wrong
+   transform could land on a real skill that is not the intended one and credit
+   the wrong tripod. So it self-checks -- mobilityTripodReport() names each rule's
+   skill as soon as a character of that class has been cached, and until then
+   says so. Check it the first time one of these classes comes through a lobby.
+
+   Rule keys below are the derived Bible ids; the original is in the comment. */
 const MOBILITY_TRIPODS={
- 3802001:[{tier:1,index:2,name:'Excellent Mobility',type:'displacement'}],
- 2821001:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'},
-          {tier:2,index:1,name:'Quick Pace',type:'movespeed'}],
- 2424001:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'},
-          {tier:2,index:1,name:'Quick Pace',type:'movespeed'}],
- 1711001:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'}],
- 2020001:[{tier:1,index:1,name:'Quick Pace',type:'movespeed'},
-          {tier:3,index:1,name:'Storm Stampede',type:'displacement'}],
- 3518001:[{tier:3,index:1,name:'Additional Maneuver',type:'displacement'}]
+ 38020:[{tier:1,index:2,name:'Excellent Mobility',type:'displacement'}],                /* 3802001 */
+ 28210:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'},                 /* 2821001 */
+        {tier:2,index:1,name:'Quick Pace',type:'movespeed'}],
+ 24240:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'},                 /* 2424001 */
+        {tier:2,index:1,name:'Quick Pace',type:'movespeed'}],
+ 17110:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'}],                /* 1711001 */
+ 20200:[{tier:1,index:1,name:'Quick Pace',type:'movespeed'},                            /* 2020001 */
+        {tier:3,index:1,name:'Storm Stampede',type:'displacement'}],
+ 35180:[{tier:3,index:1,name:'Additional Maneuver',type:'displacement'}]                /* 3518001 */
 };
+/* What each rule actually points at, once a character of that class has been
+   cached. This is the check on the id transform above: read it after importing a
+   lobby containing one of these classes and confirm the skill is the one the
+   rule was written for. */
+function mobilityTripodReport(){
+ let dict={};
+ try{dict=window.LostArkBuildProfilesV3?.skillNames?.()||{}}catch{}
+ return Object.keys(MOBILITY_TRIPODS).map(id=>{
+  const known=dict[id];
+  return {skillId:+id, sourceId:(+id/10)*1000+1,
+   skill:known?known.name:'not seen yet — import a character of this class',
+   cls:known?known.class:null,
+   tripods:MOBILITY_TRIPODS[id].map(r=>`T${r.tier}-${r.index} ${r.name} (${r.type})`)};
+ })}
 function tripodMobility(skillData){
  const out={displacement:0,movespeed:0,taken:[]};
  for(const s of (Array.isArray(skillData)?skillData:[])){
@@ -397,5 +418,5 @@ function characterScore(c){const p=profile();if(!p)return{score:1,components:{},
  score=Math.max(.60,Math.min(1.15,score));return{score,components,reasons,profile:p.name,confidence:p.confidence,traits:t};}
 function partyScore(chars){const results=(chars||[]).map(characterScore);if(!results.length)return{score:0,characters:[],partyFactors:{}};const avg=results.reduce((s,r)=>s+r.score,0)/results.length;const supports=results.filter((r,i)=>traits(chars[i]).support).length;return{score:avg,characters:results,partyFactors:{averageEncounterFit:avg,supportCount:supports}}}
 function explain(chars){const r=partyScore(chars);return{...r,encounter:profile()?.name||null,mechanics:profile()?.mechanics||{}}}
-window.LostArkEncounterScoring={profiles:PROFILES,selected,profile,traits,characterScore,partyScore,explain};
+window.LostArkEncounterScoring={profiles:PROFILES,selected,profile,traits,characterScore,partyScore,explain,mobilityTripodReport};
 })();
