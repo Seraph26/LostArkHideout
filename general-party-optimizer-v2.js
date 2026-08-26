@@ -24,7 +24,21 @@ function textUncached(c){const p=profile(c),b=build(c);return clean([p.rawText,p
 function cls(c){const p=profile(c),b=build(c),v=clean(p.class||p.className||p.characterClass||b.className);if(v&&v.toLowerCase()!=='unknown')return({'Soul Eater':'Souleater','Arcana':'Arcanist','Glavier':'Glaivier'}[v]||v);const t=text(c),m=[['Summoner',/\bsummoner\b|master summoner|ancient spear/],['Souleater',/souleater|soul eater|full moon harvester|night.?s edge/],['Arcanist',/arcanist|arcana|empress grace|emperor.?s decree/],['Glaivier',/glaivier|glavier|pinnacle|control/],['Bard',/\bbard\b|desperate salvation|true courage/],['Artist',/\bartist\b|full bloom|recurrence/],['Paladin',/\bpaladin\b|blessed aura/],['Slayer',/\bslayer\b|predator|punisher/],['Breaker',/\bbreaker\b|asura.?s path|brawl king/],['Deathblade',/\bdeathblade\b|surge|remaining energy/],['Gunlancer',/\bgunlancer\b|lone knight|combat readiness/]];for(const[n,r]of m)if(r.test(t))return n;return'Unknown'}
 function role(c){const p=profile(c);return p.role==='Support'||SUPPORTS.has(cls(c))?'Support':'DPS'}
 function info(c){const p=profile(c);return{name:clean(p.name||c.name)||'Unknown',cls:cls(c),role:role(c),cp:num(p.cp??p.combatPower),url:c.url||p.url||''}}
-function pos(c){const b=build(c),t=text(c);if(b.positional&&b.positional!=='Unknown')return b.positional;if(b.behavior?.positioning&&b.behavior.positioning!=='flexible')return b.behavior.positioning;if(/ambush master|back attack/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(/master summoner|summoner/.test(t)&&/summoner/.test(t))return'Hit Master';return'Unknown'}
+/* Position comes from LostArkSpecAuthority, the same way the spec label does.
+   This function used to decide it alone and was strictly weaker: no ranged
+   fallback and no per-class spec rules, so an Aeromancer read "Unknown" where
+   the authority knows a ranged class has no positional requirement, and a
+   Berserker Technique or Night's Edge build read "Unknown" where the authority
+   has a rule. Both layers wrote the same label and whichever ran last won, so
+   the card showed one or the other depending on timing.
+
+   The logic below stays as the fallback for when the authority has not loaded
+   (it is a separate script tag), and is the only thing that runs then. */
+function pos(c){const auth=window.LostArkSpecAuthority;
+ if(auth&&typeof auth.positionFor==='function'){
+  try{const v=auth.positionFor(c&&c.profile||{},build(c));if(v)return v}catch{}
+ }
+ const b=build(c),t=text(c);if(b.positional&&b.positional!=='Unknown')return b.positional;if(b.behavior?.positioning&&b.behavior.positioning!=='flexible')return b.behavior.positioning;if(/ambush master|back attack/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(/master summoner|summoner/.test(t)&&/summoner/.test(t))return'Hit Master';return'Unknown'}
 /* Summoner supplies party mana through Shurdi, but only with the mana tripod
    selected: skill 20160, third tripod line, choice 2. Bible exposes tripods as
    bare indices, so this is the only way to tell. Profiles imported before

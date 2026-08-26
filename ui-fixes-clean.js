@@ -65,6 +65,17 @@ function specFor(p,b){
   noteSpecGap(cls,b.enlightenment);return ''}
  for(const [needle,label] of(rules[cls]||[]))if(t.includes(needle))return label;return clean(p?.specialization||b?.specialization||'')||'';
 }
+/* Same shape as noteSpecGap: one warning per class, carrying the Enlightenment
+   nodes, which is what writing the missing rule needs. Read with
+   LostArkSpecAuthority.positionGaps(). */
+const posGaps=new Map();
+function notePositionGap(cls,b){
+ if(!cls||posGaps.has(cls))return;
+ const nodes=(b&&Array.isArray(b.enlightenment))?b.enlightenment:[];
+ posGaps.set(cls,nodes);
+ try{console.warn('[position] no positional rule for "'+cls+'", and it is not a ranged class. Nodes: '+
+  (nodes.join(', ')||'(none parsed)')+'. Add a rule to positionFor() in ui-fixes-clean.js.')}catch{}
+}
 function positionFor(p,b){const cls=norm(className(p,b));if(['bard','artist','paladin','valkyrie'].includes(cls))return'N/A';const explicit=clean(b?.positional||p?.positional||'');if(explicit&&!/^unknown$/i.test(explicit))return explicit;const t=norm([b?.text,p?.engravings,p?.arkGrid,p?.arkPassive,p?.tripods].flat().join(' '));if(/ambush master|back attack|entropy/.test(t))return'Back Attack';if(/master brawler|front attack/.test(t))return'Front Attack';if(/hit master/.test(t))return'Hit Master';if(cls==='berserker'&&/mayhem|berserker'?s technique|berserker technique/.test(t))return'Back Attack';if(cls==='summoner'&&/master summoner|communication overflow|ancient spear/.test(t))return'Hit Master';if(cls==='souleater'&&/full moon harvester|night.?s edge/.test(t))return'Hit Master';
  /* A ranged class has no positional requirement to begin with, so "Unknown" was
     never right for one -- it just meant the build text held no Ambush Master or
@@ -72,6 +83,11 @@ function positionFor(p,b){const cls=norm(className(p,b));if(['bard','artist','pa
     the case that surfaced this. Positional evidence above still wins, so a build
     that does run back attacks is unaffected. */
  if(RANGED.has(cls))return'Hit Master';
+ /* Melee class, no positional engraving, and no rule for its spec -- so the
+    position genuinely is not known here. Say so once, with the nodes, rather
+    than printing "Unknown" on a card forever with nothing to act on. Glaivier
+    (Pinnacle) and Scrapper (Taijutsu) are the two that surfaced this. */
+ notePositionGap(cls,b);
  return'Unknown'}
 function icon(cls){try{return window.LostArkHideoutClassData?.iconUrl?.(cls)||''}catch{return''}}
 /* New Additions can hold party seats, but this map was built from the Main Group
@@ -135,7 +151,7 @@ let queued=false;const schedule=()=>{if(queued)return;queued=true;requestAnimati
 function start(){repair();new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});window.addEventListener('lostark-build-profiles-v3-ready',()=>setTimeout(repair,100))}
 /* Single source of truth for the displayed specialization, shared so Raid
    Specific shows the same label as the Main Group instead of the class name. */
-window.LostArkSpecAuthority={specFor,className,gaps:()=>[...specGaps].map(([cls,nodes])=>({cls,nodes}))};
+window.LostArkSpecAuthority={specFor,className,positionFor,gaps:()=>[...specGaps].map(([cls,nodes])=>({cls,nodes})),positionGaps:()=>[...posGaps].map(([cls,nodes])=>({cls,nodes}))};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 
 /* General Optimize lifecycle guard. UI state only: no scoring, hover, arrow,
