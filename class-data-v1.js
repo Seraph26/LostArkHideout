@@ -21,8 +21,19 @@
     Artist:'ClassIcon-Specialist-Artist.png', Aeromancer:'ClassIcon-Specialist-Aeromancer.png', Wildsoul:'ClassIcon-Specialist-Wildsoul.png', Guardianknight:'ClassIcon-Guardianknight.png'
   };
   const canonical = id => CLASS_ID_TO_NAME[String(id || '').trim().toLowerCase()] || null;
-  const iconUrl = name => String(name || '').replace(/\s+/g,'').toLowerCase() === 'souleater'
-    ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SOULEATER_SVG)}`
-    : ICON_FILES[name] ? `https://lostark.fandom.com/wiki/Special:Redirect/file/${encodeURIComponent(ICON_FILES[name])}` : '';
+  /* ICON_FILES is keyed by display name ("Machinist"), and this used to index it
+     with whatever it was handed. A class id -- "machinist", which is exactly the
+     form Bible's classId and several internal paths use -- missed entirely and
+     returned '', which reaches the page as an <img> with an empty src: a broken
+     image showing its alt text, clipped by the 22px icon box to a single
+     letter. canonical() already maps ids to display names, so try it before
+     giving up rather than failing on the case of the input. */
+  const iconUrl = name => {
+    const raw = String(name || '');
+    if (raw.replace(/\s+/g,'').toLowerCase() === 'souleater')
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SOULEATER_SVG)}`;
+    const file = ICON_FILES[raw] || ICON_FILES[canonical(raw) || ''] || '';
+    return file ? `https://lostark.fandom.com/wiki/Special:Redirect/file/${encodeURIComponent(file)}` : '';
+  };
   window.LostArkHideoutClassData = { CLASS_ID_TO_NAME, ICON_FILES, canonical, iconUrl, SOULEATER_SVG };
 })();

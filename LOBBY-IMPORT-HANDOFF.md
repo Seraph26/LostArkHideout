@@ -206,12 +206,22 @@ account-wide data.
    again. The logic had been correct for some time. **Confirm display fixes by
    calling the logic directly, or by dispatching
    `lostark-build-profiles-v3-ready`, which bypasses rAF.**
-4. **Untested:** ~~search end-to-end~~ (done, see item 2), multi-accent names,
-   a 4-player lobby import, Bible staleness tolerance (observed up to 15 days
-   stale but still matching), CE lobbies (user has no EU characters; de-risked
-   analytically). **The OCR paste path has still never run in `index.html`** —
-   it needs a real `Ctrl+V` of a real screenshot, which only the user can do.
-   That is the one thing standing between here and calling this confirmed.
+4. **The real paste works — confirmed 2026-08-25.** A live NA lobby (Kazeros —
+   Gate 1, Hard, 8 players) was screenshotted, pasted into the real dashboard,
+   and all 8 characters resolved: correct names, item levels to 2dp, CP, class
+   icons and specs, with the raid auto-selected and the parties optimising. That
+   was the last unproven step in the feature.
+
+   It also immediately earned the gap detector its place: **Machinist was
+   missing from the spec rules table**, so Teknologyman showed the class name.
+   Fixed with `Evolutionary Legacy`, taken from that character's own
+   Enlightenment nodes. His icon was the case bug in `iconUrl()` — see the
+   new-class checklist, step 2, in `HANDOFF.md`.
+
+   Still untested: multi-accent names, a 4-player lobby import, Bible staleness
+   tolerance (observed up to 15 days stale but still matching), CE lobbies (user
+   has no EU characters; de-risked analytically), and Machinist's *other* spec,
+   which will report itself through `gaps()` the first time one is imported.
 5. ~~**Deferred until the feature is finished**~~ — **done 2026-08-25.**
    `HANDOFF.md` has a new **Live Lobby Import** section, and item 9 is now a
    full **new-class checklist** — eight steps with exact file locations, worked

@@ -25,7 +25,16 @@ function specFor(p,b){
     confirmed against a real profile (Dhrammygon, 2026-08-25, "Dreadful Roar
     Lv. 1" as a T1 Enlightenment node). The class's other specs are unverified
     and guessing at them is how this file got reverted once already. */
- guardianknight:[['dreadful roar','Dreadful Roar']]};
+ guardianknight:[['dreadful roar','Dreadful Roar']],
+ /* Machinist was missing from this table entirely, so a real lobby showed
+    "Machinist" where the spec belongs -- found by Teknologyman on 2026-08-25,
+    which is the case LostArkSpecAuthority.gaps() exists to surface.
+    Evolutionary Legacy is confirmed from that character's own Enlightenment
+    block (T1 Evolutionary Legacy, then Oversync, Core Reaction Amplification,
+    Combat Mode, Zero Core Energy, Zero Mode). The class's other spec is
+    unverified and deliberately not guessed at; it will report itself through
+    gaps() the first time one is imported. */
+ machinist:[['evolutionary legacy','Evolutionary Legacy']]};
  /* The specialization comes from Bible's Ark Passive Enlightenment nodes, and
     only from there. That is where a spec actually lives, so anything else is a
     guess dressed up as data -- searching the whole flattened page produced

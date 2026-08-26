@@ -295,6 +295,14 @@ Supports score 0 contribution individually by design — their value is inside t
       classes (no Breaker, no Wildsoul), so expect to commit a local SVG and
       point at it. `app-fixed.js` `classIconUrl()` holds an older fallback map;
       it defers to the authority, so it does not need the entry.
+      A **missing icon shows as a single letter**, not as a gap: the src comes
+      back empty, the browser falls back to the alt text, and the 22px icon box
+      clips it to the first character. Machinist rendered as a bold "M" that way.
+      `iconUrl()` used to index `ICON_FILES` by the exact string given, so a
+      class *id* ("machinist") missed a table keyed by display name
+      ("Machinist"). It canonicalises now, but if an icon ever goes missing,
+      check the casing of what is being passed before assuming Fandom dropped
+      the file.
    3. **Class recognition in the build parser** — the alternation in
       `build-profile-v3.js` `parse()` (`classMatch`), plus `canonicalClass()` if
       Bible's spelling differs from ours. Miss this and `className` is
