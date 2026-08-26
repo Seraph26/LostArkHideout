@@ -97,6 +97,29 @@ function skillsFrom(body,clean){const i=body.lastIndexOf('Skills');if(i<0)return
   if(!m)continue;
   out.push({name:clean(m[2]),level:+m[1],tripods:m[3]||'',rune:m[4]?clean(m[4]):''})}
  return out}
+/* The page also ships a structured payload beside the rendered markup:
+     skills:[{id:49110,level:10,rune:65103004,tripods:[2,2,2],tripodLevels:{}}]
+   which is the only place tripod *selections* exist as data -- one index per
+   tier, 1-3, in tier order. Tripod names are nowhere on the page, so a rule has
+   to be written against id + tier + index; that is exactly what this supplies.
+
+   Skill names are not in the payload, so skillsFrom() above still provides
+   those. The two align on level and tripod code -- 49110 level 10 tripods
+   [2,2,2] is "Lv. 10 Wild Uppercut 222" -- which is also how a skill id can be
+   tied to a name if a dictionary is ever wanted.
+
+   Only the first payload is read. A profile can carry more than one loadout and
+   the raid one leads; taking them all would mix a chaos build into a raid
+   reading. */
+function payloadSkills(html){
+ const s=String(html||'');
+ const i=s.indexOf('skills:[{id:');
+ if(i<0)return[];
+ const seg=s.slice(i,i+6000);
+ const out=[];const re=/\{id:(\d+),level:(\d+),rune:(\d+),tripods:\[([0-9,]*)\]/g;let m;
+ while((m=re.exec(seg)))out.push({id:+m[1],level:+m[2],rune:+m[3],
+  tripods:m[4]?m[4].split(',').map(Number):[]});
+ return out}
 function canonicalClass(x){const m={arcana:'Arcanist',arcanist:'Arcanist',souleater:'Souleater','soul eater':'Souleater',guardianknight:'Guardianknight',glavier:'Glaivier'};const k=String(x||'').toLowerCase();return m[k]||String(x||'').replace(/\b\w/g,x=>x.toUpperCase())}
 function parse(html){const d=new DOMParser().parseFromString(html,'text/html'),t=raidText(d),full=clean(d.documentElement?.outerHTML||html),ls=t.split(/\n+/).map(clean).filter(Boolean),low=full.toLowerCase();
  const authoritative=full.match(/data-bible-authoritative-class=["']([^"']+)["']/i)?.[1]||full.match(/<[^>]*class=["'][^"']*\bclass\b[^"']*["'][^>]*>\s*([^<]+?)\s*<\//i)?.[1]||'';
@@ -106,6 +129,7 @@ function parse(html){const d=new DOMParser().parseFromString(html,'text/html'),t
  const arkPassive=arkPassiveFrom(d,clean);
  const enlightenment=enlightenmentFrom(arkPassive);
  const skills=skillsFrom(bodyText,clean);
+ const skillData=payloadSkills(html);
  /* `tripods` used to be produced by a regex loose enough to match accessory
     rows, so every character came back with the same six entries -- Necklace,
     Earring, Earring, Ring, Ring, Stone -- and that junk was flattened into the
@@ -122,7 +146,7 @@ function parse(html){const d=new DOMParser().parseFromString(html,'text/html'),t
  const sections={};
  const sectionLabels=['Gems','Skills','Tripods','Accessories','Bracelet','Ability Stone','Ark Passive','Ark Grid','Engravings'];
  for(let i=0;i<ls.length;i++){const label=ls[i].replace(/[:：]$/,'');const known=sectionLabels.find(x=>x.toLowerCase()===label.toLowerCase());if(!known)continue;const rows=[];for(let j=i+1;j<ls.length&&rows.length<80;j++){const v=ls[j];if(sectionLabels.some(x=>x.toLowerCase()===v.replace(/[:：]$/,'').toLowerCase()))break;rows.push(v)}sections[known]=rows}
- return{className,engravings:engr,grid,arkPassive,enlightenment,skills,tripods,stats,positional,burst,behavior,text:buildText,raidText:t,raidLines:ls,sections,retrievedAt:new Date().toISOString()}}
+ return{className,engravings:engr,grid,arkPassive,enlightenment,skills,skillData,tripods,stats,positional,burst,behavior,text:buildText,raidText:t,raidLines:ls,sections,retrievedAt:new Date().toISOString()}}
 async function fetchBuild(c){const r=await fetch(`${CONNECTOR}?url=${encodeURIComponent(c.url)}`,{cache:'no-store',headers:{Accept:'application/json'}});const raw=await r.text();let data;try{data=JSON.parse(raw)}catch{throw Error('Bible connector returned non-JSON data')}if(!r.ok||data.ok===false)throw Error(data.error||`HTTP ${r.status}`);return parse(data.html||data.characterHtml||data.content||data.page)}
 /* Accepts an explicit character list. Without it, the only way to refresh builds
    for anyone other than the Main Group was to overwrite the Main Group key in
@@ -146,5 +170,35 @@ async function refresh(list){let chars;
  const running=[];for(let i=0;i<Math.min(LIMIT,pending.length);i++)running.push(worker());
  await Promise.all(running);
  save(cache);window.dispatchEvent(new CustomEvent('lostark-build-profiles-v3-ready'))}
-window.LostArkBuildProfilesV3={get:url=>load()[url]||null,refresh};
+/* Bible never states which skill id is which skill: the payload has ids and the
+   markup has names, and nothing joins them. They can be joined anyway, because
+   both carry level and tripod selections -- id 49110 level 10 tripods [2,2,2] is
+   the rendered "Lv. 10 Wild Uppercut 222".
+
+   That matters because any rule about a skill has to be keyed by id (names drift
+   with translations, ids do not), and because rule sets found elsewhere use a
+   different id space entirely -- 7 digits against Bible's 5 -- so a translation
+   table is the only way to use them.
+
+   Ambiguity is left visible rather than guessed: where two equipped skills share
+   a level and a tripod code there is no way to tell which is which, so both are
+   skipped. The dictionary grows as more characters are cached, and a class with
+   distinct codes resolves completely on one profile. */
+function skillNames(){
+ const out={},cache=load();
+ for(const url of Object.keys(cache)){
+  const b=cache[url]||{};
+  const named=Array.isArray(b.skills)?b.skills:[];
+  const data=(Array.isArray(b.skillData)?b.skillData:[]).filter(s=>s&&s.level>1);
+  const key=x=>x.level+':'+(Array.isArray(x.tripods)?x.tripods.join(''):String(x.tripods||''));
+  const byKey={};
+  for(const s of data){const k=key(s);byKey[k]=byKey[k]?'AMBIGUOUS':s}
+  for(const n of named){
+   const hit=byKey[key(n)];
+   if(!hit||hit==='AMBIGUOUS')continue;
+   out[hit.id]={name:n.name,class:b.className||null};
+  }
+ }
+ return out}
+window.LostArkBuildProfilesV3={get:url=>load()[url]||null,refresh,skillNames};
 })();

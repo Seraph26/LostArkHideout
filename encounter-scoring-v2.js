@@ -65,12 +65,12 @@ function behaviorFor(cls,eng,low,bh){
  return b;
 }
 function parseClassName(v){const x=String(v||'').trim().toLowerCase();const map={arcana:'Arcanist',arcanist:'Arcanist',souleater:'Souleater',soul_eater:'Souleater',guardianknight:'Guardianknight'};return map[x]||String(v||'Unknown').trim()||'Unknown'}
-function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=parseClassName(p.class||p.className||p.characterClass||'');let position=b.positional&&b.positional!=='Unknown'?b.positional:'unknown';const bh=behaviorFor(cls,b.engravings||[],t,b.behavior||{}),runes=runeCounts(b.skills),mskills=mobilitySkillPoints(cls,b.skills);
+function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=parseClassName(p.class||p.className||p.characterClass||'');let position=b.positional&&b.positional!=='Unknown'?b.positional:'unknown';const bh=behaviorFor(cls,b.engravings||[],t,b.behavior||{}),runes=runeCounts(b.skills),mskills=mobilitySkillPoints(cls,b.skills),trip=tripodMobility(b.skillData);
  if(bh.positioning)position=bh.positioning==='back'?'Back Attack':bh.positioning==='hitmaster'?'Hit Master':bh.positioning==='front'?'Front Attack':position;
  if(position==='unknown'){if(POSITIONAL.back.test(t))position='Back Attack';else if(POSITIONAL.front.test(t))position='Front Attack';else if(POSITIONAL.hitmaster.test(t))position='Hit Master'}
  const burst=Boolean(b.burst)||bh.burstDependency==='high'||/igniter|punisher|full moon|surge|death strike|identity burst|master summoner|asura.?s path|brawl king storm|robust spirit|deathblow/i.test(t);
  const support=SUPPORT_CLASSES.has(cls);
- return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats,runes,mskills),runes,uptimePoints:uptimePoints(b.stats,runes),mobilitySkills:mskills};}
+ return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats,runes,mskills+trip.displacement),runes,uptimePoints:uptimePoints(b.stats,runes)+trip.movespeed,mobilitySkills:mskills,tripodMobility:trip};}
 /* Mobility and burst dependence were decided by class and engravings alone, so
    every character of a class scored identically no matter how they were built.
    The Ark Passive Evolution allocation is the per-character difference: 40
@@ -267,6 +267,49 @@ const MOBILITY_SKILLS={
  arcanist:{'scratch dealer':1},
  sorceress:{blink:1}
 };
+/* Mobility tripods, keyed by skill id, tier and index -- the only form that can
+   actually be checked. Bible's payload carries `tripods:[2,2,2]`, one selected
+   index per tier in tier order, so a rule matches when tripods[tier-1] equals
+   index. No name matching anywhere: names are not in the payload at all.
+
+   Displacement tripods move the character; Quick Pace and its kin raise Move
+   Speed without displacing, so they are kept apart and score on the uptime axis
+   instead, the same way Galewind and Rage do.
+
+   **These rules are currently inert, and knowingly so.** They arrived in a
+   different id space: Bible's skill ids are five digits and class-blocked
+   (25xxx Deathblade, 49xxx Guardian Knight, observed range 25040-49430, 162 of
+   them across seven characters, all five digits), while these are seven. None
+   of them appears in any real profile, so nothing here can match yet.
+
+   They are kept rather than dropped because the mechanism around them is
+   verified and the rules are the right shape; only the key is wrong. Translating
+   them needs a skill id to name mapping, which is what
+   LostArkBuildProfilesV3.skillNames() builds out of cached profiles. Once a rule
+   is rekeyed to a five-digit id it starts working with no other change. */
+const MOBILITY_TRIPODS={
+ 3802001:[{tier:1,index:2,name:'Excellent Mobility',type:'displacement'}],
+ 2821001:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'},
+          {tier:2,index:1,name:'Quick Pace',type:'movespeed'}],
+ 2424001:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'},
+          {tier:2,index:1,name:'Quick Pace',type:'movespeed'}],
+ 1711001:[{tier:1,index:3,name:'Excellent Mobility',type:'displacement'}],
+ 2020001:[{tier:1,index:1,name:'Quick Pace',type:'movespeed'},
+          {tier:3,index:1,name:'Storm Stampede',type:'displacement'}],
+ 3518001:[{tier:3,index:1,name:'Additional Maneuver',type:'displacement'}]
+};
+function tripodMobility(skillData){
+ const out={displacement:0,movespeed:0,taken:[]};
+ for(const s of (Array.isArray(skillData)?skillData:[])){
+  const rules=MOBILITY_TRIPODS[s&&s.id];
+  if(!rules)continue;
+  for(const r of rules){
+   /* A tier the skill has not unlocked yet is simply absent from the array, so
+      an undefined slot is "not taken" rather than a match. */
+   if((s.tripods||[])[r.tier-1]===r.index){out[r.type]++;out.taken.push(r.name)}
+  }
+ }
+ return out}
 function mobilitySkillPoints(cls,skills){
  const table=MOBILITY_SKILLS[String(cls||'').trim().toLowerCase()];
  if(!table)return 0;

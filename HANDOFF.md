@@ -299,9 +299,28 @@ is not there.
 Also excluded: Quick Pace, Nimble Movement and Life Absorption are Move Speed,
 not displacement, and Agile Movement is Attack Speed and not mobility at all.
 
-**What would unlock it:** the payload gives stable numeric skill ids and per-tier
-tripod indices, so a skill-id → tripod-name mapping would make rules of the form
-"skill 49110, tier 2, index 3" exact. Without that mapping, do not guess.
+**The id-keyed mechanism now exists.** `build-profile-v3.js` `payloadSkills()`
+parses `skills:[{id,level,rune,tripods:[…]}]` into `skillData`, and
+`MOBILITY_TRIPODS` in `encounter-scoring-v2.js` holds rules of the form
+`{skillId: [{tier, index, name, type}]}`, matched by `tripods[tier-1] === index`.
+No name matching at any point. Verified against a real profile: a rule at T1-2
+matched Wild Uppercut's `[2,2,2]`, a rule at T3-3 correctly did not.
+Displacement tripods feed the mobility axis, Move Speed tripods (Quick Pace and
+kin) feed the uptime axis.
+
+**Bible's skill ids are five digits and class-blocked** — 25xxx Deathblade,
+31xxx Artist, 32xxx Aeromancer, 36xxx Paladin, 37xxx Sorceress, 47xxx Breaker,
+49xxx Guardian Knight; 162 observed across seven characters, range 25040–49430,
+**all five digits**. Rule sets found elsewhere use seven-digit ids
+(`2020001`, `3518001`) which appear nowhere in real data, so **rules keyed that
+way are inert**. Check the id space before adding rules.
+
+**`LostArkBuildProfilesV3.skillNames()`** builds the translation table. Bible
+never states which id is which skill, but the payload and the markup both carry
+level and tripod selections, so they join on that: id 49110 level 10 `[2,2,2]` is
+the rendered "Lv. 10 Wild Uppercut 222". Where two equipped skills share a level
+*and* a code they are ambiguous and both skipped rather than guessed. Seven
+cached characters resolved 39 ids; it grows with every profile cached.
 
 ### Skill runes (2026-08-25)
 
