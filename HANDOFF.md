@@ -267,11 +267,45 @@ It refines an ordering rather than rewriting one.
 `bh` is the cached profile's own object — `statShaped` copies it, because
 mutating it would edit the stored build profile by reference.
 
-**Skills are parsed but not scored directly.** They reach the text-matching
-layer through `buildText`, which is now real skill and rune names rather than
-the accessory junk the old tripod regex produced. Turning runes into an uptime
-term would need evidence about what each rune does; nothing in the payload
-supplies that, so it was not invented.
+### Skill runes (2026-08-25)
+
+Runes are chosen per skill, so they say what a player built *for*. Rune effects
+came from the user, not from the payload — Bible gives only the name. Mapped:
+
+| rune | effect | term |
+|---|---|---|
+| Overwhelm | stagger damage | `staggerFactor`, weight 1 |
+| Vision | casting speed **and** stagger on hit | `staggerFactor`, weight 0.5 |
+| Wealth | identity generation | burst, same axis as Specialization |
+| Protection / Iron Wall / Mountain's Face | shield or damage taken while casting | push resilience |
+
+Vision counts half because it is a hybrid where Overwhelm buys stagger outright.
+Two or more of the defensive runes is a build choosing to survive casts; one is
+noise, so it takes two to move push resilience — likewise two Wealth for burst.
+
+**`mechanics.stagger` was in every encounter profile and read by nothing.**
+`staggerFactor` is the per-character half of it, and only ever a bonus: a build
+spending rune slots on stagger has given up damage for it, which is worth
+something on a gate with stagger checks and nothing on one without.
+
+Deliberately unmapped: Bleed, Poison and Rage are damage, which is CP's job and
+already counted; Focus, Conviction, Judgment and Purify are resource and utility
+with no term to attach to; Galewind and Quick Recharge are uptime, which lands on
+the mobility axis, left alone by request.
+
+Measured on a real lobby against Kazeros — Gate 1 (`stagger: 'high'`): the
+Overwhelm×2 support gained 1.34 points, the Overwhelm+Vision×2 character 0.69,
+a lone Vision 0.18, and characters with none were unchanged.
+
+**A rune list off the web is not necessarily complete.** The reference used here
+was headed "All Lost Ark Skill Runes" and was missing Vision, Poison and
+Mountain's Face, all of which appear on real characters. Check a parsed profile
+before trusting one.
+
+**The rune parse was verified structurally.** Bible renders each skill as a row
+of blocks — level, name, tripod digit circles, then an icon and a colour-coded
+rune span. Extracting `span.ml-2` gives the same runes in the same order as the
+flat-text parse in `skillsFrom()`, including the literal `No rune`.
 
 ## Scoring decisions the user made
 

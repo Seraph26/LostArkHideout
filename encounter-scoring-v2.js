@@ -65,12 +65,12 @@ function behaviorFor(cls,eng,low,bh){
  return b;
 }
 function parseClassName(v){const x=String(v||'').trim().toLowerCase();const map={arcana:'Arcanist',arcanist:'Arcanist',souleater:'Souleater',soul_eater:'Souleater',guardianknight:'Guardianknight'};return map[x]||String(v||'Unknown').trim()||'Unknown'}
-function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=parseClassName(p.class||p.className||p.characterClass||'');let position=b.positional&&b.positional!=='Unknown'?b.positional:'unknown';const bh=behaviorFor(cls,b.engravings||[],t,b.behavior||{});
+function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=parseClassName(p.class||p.className||p.characterClass||'');let position=b.positional&&b.positional!=='Unknown'?b.positional:'unknown';const bh=behaviorFor(cls,b.engravings||[],t,b.behavior||{}),runes=runeCounts(b.skills);
  if(bh.positioning)position=bh.positioning==='back'?'Back Attack':bh.positioning==='hitmaster'?'Hit Master':bh.positioning==='front'?'Front Attack':position;
  if(position==='unknown'){if(POSITIONAL.back.test(t))position='Back Attack';else if(POSITIONAL.front.test(t))position='Front Attack';else if(POSITIONAL.hitmaster.test(t))position='Hit Master'}
  const burst=Boolean(b.burst)||bh.burstDependency==='high'||/igniter|punisher|full moon|surge|death strike|identity burst|master summoner|asura.?s path|brawl king storm|robust spirit|deathblow/i.test(t);
  const support=SUPPORT_CLASSES.has(cls);
- return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats)};}
+ return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats,runes),runes};}
 /* Mobility and burst dependence were decided by class and engravings alone, so
    every character of a class scored identically no matter how they were built.
    The Ark Passive Evolution allocation is the per-character difference: 40
@@ -86,17 +86,75 @@ function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=pars
    factors these feed are between 0.975 and 1.012, so this refines an ordering
    rather than rewriting it. bh is the cached profile's own object, so copy it --
    mutating it would edit the stored build profile by reference. */
-function statShaped(bh,stats){
+/* Runes are chosen per skill, so they say what a player built *for* in a way
+   nothing else in the profile does. Only the ones that map to something this
+   model already knows about are used:
+
+     Overwhelm       stagger damage        -> mechanics.stagger, staggerFactor
+     Vision          stagger damage on hit -> same, at half weight
+     Wealth          identity generation   -> burst, as Specialization does
+     Protection      shield while casting  -> push resilience
+     Iron Wall       damage taken while casting
+     Mountain's Face damage taken + shield while casting
+
+   Vision counts half because it is a hybrid -- casting speed *and* stagger --
+   where Overwhelm buys stagger outright, so a build leaning on Vision has not
+   committed to stagger the way one stacking Overwhelm has.
+
+   Everything else is deliberately ignored. Bleed, Poison and Rage are damage,
+   which is CP's job and already counted. Focus, Conviction, Judgment and Purify
+   are resource and utility with no term here to attach to. Galewind and Quick
+   Recharge are uptime, which would land on the mobility axis -- left alone by
+   request. */
+const RUNE_STAGGER = /^overwhelm$/i;
+const RUNE_STAGGER_HALF = /^vision$/i;
+const RUNE_IDENTITY = /^wealth$/i;
+const RUNE_GUARD = /^(protection|iron wall|mountain'?s face)$/i;
+function runeCounts(skills){
+ const out={stagger:0,identity:0,guard:0};
+ for(const s of (Array.isArray(skills)?skills:[])){
+  const r=String(s&&s.rune||'').trim();
+  if(!r)continue;
+  if(RUNE_STAGGER.test(r))out.stagger+=1;
+  else if(RUNE_STAGGER_HALF.test(r))out.stagger+=0.5;
+  else if(RUNE_IDENTITY.test(r))out.identity++;
+  else if(RUNE_GUARD.test(r))out.guard++;
+ }
+ return out}
+/* Only ever a bonus, and only on a fight that actually asks for stagger. A
+   build carrying Overwhelm has given up a damage rune for it, which is a real
+   choice on a gate with stagger checks and worth nothing on one without. Sized
+   like the other mechanics terms in this file, which sit between 1.003 and
+   1.012. */
+function staggerFactor(count,mechanics){
+ if(!count)return 1;
+ const d=mechanics&&mechanics.stagger;
+ if(d!=='high'&&d!=='very-high')return 1;
+ const step=d==='very-high'?.005:.004;
+ return 1+Math.min(count,2)*step}
+function statShaped(bh,stats,runes){
  const dom=stats&&stats.dominant;
- if(!dom||(dom!=='swiftness'&&dom!=='specialization'))return bh;
+ const r=runes||{stagger:0,identity:0,guard:0};
+ const wantsBurst=dom==='specialization'||r.identity>=2;
+ const wantsMobility=dom==='swiftness';
+ const wantsGuard=r.guard>=2;
+ if(!wantsBurst&&!wantsMobility&&!wantsGuard)return bh;
  const out={...bh,evidence:(bh.evidence||[]).slice()};
- const points=stats[dom];
- if(dom==='swiftness'&&out.mobility!=='high'){
+ if(wantsMobility&&out.mobility!=='high'){
   out.mobility=out.mobility==='low'?'standard':'high';
-  out.evidence.push(`Swiftness ${points}/${stats.total} — mobility read up one step`);
- } else if(dom==='specialization'&&out.burstDependency!=='high'){
+  out.evidence.push(`Swiftness ${stats[dom]}/${stats.total} — mobility read up one step`);
+ }
+ if(wantsBurst&&out.burstDependency!=='high'){
   out.burstDependency='high';
-  out.evidence.push(`Specialization ${points}/${stats.total} — identity-driven burst`);
+  out.evidence.push(dom==='specialization'
+   ? `Specialization ${stats[dom]}/${stats.total} — identity-driven burst`
+   : `${r.identity} Wealth runes — identity-driven burst`);
+ }
+ /* Two or more defensive runes is a build choosing to survive casts rather than
+    shorten them, which is what push resilience means here. One is noise. */
+ if(wantsGuard&&out.pushResilience!=='high'){
+  out.pushResilience='high';
+  out.evidence.push(`${r.guard} Protection / Iron Wall runes — casts defended`);
  }
  return out}
 function mobilityFactor(level,mechanics){const m=mechanics?.movement||'low';if(level==='high')return 1;if(level==='low'){if(m==='very-high')return .975;if(m==='high')return .98;if(m==='moderate-high')return .985;if(m==='moderate')return .992}return 1}
@@ -140,6 +198,12 @@ function characterScore(c){const p=profile();if(!p)return{score:1,components:{},
  const mf=mobilityFactor(t.behavior.mobility,p.mechanics);score*=mf;components.mobility=mf;if(mf!==1)reasons.push(`${t.behavior.mobility} mobility vs ${p.mechanics?.movement||'unknown'} movement × ${mf.toFixed(3)}`);
  const bf=burstFactor(t.behavior.burstDependency,p.mechanics);score*=bf;components.buildBurst=bf;if(bf!==1)reasons.push(`Build burst dependence vs encounter windows × ${bf.toFixed(3)}`);
  const pf=pushFactor(t.behavior.pushResilience,p.mechanics);score*=pf;components.pushResilience=pf;if(pf!==1)reasons.push(`Push resilience × ${pf.toFixed(3)}`);
+ /* mechanics.stagger was carried in every encounter profile and read by nothing.
+    Skill runes are the per-character half of it: a build spending rune slots on
+    Overwhelm or Vision has given up damage for stagger, which is worth something
+    on a gate with stagger checks and nothing on one without. */
+ const stf=staggerFactor(t.runes?.stagger||0,p.mechanics);score*=stf;components.stagger=stf;
+ if(stf!==1)reasons.push(`Stagger runes vs ${p.mechanics?.stagger||'unknown'} stagger demand × ${stf.toFixed(3)}`);
  const sf=supportFactor(t,p);if(t.support){score*=sf;components.support=sf;const live=supportUptimeFactor(t.cls);if(live.source==='bible'){components.bibleSupportUptime=live.factor;if(live.weighted!==null)components.bibleWeightedUptime=live.weighted;reasons.push(`Bible support uptime × ${live.factor.toFixed(3)} (${(live.weighted*100).toFixed(1)}% weighted uptime)`)}else reasons.push(`Support encounter fit × ${sf.toFixed(3)}`)}else components.support=1;
  /* The floor was .75, which extreme content reached for every support, so real
     differences between them were flattened into one identical number. .60 leaves
