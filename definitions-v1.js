@@ -78,8 +78,9 @@ const SECTIONS=[
   `<p><strong>Estimated potential</strong> on a party is its three DPS contributions added together.</p>
    <p><strong>Combined estimated potential</strong> at the top is both parties added together. That single number is what the optimizer is trying to make as large as possible.</p>`],
 
- ['Encounter Favorability (Raid Specific only)',
-  `<p>The percentage in the top right of each card in Raid Specific mode. <strong>How much the selected fight suits that character</strong> — nothing to do with how strong they are.</p>
+ ['Encounter Spec Favorability (Raid Specific only)',
+  `<p>The percentage in the top right of each card in Raid Specific mode. <strong>How much the selected fight suits that character's spec</strong> — nothing to do with how strong they are.</p>
+   <p>It is called <em>Spec</em> favorability because the specialization does most of the work: two Souleaters read differently if one is Night's Edge and the other Full Moon Harvester. The build refines it on top — stat allocation, runes and movement skills — but only by a fraction of a point, and only where the fight asks for what the build bought. <strong>It never depends on which party the character is sitting in.</strong></p>
    <p><strong>Green means this fight suits them more than the rest of your lineup; red, less.</strong> The colour compares them against the average of the eight characters currently seated, not against a fixed number — on a punishing raid everyone's figure is low, and what matters is who copes best. Grey means they are within a third of a point of that average. The percentage itself is absolute, so it is still comparable to the numbers below.</p>
    <p><strong>100% is neutral, not perfect.</strong> Above 100% the fight plays to their kit; below it, the fight costs them uptime they would have had in a plain tank-and-spank. The scale is capped at <strong>60% to 115%</strong>, so it is a nudge, never a verdict.</p>
    <p>It is built by multiplying together, for that fight:</p>
@@ -87,11 +88,13 @@ const SECTIONS=[
     <li><strong>Position</strong> — how reliably a Back Attack, Front Attack or Hit Master character can hold their spot. A character whose position could not be determined skips this entirely.</li>
     <li><strong>Range</strong> — whether the fight rewards ranged or melee.</li>
     <li><strong>Burst windows</strong> — whether the fight has them, and whether the build needs them.</li>
-    <li><strong>Mobility</strong> — the build's movement against how much the fight makes you move.</li>
-    <li><strong>Push resilience</strong> — against forced repositioning and stagger checks.</li>
+    <li><strong>Mobility</strong> — the class's movement against how much the fight makes you move, plus a step up for a build actually carrying two or more movement skills.</li>
+    <li><strong>Build uptime</strong> — Swiftness in the Ark Passive allocation, a paired Conviction/Judgment rune combo, and speed or cooldown runes, weighed together against how much the fight moves you.</li>
+    <li><strong>Stagger runes</strong> — Overwhelm and Vision, but only on a fight that actually has stagger checks.</li>
+    <li><strong>Push resilience</strong> — against forced repositioning, raised by two or more defensive runes.</li>
     <li><strong>Support fit</strong> — supports only. An area-style, flexible support (Valkyrie, Paladin) keeps buffs on a party the fight has forced apart; a placement-sensitive one (Bard, Artist) needs the party to come to the buff and loses uptime when the fight will not allow it. The gap grows with how much the fight moves people around, and their own measured support uptime is folded in on top.</li>
    </ul>
-   <p><strong>Average Party Encounter Favorability</strong>, next to a party's encounter score, is exactly that — the average of its four characters' figures.</p>
+   <p><strong>Realised party fit</strong>, next to a party's encounter score, is <em>not</em> the average of those four figures. It weights the three DPS by their CP, so a high-scoring low-CP character cannot flatter the party, and then scales the result by that party's own support uptime — which is how the support reaches the figure, rather than being averaged in alongside the DPS. Both of those depend on who is actually in the party, so unlike the card numbers it does change when you move people between parties.</p>
    <p>Compare it across characters in the same fight, never across fights. It says which raid suits a character, not which character is better.</p>`],
 
  ['What the optimizer is actually doing',

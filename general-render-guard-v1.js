@@ -32,7 +32,7 @@ function names(){const m=new Map();const add=list=>{for(const c of list||[])if(c
  return m}
 function swapNames(before,after){if(!before||!after)return'Manual party swap';const out=[];for(const party of ['party1','party2']){const a=new Set(before.state[party]||[]),b=new Set(after.state[party]||[]);for(const id of a)if(!b.has(id))out.push(id)}if(out.length!==2)return'Manual party swap';const n=names();return`${n.get(String(out[0]))||out[0]} swapped with ${n.get(String(out[1]))||out[1]}`}
 /* Two shapes: a total, shown as its own change plus the relative percentage, and
-   a figure that is already a percentage (Average Party Encounter Favorability),
+   a figure that is already a percentage (Realised party fit),
    where the honest delta is in points -- the same wording the metrics block uses
    for its two percentage rows. */
 function arrow(delta,base,title,key,points){if(Math.abs(delta)<(points?.05:.005))return'';const up=delta>0;

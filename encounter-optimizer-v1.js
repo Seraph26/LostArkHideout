@@ -71,7 +71,7 @@ function specLabel(c,fallback){try{const a=window.LostArkSpecAuthority;if(a?.spe
    why it showed a smaller card and "unknown" where General shows Back Attack.
    The .slot class rides along only because the drag handlers and layout key
    off it. */
-/* Encounter Favorability sits on the card, top right, rather than in the hover.
+/* Encounter Spec Favorability sits on the card, top right, rather than in the hover.
    100% is neutral in the model, but on real encounters nearly every character
    sits below it, so colouring against 100 would paint every card red and say
    nothing. Colour against this lineup's own average instead: green means the
@@ -83,7 +83,7 @@ function favourability(c){try{const r=window.LostArkEncounterScoring?.characterS
    instead, and Definitions carries the detail. */
 function favBadge(c,mean){const v=favourability(c);if(v===null)return'';
  const d=Number.isFinite(mean)?v-mean:0,cls=d>=.3?'fav-good':d<=-.3?'fav-bad':'fav-even';
- return `<span class="encounter-fav ${cls}"><span class="encounter-fav-label">Encounter Favorability</span><span class="encounter-fav-value">${v.toFixed(1)}%</span></span>`}
+ return `<span class="encounter-fav ${cls}"><span class="encounter-fav-label">Encounter Spec Favorability</span><span class="encounter-fav-value">${v.toFixed(1)}%</span></span>`}
 function slotHtml(c,gs,p,mean){const g=window.LostArkGeneralModel;if(g?.member)return g.member(c,gs,p,'slot').replace(/^(<div[^>]*>)/,`$1${favBadge(c,mean)}`);const i=info(c),roleClass=i.role==='Support'?'support':'dps';return `<div class="slot party-member authoritative-member" draggable="true" data-character-id="${esc(c.id)}"><a class="party-character-link" href="${esc(i.url||'')}" target="_blank" rel="noopener noreferrer">${esc(i.name)}</a><span class="party-class-label">${esc(specLabel(c,i.cls))}</span><span class="party-role-label ${roleClass}">${esc(i.role)}</span><span class="party-stat-label">CP ${Math.round(i.cp).toLocaleString()}</span>${generalHover(c,gs,p)||'<div class="character-hover-breakdown"><strong>'+esc(i.name)+'</strong><div>CP '+Math.round(i.cp).toLocaleString()+'</div></div>'}</div>`}
 /* Same Synergies line the Main Group shows, from the same model, so the two
    modes describe a party the same way. Support uptime comes off the General
