@@ -282,7 +282,14 @@
       });
     });
     $('#sourceMainBtn').addEventListener('click', () => { G.setSource('main'); apply({ force: true }); });
-    $('#sourceLiveBtn').addEventListener('click', () => { G.setSource('live'); apply({ force: true }); });
+    /* Selecting the lobby's own fight, the same as an import does. This matters
+       more now that the dashboard always opens on the Main Group: returning to
+       a stored lobby is a normal thing to do, and leaving the dropdown on
+       whatever was picked last means optimising that lobby against the wrong
+       encounter. */
+    $('#sourceLiveBtn').addEventListener('click', () => {
+      G.setSource('live'); apply({ force: true }); autoSelectEncounter(G.meta());
+    });
 
     wireBusyState();
     apply();

@@ -278,6 +278,15 @@ came from the user, not from the payload — Bible gives only the name. Mapped:
 | Vision | casting speed **and** stagger on hit | `staggerFactor`, weight 0.5 |
 | Wealth | identity generation | burst, same axis as Specialization |
 | Protection / Iron Wall / Mountain's Face | shield or damage taken while casting | push resilience |
+| Conviction **+** Judgment | paired: cooldown window | mobility (uptime), **only when both are present** |
+
+**Conviction and Judgment are one mechanic wearing two rune slots.** Conviction
+on skill A can proc a 3s state; Judgment on skill B can consume it to open a 6s
+window; and only skills *cast inside* that window get the 15% cooldown
+reduction. Either rune alone does literally nothing, so they are counted as a
+combo — crediting them separately would score half a combo that cannot fire.
+Verified on a synthetic low-mobility build: Conviction alone 83.986, Judgment
+alone 83.986, both together 85.265 with the low-mobility penalty lifted.
 
 Vision counts half because it is a hybrid where Overwhelm buys stagger outright.
 Two or more of the defensive runes is a build choosing to survive casts; one is

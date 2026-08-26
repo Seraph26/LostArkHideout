@@ -110,8 +110,10 @@ const RUNE_STAGGER = /^overwhelm$/i;
 const RUNE_STAGGER_HALF = /^vision$/i;
 const RUNE_IDENTITY = /^wealth$/i;
 const RUNE_GUARD = /^(protection|iron wall|mountain'?s face)$/i;
+const RUNE_CONVICTION = /^conviction$/i;
+const RUNE_JUDGMENT = /^judgment$/i;
 function runeCounts(skills){
- const out={stagger:0,identity:0,guard:0};
+ const out={stagger:0,identity:0,guard:0,conviction:0,judgment:0};
  for(const s of (Array.isArray(skills)?skills:[])){
   const r=String(s&&s.rune||'').trim();
   if(!r)continue;
@@ -119,7 +121,16 @@ function runeCounts(skills){
   else if(RUNE_STAGGER_HALF.test(r))out.stagger+=0.5;
   else if(RUNE_IDENTITY.test(r))out.identity++;
   else if(RUNE_GUARD.test(r))out.guard++;
+  else if(RUNE_CONVICTION.test(r))out.conviction++;
+  else if(RUNE_JUDGMENT.test(r))out.judgment++;
  }
+ /* Conviction and Judgment are one mechanic wearing two rune slots, not two
+    buffs. Conviction on skill A can proc a 3s state; Judgment on skill B can
+    consume that state to open a 6s window; and only skills *cast inside* that
+    window get the 15% cooldown reduction. Either rune alone does nothing at
+    all, so counting them separately would credit half a combo that cannot
+    fire. */
+ out.judgmentCombo=out.conviction>0&&out.judgment>0;
  return out}
 /* Only ever a bonus, and only on a fight that actually asks for stagger. A
    build carrying Overwhelm has given up a damage rune for it, which is a real
@@ -136,13 +147,23 @@ function statShaped(bh,stats,runes){
  const dom=stats&&stats.dominant;
  const r=runes||{stagger:0,identity:0,guard:0};
  const wantsBurst=dom==='specialization'||r.identity>=2;
- const wantsMobility=dom==='swiftness';
+ /* The Judgment window is cooldown reduction, which is uptime, and uptime is the
+    mobility axis here. Deliberately the same single step Swiftness gets and
+    never additive with it: this is a chance to proc a state, then a chance to
+    consume it, then a reward only for what is cast inside six seconds. It is a
+    real build choice worth recognising, not a multiplier to stack.
+    Note it therefore changes nothing for a class already at standard or high
+    mobility, because mobilityFactor returns 1 for both -- the same limit that
+    applies to Swiftness, and it stays until that table is widened. */
+ const wantsMobility=dom==='swiftness'||r.judgmentCombo;
  const wantsGuard=r.guard>=2;
  if(!wantsBurst&&!wantsMobility&&!wantsGuard)return bh;
  const out={...bh,evidence:(bh.evidence||[]).slice()};
  if(wantsMobility&&out.mobility!=='high'){
   out.mobility=out.mobility==='low'?'standard':'high';
-  out.evidence.push(`Swiftness ${stats[dom]}/${stats.total} — mobility read up one step`);
+  out.evidence.push(dom==='swiftness'
+   ? `Swiftness ${stats[dom]}/${stats.total} — mobility read up one step`
+   : 'Conviction + Judgment runes paired — cooldown window');
  }
  if(wantsBurst&&out.burstDependency!=='high'){
   out.burstDependency='high';
