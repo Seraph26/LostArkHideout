@@ -15,13 +15,12 @@ and the worker is deployed. Verified on the live origin: all modules load, the
 panel mounts, no console errors, and the page defaults to **Main Group**, so the
 feature is inert until someone picks Live Lobby.
 
-Smoke-tested through a synthetic paste rather than a real screenshot: OCR ran,
-translated *Sennir Basin* to `[EXTREME] Brelshaza — Gate 2` (act-name map **and**
-the G2 pin), then correctly refused the import because the row count was not 8.
-**Row-level OCR accuracy on a real 8-person capture is still the one unproven
-step** — everything around it is verified.
+**Proven on real lobbies**, not just synthetically: an 8-player Kazeros — Gate 1
+and a 4-player Serca — Gate 1, both pasted into the real dashboard, both
+resolving every character and optimising. See item 4 for what each one taught.
 
-Branch: `lobby-import`. **Nothing committed, nothing pushed.**
+Branch: `lobby-import` is **merged into `main` and deleted**. Everything is
+committed and pushed; the site and the worker are both live.
 
 ---
 
@@ -32,9 +31,9 @@ Branch: `lobby-import`. **Nothing committed, nothing pushed.**
   `127.0.0.1` is a different origin and gets 403.
   Server script: `scratchpad/serve.ps1` (PowerShell `HttpListener`; there is no
   node/npx/python on this machine). Recreate if lost.
-- Preview page: `http://localhost:8777/lobby-preview.html`, **generated** from
-  `index.html` by splicing two fragments (`scratchpad/frag-markup.html`,
-  `scratchpad/frag-scripts.html`). Regenerate after any `index.html` change.
+- There is no preview page any more. The feature lives in `index.html`, so the
+  real dashboard is the test surface; `lobby-preview.html` and its wiring were
+  deleted once that landed.
 - **`requestAnimationFrame` never fires in the in-app browser pane** because it
   does not composite frames. The encounter optimizer gates `optimize()` behind
   `rAF → rAF → setTimeout`, so it sets the busy label and hangs forever. This
@@ -58,14 +57,14 @@ Branch: `lobby-import`. **Nothing committed, nothing pushed.**
 | `lobby-group-v1.js` | live-group storage, source toggle, assignment parking | `lobby-group-test.html` — **19/19** |
 | `lobby-panel-v1.js` | review table, per-row autocomplete, import | `lobby-panel-test.html` |
 | `lobby-wiring-v1.js` | the shipped integration — Party Source toggle, panel host, busy state, encounter auto-select. Inert if the markup is absent. | — |
-| `lobby-preview-wiring.js` | **superseded** by `lobby-wiring-v1.js`; kept only until `lobby-preview.html` is pruned | — |
+| `build-profile-heal-v1.js` | one-time backfill of profiles cached before Ark Passive parsed; kill switch `lostark-heal-off` | — |
 | `breaker-icon.svg`, `wildsoul-icon.svg` | class icons Fandom does not host | — |
 
-## Tracked files changed (uncommitted)
+## Tracked files changed — all committed and pushed
 
 | file | change |
 |---|---|
-| `worker/src/index-support-v2.js` | **`/search` route** + **`validBibleUrl` fix**. Version bumped to `2026-08-25-search-and-name-fix`. **NOT DEPLOYED.** |
+| `worker/src/index-support-v2.js` | **`/search` route** + **`validBibleUrl` fix**. **Deployed**, live as `2026-08-25-search-and-name-fix`. |
 | `candidate-roster-v1.js` | the roster seam — `allCharacters()` returns the live group when active. Inert otherwise. |
 | `app-fixed.js` | `render()` draws whichever roster is selected; exposes `window.LostArkDashboard.render()` |
 | `class-icon-authority-v1.js` | Breaker registered; Wildsoul repointed off Fandom; `alt` ternary replaced with `DISPLAY_NAMES` lookup |
@@ -73,12 +72,20 @@ Branch: `lobby-import`. **Nothing committed, nothing pushed.**
 | `visits.js` | cache-bust for the icon authority |
 
 `index.html` now carries the Party Source markup, the import section, one extra
-`<style>` block and seven `<script>` tags at `?v=20260825lobby1`. The lobby
-section is inserted **before** "Add a specific character"; the wiring no longer
-depends on that order, it selects `.import-panel:not(.lobby-import-section)`.
+`<style>` block and the lobby `<script>` tags. Those carry `?v=` cache busters
+which have been bumped many times since — read the file for the current values
+rather than trusting a number written here. The lobby section is inserted
+**before** "Add a specific character"; the wiring no longer depends on that
+order, it selects `.import-panel:not(.lobby-import-section)`.
 
-`lobby-preview.html` and `lobby-preview-wiring.js` are now redundant — the real
-page is the test surface. Kept pending a deliberate prune.
+Beyond this table, today's work also touched `encounter-scoring-v2.js`,
+`build-profile-v3.js`, `build-profile-v2.js`, `ui-fixes-clean.js`,
+`build-spec-display-v1.js` and `class-data-v1.js`. Those changes are described
+in `HANDOFF.md` rather than here, because they are about scoring and class data
+rather than about importing a lobby.
+
+`lobby-preview.html` and `lobby-preview-wiring.js` were deleted once this
+landed; the real page is the test surface.
 
 ---
 
@@ -238,9 +245,20 @@ account-wide data.
    The winner is still confirmed by fetching the profile, so the result was
    `resolved`, not merely guessed — the profile matched the lobby exactly.
 
-   Still untested: multi-accent names, CE lobbies (user has no EU characters;
-   de-risked analytically), and Machinist's *other* spec, which will report
-   itself through `gaps()` the first time one is imported.
+   **Multi-accent names are proven too.** A third lobby carried `Sorrëngail`,
+   `Ãndraxxus` and `Kallisti`, all recovered automatically by the de-accented
+   search. The one failure in it was `Cûjô`, read as `Cajó` — an error in the
+   *second* character, and Bible's search is strictly prefix matching (`ujo`
+   returns only `Ujo*`), so no query derivable from the misreading can reach the
+   character. That one cannot be automated; correcting the name by hand is the
+   path, which is why the autocomplete now sorts the item-level match to the top
+   — `cujo` returns nine accent variants and exactly one sits at the row's item
+   level.
+
+   Still untested: **CE lobbies** (user has no EU characters; de-risked
+   analytically) and **Machinist's second spec**, Arthetinean Skill, which was
+   supplied by the user rather than read off a profile and will confirm itself
+   through `gaps()` the first time one is imported.
 5. ~~**Deferred until the feature is finished**~~ — **done 2026-08-25.**
    `HANDOFF.md` has a new **Live Lobby Import** section, and item 9 is now a
    full **new-class checklist** — eight steps with exact file locations, worked
