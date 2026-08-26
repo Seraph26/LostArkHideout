@@ -129,11 +129,18 @@
     if (!meta) return;
     const fire = node => node.dispatchEvent(new Event('change', { bubbles: true }));
 
+    /* Set, but deliberately without firing change. The General optimizer reads
+       this select's value live, so the session behaves correctly either way --
+       but its change handler *persists* the choice, and that is a Main Group
+       preference. A borrowed 4-player lobby has no business leaving someone's
+       own dashboard stuck on "4-player · 1 party" afterwards; the Main Group is
+       untouched by an import, and that has to include its settings. Their own
+       preference comes back on the next load. */
     const format = $('#generalFormatSelect');
     if (format && meta.players) {
       const want = String(meta.players);
       if ([...format.options].some(o => o.value === want) && format.value !== want) {
-        format.value = want; fire(format);
+        format.value = want;
       }
     }
 

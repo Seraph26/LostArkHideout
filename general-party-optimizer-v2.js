@@ -183,6 +183,10 @@ function installFormat(){
   const st=partyState();if(st.party1.length||st.party2.length)render(st,false)});
  document.getElementById('generalOptimization')?.addEventListener('change',sync);
  document.getElementById('raidSpecificSelect')?.addEventListener('change',sync);
+ /* raid-selector-v1.js restores the saved mode by assigning `checked`, which
+    fires no change event, so this listened to nothing when the page loaded
+    straight into Raid Specific and the control stayed on screen. */
+ window.addEventListener('lostark-optimizer-mode-applied',sync);
  sync();
 }
 function install(){installFormat();const b=document.getElementById('optimizeBtn'),h=document.getElementById('suggestedParties');if(!b||!h||h.dataset.generalV3)return;h.dataset.generalV3='1';const active=()=>window.LostArkOptimizerMode?.general!==false;

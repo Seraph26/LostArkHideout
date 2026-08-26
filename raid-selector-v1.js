@@ -8,7 +8,16 @@ function state(){try{return {...DEFAULT,...JSON.parse(localStorage.getItem(MODE)
 function save(s){localStorage.setItem(MODE,JSON.stringify(s))}
 function controls(){return{select:document.getElementById('raidSpecificSelect'),general:document.getElementById('generalOptimization'),label:document.getElementById('optimizerModeLabel')}}
 function setModeText(s){const c=controls();if(c.label)c.label.textContent=s.general?'General Optimization':'Raid Specific Optimization'}
-function apply(s){const c=controls();if(!c.select||!c.general)return;c.general.checked=!!s.general;c.select.value=s.raid||'';c.select.disabled=!!s.general;setModeText(s);window.LostArkOptimizerMode=s}
+/* Restoring the saved mode sets `checked` directly, which fires no change event,
+   so anything listening for one never learns the mode moved. The General format
+   control hid itself on change alone and therefore stayed visible whenever this
+   ran after it installed -- a "4-player · 1 party" selector sitting next to an
+   8-player raid, contradicting the two parties actually rendered.
+
+   A custom event rather than a synthetic `change`: raid-selector itself saves on
+   change, so dispatching one here would feed its own listener. */
+function apply(s){const c=controls();if(!c.select||!c.general)return;c.general.checked=!!s.general;c.select.value=s.raid||'';c.select.disabled=!!s.general;setModeText(s);window.LostArkOptimizerMode=s;
+ try{window.dispatchEvent(new CustomEvent('lostark-optimizer-mode-applied',{detail:s}))}catch{}}
 function addGroup(select,label,items){if(!items.length)return;const g=document.createElement('optgroup');g.label=label;for(const x of items){const o=document.createElement('option');o.value=x.id;o.textContent=x.label;o.dataset.boss=x.boss||'';o.dataset.difficulty=x.difficulty||'';o.dataset.schema=x.schema||'';o.dataset.gate=x.gate==null?'':String(x.gate);o.dataset.sourceGroup=x.sourceGroup||'';o.dataset.kind=x.kind||'raid';o.dataset.players=String(Number(x.players)===4?4:8);g.appendChild(o)}select.appendChild(g)}
 async function loadManifest(){const r=await fetch(MANIFEST+'?v='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('Raid manifest unavailable');return r.json()}
 function encounterFromOption(o){return o?{id:o.value,label:o.textContent,boss:o.dataset.boss,difficulty:o.dataset.difficulty,schema:o.dataset.schema,gate:o.dataset.gate?Number(o.dataset.gate):null,sourceGroup:o.dataset.sourceGroup,kind:o.dataset.kind,players:Number(o.dataset.players)===4?4:8}:null}

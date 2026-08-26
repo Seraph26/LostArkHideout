@@ -144,6 +144,23 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
     modes cannot drift apart. Do not reintroduce a raid-side card template.
   - `window.LostArkSpecAuthority = {specFor, className}` from `ui-fixes-clean.js`
   Raid uses both for its card labels and hovers. The General model's support uptime already consults the selected encounter, so its numbers are encounter-aware.
+- **Restoring the saved mode fires no `change` event.** `raid-selector-v1.js`
+  `apply()` assigns `general.checked` directly, so anything wired only to
+  `change` never learns the mode moved. That is how the General **Format**
+  control came to sit visible next to an 8-player raid reading "4-player · 1
+  party": it hid itself on `change` alone, and on a page that loaded straight
+  into Raid Specific, `apply()` ran after it installed. `apply()` now dispatches
+  **`lostark-optimizer-mode-applied`** and `installFormat()` listens for it.
+  Use that event for anything that must track the mode; do not dispatch a
+  synthetic `change` from `apply()`, because raid-selector saves on change and
+  would feed its own listener.
+- **A lobby import must not persist Main Group settings.** `autoSelectEncounter()`
+  sets the Format select to the lobby's player count but deliberately does **not**
+  fire `change`, because the change handler persists it — and a borrowed
+  4-player lobby was leaving the dashboard stuck on 4-player afterwards. The
+  General optimizer reads the select live, so the session is still correct; the
+  user's own preference returns on the next load. "The Main Group is untouched"
+  has to include its settings.
 - **Party size**: `raid-encounters.json` carries `players` (4 or 8). Horizon Cathedral and Serca are 4-player. General has its own `#generalFormatSelect` (8-player / 4-player), hidden while Raid Specific is selected, persisted in `lostark-hideout-general-format-v1`.
 
 ## Live Lobby Import
