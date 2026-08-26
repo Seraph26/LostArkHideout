@@ -48,6 +48,16 @@ function workedExample(){
 }
 
 const SECTIONS=[
+ /* Deliberately the first thing in the panel. Everything after it is a number
+    with a decimal point, which reads as more certain than it is; this says what
+    those numbers structurally cannot contain before anyone starts trusting
+    them. */
+ ['Read this first — what it cannot see',
+  `<p>This reads characters, not players. Gear, engravings, Ark Passive, tripods, runes — everything a character carries, and <strong>nothing about who is holding it</strong>.</p>
+   <p><strong>It cannot see that people play better together.</strong> Two players who have run a gate for months cover each other's mistakes, pre-position without being asked, and hold a stagger check that a better-geared pair of strangers will drop. A static that knows its own rhythm beats a stronger group of people meeting for the first time, and none of that is on a character page for this to find.</p>
+   <p><strong>It cannot see hands.</strong> It scores what a build could do if played properly. It has no idea whether the person will hit their back attacks, dodge the wipe mechanic, or press their awakening at the right time. A perfect character sheet and no hands is still a wipe.</p>
+   <p>So use it for what it is good at — spotting that a support is wasted in one party, or that a fight punishes a build you had not thought about. Then apply what you know that it cannot. <strong>If two arrangements are within a couple of points and one of them is the group that actually plays well together, take that one.</strong> The model will not mind.</p>`],
+
  ['What this whole thing is for',
   `<p>You have more characters than seats. This tool tries every legal way to split them into parties and keeps the arrangement where the group as a whole hits hardest.</p>
    <p>Every number below is an <strong>estimate from a model</strong>, not a damage meter reading. It is for comparing arrangements against each other. It is not a prediction of your DPS in a real raid.</p>`],
@@ -121,6 +131,7 @@ const SECTIONS=[
    <li>It is <strong>not</strong> in-game DPS, and not a log parse.</li>
    <li>Contribution is <strong>not</strong> a property of a character. It only exists relative to the party they are in.</li>
    <li>Two arrangements a fraction of a percent apart are, in practice, a tie. Pick whichever you prefer to play.</li>
+   <li>It is <strong>not</strong> a judgement on the players. It never sees them — see "Read this first" at the top.</li>
   </ul>`]
 ];
 
