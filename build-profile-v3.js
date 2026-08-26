@@ -53,11 +53,33 @@ function gridFrom(body,clean){const out=[];let m;
  const re=/([A-Za-z][A-Za-z' -]{1,30}?)\s+(\d+)\s*\|\s*(Order|Chaos)\s+(Sun|Moon|Star)/g;
  while((m=re.exec(body)))out.push({name:clean(m[1]),points:+m[2],type:m[3],branch:m[4]});
  return out}
-/* Combat stats read as "Crit +92", never "Crit 92", which is why the old
-   `crit\s+(\d+)` never matched one. */
-function statsFrom(body){const out={crit:null,specialization:null,swiftness:null};let m;
- const re=/(Crit|Specialization|Swiftness)\s*\+\s*(\d+)/g;
- while((m=re.exec(body)))out[m[1].toLowerCase()]=+m[2];
+/* The profile page carries no combat-stat totals at all. Reading "Crit +92" off
+   it looked right and was not: that is a *bracelet* roll, one item's line rather
+   than the character's build, and adjacent text runs into the numbers there
+   ("Weapon Power +90" followed by "00 Outgoing" parsed as +9000).
+
+   The real allocation is in the Ark Passive Evolution block, whose first-tier
+   nodes are literally the stats -- "T1 Crit Lv. 16", "T1 Swiftness Lv. 24" --
+   and which summed to exactly 40 on every character checked. That is the
+   allocation itself, per character, which is what tells two Sorceresses apart. */
+const STAT_NODE = /^(crit|swiftness|specialization|domination|endurance|expertise)$/;
+function statsFrom(nodes){
+ const out={crit:null,specialization:null,swiftness:null};
+ let total=0;
+ for(const n of nodes||[]){
+  const k=String(n?.name||'').trim().toLowerCase();
+  if(!STAT_NODE.test(k))continue;
+  const lv=Number(n.level);
+  if(!Number.isFinite(lv))continue;
+  out[k]=lv; total+=lv;
+ }
+ out.total=total;
+ /* The dominant stat, and only when it is a real commitment rather than a
+    rounding accident. 24 of 40 is 60%: Kumamagic's 22/12/6 spread is not a
+    Crit build in any meaningful sense, and should not be treated as one. */
+ const named=Object.keys(out).filter(k=>k!=='total'&&Number.isFinite(out[k]));
+ const top=named.sort((a,b)=>out[b]-out[a])[0];
+ out.dominant=(top&&out[top]>=24)?top:null;
  return out}
 /* "Lv. 10 Wild Uppercut 222 Quick Recharge" -- level, skill, tripod selections,
    rune. The rune is absent as the literal "No rune", which has to be stripped
@@ -90,7 +112,7 @@ function parse(html){const d=new DOMParser().parseFromString(html,'text/html'),t
     text the optimizers pattern-match against. Carry the real skills instead,
     keeping the {skill, name} shape the existing consumers read. */
  const tripods=skills.map(s=>({skill:s.name,name:s.rune||s.tripods||'',tier:s.tripods||''}));
- const stats=statsFrom(bodyText);
+ const stats=statsFrom(arkPassive);
  const positional=engr.some(x=>/ambush master/i.test(x))?'Back Attack':engr.some(x=>/master brawler/i.test(x))?'Front Attack':engr.some(x=>/hit master/i.test(x))?'Hit Master':/back attack/.test(low)?'Back Attack':/front attack/.test(low)?'Front Attack':'Unknown';
  const burst=/(igniter|punisher|full moon|burst|death strike|surge|identity burst|master summoner|asura.?s path|brawl king storm)/i.test(t);
  const classMatch=low.match(/\b(berserker|destroyer|gunlancer|paladin|slayer|valkyrie|arcanist|arcana|bard|sorceress|summoner|glaivier|glavier|scrapper|soulfist|striker|wardancer|breaker|artillerist|deadeye|machinist|sharpshooter|gunslinger|deathblade|shadowhunter|reaper|souleater|soul eater|artist|aeromancer|wildsoul|guardianknight)\b/i);

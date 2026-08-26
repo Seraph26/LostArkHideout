@@ -68,6 +68,15 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
   `Crit 92`; skills read `Lv. 10 Wild Uppercut 222 Quick Recharge`, where an
   absent rune is the literal `No rune` and must be stripped before matching or
   the name capture stops early and the rune swallows the rest of it.
+- **There are no combat-stat totals on the profile page.** "Crit +92" is a
+  *bracelet* roll — one item's line, not the character's build — and numbers there
+  run into adjacent text (`Weapon Power +90` followed by `00 Outgoing` parsed as
+  `+9000`). `stats` was read that way and was meaningless; do not go back to it.
+  The real allocation is the Ark Passive **Evolution** block, whose first-tier
+  nodes are literally the stats (`T1 Crit Lv. 16`, `T1 Swiftness Lv. 24`) and
+  which summed to exactly **40** on every character checked. `stats` now carries
+  `{crit, specialization, swiftness, total, dominant}` from there, with
+  `dominant` set only at **24 of 40** — a 22/12/6 spread is not a Crit build.
 - **`sections` is still empty** and nothing reads it. Left alone deliberately.
 - **`tripods` used to be junk.** A regex loose enough to match accessory rows
   gave every character the same six entries — Necklace, Earring, Earring, Ring,
@@ -225,6 +234,38 @@ Also: `text()`/`build()` in the General optimizer and `build()`/`info()` in the 
 
 Own CP ~60%, party synergy ~30%, support impact ~10%, build completeness <1%.
 Supports score 0 contribution individually by design — their value is inside the DPS numbers.
+
+## Stat allocation feeds encounter fit (2026-08-25)
+
+`traits()` in `encounter-scoring-v2.js` used to take mobility and burst
+dependence from **class and engravings alone**, so every character of a class
+scored identically however they were built. `statShaped()` now refines that from
+the Ark Passive Evolution allocation:
+
+- **Swiftness** dominant → mobility reads one step up. Swiftness is cooldown and
+  attack/move speed, i.e. uptime while a fight moves you, which is what
+  `mobilityFactor` already models. Note this only changes anything for a class
+  whose behaviour is `low`, because `mobilityFactor` returns 1 for both
+  `standard` and `high`.
+- **Specialization** dominant → burst dependence reads `high`. Specialization
+  drives the identity gauge, which is burst, which is what `burstFactor` models.
+- **Crit** deliberately changes nothing. It is damage rather than fit, and it
+  already reaches the optimizer through CP.
+
+One step, never more, never downward, and only at a dominant 24 of 40. Measured
+on a real lobby against Kazeros — Gate 1: Etto and Haylebrella (both
+Specialization 30) gained 0.67 and 0.74 points, Chargesforheals (Swiftness 30)
+gained 0.16, and the Crit-dominant and no-dominant characters were unchanged.
+It refines an ordering rather than rewriting one.
+
+`bh` is the cached profile's own object — `statShaped` copies it, because
+mutating it would edit the stored build profile by reference.
+
+**Skills are parsed but not scored directly.** They reach the text-matching
+layer through `buildText`, which is now real skill and rune names rather than
+the accessory junk the old tripod regex produced. Turning runes into an uptime
+term would need evidence about what each rune does; nothing in the payload
+supplies that, so it was not invented.
 
 ## Scoring decisions the user made
 

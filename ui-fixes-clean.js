@@ -34,7 +34,11 @@ function specFor(p,b){
     Combat Mode, Zero Core Energy, Zero Mode). The class's other spec is
     unverified and deliberately not guessed at; it will report itself through
     gaps() the first time one is imported. */
- machinist:[['evolutionary legacy','Evolutionary Legacy']]};
+ /* Needle is the bare "arthetinean" because the node may render as either
+    "Arthetinean" or "Arthetinean Skill"; the label is the full spec name either
+    way. Supplied by the user rather than read off a profile -- no Arthetinean
+    Machinist has come through yet, and gaps() will stay quiet once one does. */
+ machinist:[['evolutionary legacy','Evolutionary Legacy'],['arthetinean','Arthetinean Skill']]};
  /* The specialization comes from Bible's Ark Passive Enlightenment nodes, and
     only from there. That is where a spec actually lives, so anything else is a
     guess dressed up as data -- searching the whole flattened page produced

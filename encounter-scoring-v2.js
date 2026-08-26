@@ -70,7 +70,35 @@ function traits(c){const t=text(c),p=c?.profile||c?.data||{},b=build(c),cls=pars
  if(position==='unknown'){if(POSITIONAL.back.test(t))position='Back Attack';else if(POSITIONAL.front.test(t))position='Front Attack';else if(POSITIONAL.hitmaster.test(t))position='Hit Master'}
  const burst=Boolean(b.burst)||bh.burstDependency==='high'||/igniter|punisher|full moon|surge|death strike|identity burst|master summoner|asura.?s path|brawl king storm|robust spirit|deathblow/i.test(t);
  const support=SUPPORT_CLASSES.has(cls);
- return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:bh};}
+ return{cls,position:String(position).toLowerCase().replace(/\s+/g,''),positionLabel:position,burst,support,ranged:CLASS_RANGED.has(cls),behavior:statShaped(bh,b.stats)};}
+/* Mobility and burst dependence were decided by class and engravings alone, so
+   every character of a class scored identically no matter how they were built.
+   The Ark Passive Evolution allocation is the per-character difference: 40
+   points, and a dominant stat only counts here at 24 of them.
+
+   Swiftness is cooldown and attack/move speed, which is uptime while a fight
+   moves you -- exactly what mobilityFactor already models. Specialization drives
+   the identity gauge, which is burst, which is what burstFactor models. Crit is
+   damage rather than fit and deliberately changes nothing: it belongs to CP,
+   which the optimizer already counts separately.
+
+   One step, never more, and only upward from what the class implies. The
+   factors these feed are between 0.975 and 1.012, so this refines an ordering
+   rather than rewriting it. bh is the cached profile's own object, so copy it --
+   mutating it would edit the stored build profile by reference. */
+function statShaped(bh,stats){
+ const dom=stats&&stats.dominant;
+ if(!dom||(dom!=='swiftness'&&dom!=='specialization'))return bh;
+ const out={...bh,evidence:(bh.evidence||[]).slice()};
+ const points=stats[dom];
+ if(dom==='swiftness'&&out.mobility!=='high'){
+  out.mobility=out.mobility==='low'?'standard':'high';
+  out.evidence.push(`Swiftness ${points}/${stats.total} — mobility read up one step`);
+ } else if(dom==='specialization'&&out.burstDependency!=='high'){
+  out.burstDependency='high';
+  out.evidence.push(`Specialization ${points}/${stats.total} — identity-driven burst`);
+ }
+ return out}
 function mobilityFactor(level,mechanics){const m=mechanics?.movement||'low';if(level==='high')return 1;if(level==='low'){if(m==='very-high')return .975;if(m==='high')return .98;if(m==='moderate-high')return .985;if(m==='moderate')return .992}return 1}
 function burstFactor(level,mechanics){const w=mechanics?.burstWindows||'low';if(level==='high'){if(w==='very-high')return 1.012;if(w==='high')return 1.008;if(w==='moderate')return 1.003}return 1}
 function pushFactor(level,mechanics){if(level==='high'&&mechanics?.forcedPositioning==='very-high')return 1.005;return 1}
