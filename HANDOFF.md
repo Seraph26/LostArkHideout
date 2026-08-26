@@ -50,6 +50,12 @@ wrapper/bridge scripts on top of working code. Rules that still apply:
 
 ## Data / Bible facts (hard-won)
 
+- **Search returns Korean internal class ids, not Western class names.** A
+  Gunslinger comes back as `devil_hunter_female` and a Deathblade as `blade`,
+  which the lobby autocomplete printed raw. `CLASS_ID_TO_NAME` in
+  `class-data-v1.js` already held that kind of alias (`dragon_knight`,
+  `holyknight_female`, `weather_artist`) and now covers these too. An id nobody
+  has mapped still renders readably and warns once, naming the id.
 - **Bible's search index lags its own profile pages.** `/search` reported Kingqi
   at **1732.50** while his profile page said **1736.67** — the live figure, and
   the one the party finder showed. So an item level from *search* is a proximity

@@ -63,6 +63,27 @@
     document.head.appendChild(s);
   }
 
+  /* Bible's search returns internal class ids -- Korean class names -- so a
+     Gunslinger candidate read "devil hunter female" and a Deathblade read
+     "blade". Translate through the class-data authority, which already holds
+     that kind of alias. An id nobody has mapped yet still shows something
+     readable, and says so once, so it can be added rather than quietly
+     confusing the next person choosing between accent variants. */
+  const unknownClassIds = new Set();
+  function classLabel(id) {
+    const raw = String(id || '');
+    if (!raw) return '';
+    let name = '';
+    try { name = window.LostArkHideoutClassData?.canonical?.(raw) || ''; } catch {}
+    if (name) return name;
+    if (!unknownClassIds.has(raw)) {
+      unknownClassIds.add(raw);
+      try { console.warn('[lobby] unmapped Bible class id "' + raw +
+        '". Add it to CLASS_ID_TO_NAME in class-data-v1.js.'); } catch {}
+    }
+    return raw.replace(/_/g, ' ');
+  }
+
   /* One row per slot, phrased so the reason is visible rather than implied. */
   const TAGS = {
     direct:                 ['lp-ok',   'read correctly'],
@@ -243,7 +264,18 @@
           if (!list.length) {
             menu.appendChild(el('div', 'lp-s-empty', 'No matches. Character search is unavailable.'));
           } else {
-            list.slice(0, 10).forEach(c => {
+            /* Item level decides which of these is the right person, so the one
+               that matches goes first instead of wherever Bible happened to
+               rank it. This is the accent-squatting case: "cujo" returns nine
+               live variants of one name -- Cújó, Cûjo, Cüjó, Cüjô, Çüjo, Cujó,
+               Cûjô, Cüjo, Cüjö -- differing only by diacritics, and exactly one
+               of them is at the row's item level. Buried seventh in that list it
+               is a puzzle; first, it is a click. Order is otherwise untouched. */
+            const ranked = list.slice(0, 10)
+              .map((c, i) => ({ c, i, hit: api.ilvlMatches(c.itemLevel, r.slot.ilvl) }))
+              .sort((a, b) => (b.hit - a.hit) || (a.i - b.i))
+              .map(x => x.c);
+            ranked.forEach(c => {
               const b = el('button');
               b.type = 'button';
               b.appendChild(el('span', null, c.name));
@@ -252,7 +284,7 @@
                  compare numbers by eye. */
               const hit = api.ilvlMatches(c.itemLevel, r.slot.ilvl);
               const meta = el('span', 'lp-s-meta' + (hit ? ' lp-s-hit' : ''),
-                (c.classId ? c.classId.replace(/_/g, ' ') + ' · ' : '') +
+                (c.classId ? classLabel(c.classId) + ' · ' : '') +
                 (Number.isFinite(Number(c.itemLevel)) ? api.round2(c.itemLevel) : '?') +
                 (hit ? '  ← matches this row' : ''));
               b.appendChild(meta);

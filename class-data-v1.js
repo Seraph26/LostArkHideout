@@ -6,7 +6,14 @@
     artillerist:'Artillerist', deadeye:'Deadeye', machinist:'Machinist', sharpshooter:'Sharpshooter', gunslinger:'Gunslinger',
     deathblade:'Deathblade', shadowhunter:'Shadowhunter', reaper:'Reaper', soul_eater:'Souleater', souleater:'Souleater',
     artist:'Artist', aeromancer:'Aeromancer', wildsoul:'Wildsoul', dragon_knight:'Guardianknight', holyknight:'Paladin', holyknight_female:'Paladin',
-    weather_artist:'Aeromancer', yinyangshi:'Yinyangshi', alchemist:'Alchemist'
+    weather_artist:'Aeromancer', yinyangshi:'Yinyangshi', alchemist:'Alchemist',
+    /* Bible's search returns its internal class ids, which are the Korean class
+       names rather than the Western ones, so an autocomplete row read
+       "devil hunter female" for a Gunslinger. Same shape as the holyknight /
+       holyknight_female pair already above. Deathblade is "Blade" there, seen on
+       a real candidate; Deadeye is the male Devil Hunter to Gunslinger's
+       female. Anything still unmapped reports itself -- see the panel. */
+    devil_hunter_female:'Gunslinger', devil_hunter:'Deadeye', blade:'Deathblade'
   };
   // Bible roster Souleater SVG. The original viewBox contains large transparent
   // margins, making the rendered icon look smaller than the other class icons.
